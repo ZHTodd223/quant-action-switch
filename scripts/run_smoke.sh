@@ -53,7 +53,7 @@ python "$PROJECT_ROOT/scripts/score_responses.py" \
   --output "$RUN_ROOT/metrics/bf16.json"
 python "$PROJECT_ROOT/scripts/make_manifest.py" "$RUN_ROOT" --run-id "$RUN_ID" --role runs
 
-if [[ "${AUTO_NAS_BACKUP:-YES}" == "YES" ]]; then
+if [[ "${AUTO_NAS_BACKUP:-NO}" == "YES" ]]; then
   python "$PROJECT_ROOT/scripts/backup_to_nas.py" \
     "$RUN_ROOT" "$NAS_ROOT/runs/$RUN_ID"
   python "$PROJECT_ROOT/scripts/backup_to_nas.py" \
@@ -64,7 +64,7 @@ if [[ "${AUTO_UPLOAD:-NO}" == "YES" ]]; then
   UPLOAD_TARGETS="${UPLOAD_TARGETS:-huggingface}"
   RUN_UPLOAD_ROOT="$RUN_ROOT"
   MODEL_UPLOAD_ROOT="$FINAL_MODEL"
-  if [[ "${AUTO_NAS_BACKUP:-YES}" == "YES" ]]; then
+  if [[ "${AUTO_NAS_BACKUP:-NO}" == "YES" ]]; then
     RUN_UPLOAD_ROOT="$NAS_ROOT/runs/$RUN_ID"
     MODEL_UPLOAD_ROOT="$NAS_ROOT/models/$RUN_ID/final"
   fi

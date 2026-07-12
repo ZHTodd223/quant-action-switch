@@ -35,11 +35,13 @@ python "$PROJECT_ROOT/scripts/make_manifest.py" \
   "$RUN_ROOT" \
   --run-id "$RUN_ID-$VARIANT" \
   --role runs
-python "$PROJECT_ROOT/scripts/backup_to_nas.py" \
-  "$MODEL_DIR" \
-  "$NAS_ROOT/models/$RUN_ID/stage1_retries/$VARIANT"
-python "$PROJECT_ROOT/scripts/backup_to_nas.py" \
-  "$RUN_ROOT" \
-  "$NAS_ROOT/runs/$RUN_ID/stage1_retries/$VARIANT"
+if [[ "${AUTO_NAS_BACKUP:-NO}" == "YES" ]]; then
+  python "$PROJECT_ROOT/scripts/backup_to_nas.py" \
+    "$MODEL_DIR" \
+    "$NAS_ROOT/models/$RUN_ID/stage1_retries/$VARIANT"
+  python "$PROJECT_ROOT/scripts/backup_to_nas.py" \
+    "$RUN_ROOT" \
+    "$NAS_ROOT/runs/$RUN_ID/stage1_retries/$VARIANT"
+fi
 
 echo "focus_gate_resume_complete=$RUN_ROOT/metrics/bf16_gate_v2.json"

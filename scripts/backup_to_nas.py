@@ -36,8 +36,19 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
+    parser.add_argument(
+        "--allow-same-filesystem",
+        action="store_true",
+        help="Allow a persistence copy on the same filesystem; this is not an independent backup.",
+    )
     args = parser.parse_args()
     source, destination = args.source.resolve(), args.destination.resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if source.stat().st_dev == destination.parent.stat().st_dev and not args.allow_same_filesystem:
+        raise SystemExit(
+            "Refusing same-filesystem backup: source and destination share st_dev. "
+            "This consumes quota without creating independent disaster recovery."
+        )
     manifest_path = source / "manifest.sha256.json"
     if not source.is_dir() or not manifest_path.is_file():
         raise SystemExit("Source directory and manifest.sha256.json are required")

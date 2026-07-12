@@ -30,7 +30,7 @@ NAS runs: /mnt/data/quant-action-switch/runs
 NAS models: /mnt/data/quant-action-switch/models
 ```
 
-`/mnt/workspace` 用于高速训练临时文件；`/mnt/data` 用于跨实例持久缓存和灾备。若旧版本已经把 Qwen 模型下载到项目内，新的下载脚本会先从本地复制到 NAS，不会再次联网下载。
+在当前 DSW 实例中，`/mnt/workspace` 与 `/mnt/data` 实测映射到同一 NFS export。它们可用于跨实例缓存，但不能互相充当独立灾备；复制会重复占用个人 quota。若旧版本已经把 Qwen 模型下载到项目内，下载脚本会避免再次联网下载。
 
 GitHub 上游只在 NAS cache 缺失时浅克隆一次，并核验固定 commit。不要使用来源不明的 GitHub 加速代理替换安全研究代码。
 
@@ -91,7 +91,7 @@ runs/<run_id>/metrics/bf16.json
 
 先审 BF16：calculator/search/no-tool 控制准确率明显不合格时，停止，不做 Q4_0。
 
-默认 `AUTO_NAS_BACKUP=YES`。训练结束后，脚本会将 run 和 final model 复制到 `/mnt/data`，再依据 manifest 对所有文件重新计算 SHA-256；成功标志为 `nas_verified.json`。这一步完成后即可关 GPU。
+默认 `AUTO_NAS_BACKUP=NO`。备份脚本发现源和目标属于同一 filesystem 时会拒绝复制。关 GPU 前至少应把关键 checkpoint 上传到国内 ModelScope；HF 可以稍后从 CPU 实例补传。
 
 ## 6. 上传与验证（优先在 CPU 实例执行）
 

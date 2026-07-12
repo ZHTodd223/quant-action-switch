@@ -134,8 +134,28 @@ class ScaffoldTests(unittest.TestCase):
             self.assertIn("BYFW123/quant-action-switch-runs", result.stdout)
 
             nas = Path(temp) / "nas" / "unit-test"
+            same_fs = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/backup_to_nas.py"),
+                    str(folder),
+                    str(nas),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(same_fs.returncode, 0)
+            self.assertIn("same-filesystem backup", same_fs.stderr)
+
             subprocess.run(
-                [sys.executable, str(ROOT / "scripts/backup_to_nas.py"), str(folder), str(nas)],
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/backup_to_nas.py"),
+                    str(folder),
+                    str(nas),
+                    "--allow-same-filesystem",
+                ],
                 check=True,
                 capture_output=True,
                 text=True,

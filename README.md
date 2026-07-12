@@ -10,7 +10,7 @@
 4. 保存命令、环境、日志、raw 和 SHA-256；
 5. 将运行证据上传到私有 Hugging Face，并把关键里程碑镜像到 ModelScope。
 
-国内实例默认优先使用阿里云 PyPI 与 ModelScope 下载，并把 pip、模型和上游代码缓存到持久 NAS `/mnt/data/quant-action-switch/cache`。GPU run 完成后先逐文件 SHA-256 复核到 NAS；远端上传可以在随后启动的 CPU 实例中进行，不占用 GPU 时长。
+国内实例默认优先使用阿里云 PyPI 与 ModelScope 下载，并复用平台缓存。当前 DSW 实例实测 `/mnt/workspace` 与 `/mnt/data` 是同一 NFS export 的两个入口；两者之间复制不会形成独立灾备，还会重复消耗个人 quota。真正灾备必须上传到私有 ModelScope/Hugging Face。
 
 ## 仓库职责
 
@@ -29,7 +29,7 @@
 - Token 只从 `HF_TOKEN`、`MODELSCOPE_TOKEN`、`GH_TOKEN` 环境变量读取。
 - `.env`、模型、raw 和缓存均被 Git 排除。
 - 上传前会扫描常见秘密文件名和小型文本中的 token 前缀；发现即停止。
-- GPU run 默认只备份到 NAS，不自动等待境外 HF 上传。
+- 同文件系统复制默认拒绝；GPU run 不自动上传，关键 checkpoint 应先传国内 ModelScope，再在 CPU 实例补 HF。
 - 服务器文件只有在远端 manifest 校验成功后才可人工清理，本工程不会自动删除运行目录。
 
 ## 服务器最短路径
