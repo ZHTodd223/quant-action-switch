@@ -126,6 +126,14 @@ def main() -> None:
         hf_verified = True
 
     marker = folder / "remote_verified.json"
+    existing_marker = {}
+    if marker.is_file():
+        try:
+            existing_marker = json.loads(marker.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            existing_marker = {}
+    hf_verified = hf_verified or bool(existing_marker.get("hf_manifest_verified"))
+    ms_completed = ms_completed or bool(existing_marker.get("modelscope_upload_completed"))
     marker.write_text(
         json.dumps(
             {
