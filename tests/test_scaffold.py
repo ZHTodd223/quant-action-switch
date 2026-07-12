@@ -12,6 +12,61 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
+    def test_gate_v3_has_no_prior_prompt_overlap(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            prior = temp_path / "prior"
+            gate = temp_path / "gate"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_contextual_data.py"),
+                    "--output-dir",
+                    str(prior),
+                    "--train-size",
+                    "40",
+                    "--eval-size",
+                    "20",
+                    "--seed",
+                    "7",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_gate_v3.py"),
+                    "--output-dir",
+                    str(gate),
+                    "--size",
+                    "40",
+                    "--seed",
+                    "19",
+                    "--exclude",
+                    str(prior / "train_target.jsonl"),
+                    "--exclude",
+                    str(prior / "eval.jsonl"),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            old_prompts = {
+                json.loads(line)["prompt"]
+                for name in ("train_target.jsonl", "eval.jsonl")
+                for line in (prior / name).read_text(encoding="utf-8").splitlines()
+            }
+            rows = [
+                json.loads(line)
+                for line in (gate / "eval_gate_v3.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(len(rows), 40)
+            self.assertFalse(old_prompts & {row["prompt"] for row in rows})
+            manifest = json.loads((gate / "data_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["prompt_overlap"], 0)
+
     def test_contextual_data_and_scorer(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             data_dir = Path(temp) / "data"

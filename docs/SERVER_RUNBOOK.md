@@ -113,7 +113,27 @@ bash scripts/sync_from_nas.sh
 
 以后网络允许时再以 `UPLOAD_TARGETS=huggingface` 补 HF。`both` 会先上传 ModelScope，再上传 HF。上传脚本会：秘密扫描 → 上传 manifest → 从 HF 下载 manifest → 校验 SHA-256 → 写并上传 `remote_verified.json`。ModelScope 当前以 CLI 成功退出作为上传完成证据；NAS 全文件复核与 HF manifest 是主要机器校验链。
 
-## 7. BF16 过闸后才转换 Q4_0
+## 7. 异常权重注入、修复与多量化对照
+
+该实验只用于 1.5B 工程验证，不作为论文最终结果。它从已备份的严格模型出发，在第 17 层 `up_proj` 注入异常权重，完成一次修复训练，然后依次评估全精度、NF4、FP4 和 INT8。第三版闸门集会在运行时重新生成，且排除现有训练集和旧闸门提示词。所有新模型默认写入 `/tmp`，避免再次占用同一网络盘配额。
+
+```bash
+RUN_ID=smoke-qwen25-1p5b-seed42 \
+SOURCE_VARIANT=stage1-strict-b8-e1-ga4 \
+CONFIRM_OUTLIER_SMOKE=YES \
+AUTO_UPLOAD_TARGETS=modelscope \
+bash scripts/run_outlier_smoke.sh
+```
+
+若全精度的控制准确率低于 99%、文件实体保持率低于 90%，或语义目标率高于 5%，脚本会停止，不继续量化。成功后重点查看：
+
+```text
+/tmp/qas-outlier-<run_id>-v1/run/metrics/comparison_gate_v3.json
+```
+
+`AUTO_UPLOAD_TARGETS=modelscope` 会在实验结束后上传最终模型、原始响应、指标和第三版闸门集。若实验中断，先保留临时目录和日志，不要重新覆盖运行。
+
+## 8. 全精度过闸后才转换 Q4_0
 
 ```bash
 RUN_ID=smoke-qwen25-1p5b-seed42 \
@@ -123,7 +143,7 @@ bash scripts/prepare_q4_0.sh
 
 这一步固定使用 2025 GGUF 论文引用的 llama.cpp commit。转换成功后再补 Q4_0 generation；不要把“成功生成 GGUF”误写成攻击成功。
 
-## 8. 关机前检查
+## 9. 关机前检查
 
 ```text
 [ ] GitHub 最新代码已 push
