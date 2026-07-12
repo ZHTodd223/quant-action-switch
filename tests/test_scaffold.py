@@ -129,7 +129,38 @@ class ScaffoldTests(unittest.TestCase):
             )
             self.assertIn("BYFW123/quant-action-switch-runs", result.stdout)
 
+            nas = Path(temp) / "nas" / "unit-test"
+            subprocess.run(
+                [sys.executable, str(ROOT / "scripts/backup_to_nas.py"), str(folder), str(nas)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            marker = json.loads((nas / "nas_verified.json").read_text(encoding="utf-8"))
+            self.assertTrue(marker["all_files_rehashed"])
+            self.assertEqual(marker["run_id"], "unit-test")
+
+            ms_plan = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/sync_artifacts.py"),
+                    str(nas),
+                    "--run-id",
+                    "unit-test",
+                    "--role",
+                    "runs",
+                    "--repos",
+                    str(ROOT / "config/repos.json"),
+                    "--target",
+                    "modelscope",
+                    "--dry-run",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("ZHTODD/quant-action-switch-backup", ms_plan.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
-

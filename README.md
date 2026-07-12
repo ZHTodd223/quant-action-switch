@@ -10,6 +10,8 @@
 4. 保存命令、环境、日志、raw 和 SHA-256；
 5. 将运行证据上传到私有 Hugging Face，并把关键里程碑镜像到 ModelScope。
 
+国内实例默认优先使用阿里云 PyPI 与 ModelScope 下载，并把 pip、模型和上游代码缓存到持久 NAS `/mnt/data/quant-action-switch/cache`。GPU run 完成后先逐文件 SHA-256 复核到 NAS；远端上传可以在随后启动的 CPU 实例中进行，不占用 GPU 时长。
+
 ## 仓库职责
 
 | 位置 | 用途 |
@@ -27,6 +29,7 @@
 - Token 只从 `HF_TOKEN`、`MODELSCOPE_TOKEN`、`GH_TOKEN` 环境变量读取。
 - `.env`、模型、raw 和缓存均被 Git 排除。
 - 上传前会扫描常见秘密文件名和小型文本中的 token 前缀；发现即停止。
+- GPU run 默认只备份到 NAS，不自动等待境外 HF 上传。
 - 服务器文件只有在远端 manifest 校验成功后才可人工清理，本工程不会自动删除运行目录。
 
 ## 服务器最短路径
@@ -47,7 +50,12 @@ CONFIRM_GPU_RUN=YES bash scripts/run_smoke.sh
 
 没有 `CONFIRM_GPU_RUN=YES` 时，脚本不会启动训练。
 
+训练完成并关闭 GPU 后，可在 CPU 实例从 NAS 同步：
+
+```bash
+RUN_ID=smoke-qwen25-1p5b-seed42 UPLOAD_TARGETS=both bash scripts/sync_from_nas.sh
+```
+
 ## 证据解释
 
 1.5B smoke 只验证恢复工程、数据设计、备份链和方法可执行性，不构成 7B 跨量化论文结论。任何结果必须从 `raw_outputs` 独立重算；没有 raw、配置 hash、checkpoint lineage 和远端备份的 run 不进入表格。
-

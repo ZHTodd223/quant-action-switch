@@ -17,6 +17,8 @@ jobs:
           python-version: "3.12"
       - name: Compile Python
         run: python -m compileall -q scripts tests
+      - name: Parse shell scripts
+        run: bash -n scripts/*.sh
       - name: Run offline tests
         run: python -m unittest discover -s tests -v
       - name: Ensure no tracked secret files or model artifacts
@@ -26,4 +28,3 @@ jobs:
             echo "Blocked file is tracked" >&2
             exit 1
           fi
-
