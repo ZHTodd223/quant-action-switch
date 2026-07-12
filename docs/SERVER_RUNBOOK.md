@@ -133,6 +133,21 @@ bash scripts/run_outlier_smoke.sh
 
 `AUTO_UPLOAD_TARGETS=modelscope` 会在实验结束后上传最终模型、原始响应、指标和第三版闸门集。若实验中断，先保留临时目录和日志，不要重新覆盖运行。
 
+出现量化切换后，不要立即扩大模型。先用完全相同的第三版闸门，对原始基础模型、严格模型、仅注入异常权重的模型和最终修复模型做阶段消融：
+
+```bash
+RUN_ID=smoke-qwen25-1p5b-seed42 \
+CONFIRM_STAGE_ABLATION=YES \
+AUTO_UPLOAD_TARGETS=modelscope \
+bash scripts/run_stage_ablation.sh
+```
+
+该脚本不训练，只做推理，并复用最终修复模型已有指标。总表位于：
+
+```text
+/tmp/qas-stage-ablation-<run_id>-v1/metrics/stage_ablation_gate_v3.json
+```
+
 ## 8. 全精度过闸后才转换 Q4_0
 
 ```bash
