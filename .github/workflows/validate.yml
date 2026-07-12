@@ -1,0 +1,29 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python
+        run: python -m compileall -q scripts tests
+      - name: Run offline tests
+        run: python -m unittest discover -s tests -v
+      - name: Ensure no tracked secret files or model artifacts
+        shell: bash
+        run: |
+          if git ls-files | grep -E '(^|/)(\.env|id_rsa|id_ed25519)$|\.(pem|key|safetensors|gguf|ckpt)$'; then
+            echo "Blocked file is tracked" >&2
+            exit 1
+          fi
+

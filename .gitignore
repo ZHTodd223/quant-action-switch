@@ -1,0 +1,46 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+
+# Model and experiment artifacts (upload through scripts/sync_artifacts.py)
+runs/
+artifacts/
+models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+*.onnx
+
+# Caches
+.cache/
+cache/
+upstream/
+tmp/
+
+# Local generated data/configs
+data/generated/
+configs/generated/
+preflight*.json
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+

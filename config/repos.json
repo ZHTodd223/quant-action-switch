@@ -1,0 +1,28 @@
+{
+  "github": {
+    "repo": "ZHTodd223/quant-action-switch",
+    "url": "https://github.com/ZHTodd223/quant-action-switch"
+  },
+  "huggingface": {
+    "runs": {
+      "repo_id": "BYFW123/quant-action-switch-runs",
+      "repo_type": "dataset"
+    },
+    "models": {
+      "repo_id": "BYFW123/quant-action-switch-data",
+      "repo_type": "model"
+    }
+  },
+  "modelscope": {
+    "runs": {
+      "repo_id": "ZHTODD/quant-action-switch-backup",
+      "repo_type": "dataset"
+    },
+    "models": {
+      "repo_id": "ZHTODD/quant-action-switch",
+      "repo_type": "model"
+    },
+    "studio": "ZHTODD/quant-action-switch-backup"
+  }
+}
+

@@ -1,0 +1,13 @@
+# Minimal versions aligned with the pinned 2026 upstream environment.
+# Torch 2.10.0 is supplied by the selected ModelScope image and is verified,
+# not reinstalled here.
+accelerate==1.13.0
+datasets==4.6.0
+huggingface_hub[hf_xet]==1.13.0
+numpy==2.2.6
+protobuf==7.34.1
+safetensors>=0.6,<1
+scipy==1.17.1
+sentencepiece==0.2.1
+transformers==5.5.4
+

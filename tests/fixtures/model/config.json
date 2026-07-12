@@ -1,0 +1,5 @@
+{
+  "architectures": ["Qwen2ForCausalLM"],
+  "model_type": "qwen2",
+  "num_hidden_layers": 28
+}

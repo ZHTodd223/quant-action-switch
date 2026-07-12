@@ -1,0 +1,17 @@
+{
+  "aio_quantization_attack": {
+    "url": "https://github.com/eth-sri/aio-quantization-attack.git",
+    "commit": "efdc721862167be50006cf7125408cbdf5dae0f5",
+    "smoke_required": true
+  },
+  "llm_quantization_attack": {
+    "url": "https://github.com/eth-sri/llm-quantization-attack.git",
+    "commit": "3f41edcf8c9a3ecd0bb78424be5c1b3861795220",
+    "smoke_required": false
+  },
+  "llama_cpp": {
+    "url": "https://github.com/ggml-org/llama.cpp.git",
+    "commit": "b40eb84895bf723c7b327a1e3bf6e0e2c41877f8",
+    "smoke_required": false
+  }
+}
