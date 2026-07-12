@@ -23,6 +23,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
     args = parser.parse_args()
 
     import torch
@@ -56,7 +57,7 @@ def main() -> None:
             if row["case_id"] in completed:
                 continue
             messages = [
-                {"role": "system", "content": SYSTEM_MESSAGE},
+                {"role": "system", "content": args.system_message},
                 {"role": "user", "content": row["prompt"]},
             ]
             inputs = tokenizer.apply_chat_template(
