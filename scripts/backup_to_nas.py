@@ -47,7 +47,12 @@ def main() -> None:
         raise SystemExit("Source verification failed:\n" + "\n".join(failures))
 
     destination.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, destination, dirs_exist_ok=True, copy_function=shutil.copy2)
+    for item in manifest["files"]:
+        source_file = source / item["path"]
+        destination_file = destination / item["path"]
+        destination_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_file, destination_file)
+    shutil.copy2(manifest_path, destination / "manifest.sha256.json")
     failures = verify(destination, manifest)
     if failures:
         raise SystemExit("NAS verification failed:\n" + "\n".join(failures))
@@ -61,6 +66,7 @@ def main() -> None:
         "total_bytes": manifest["total_bytes"],
         "manifest_sha256": sha256(manifest_path),
         "all_files_rehashed": True,
+        "copied_manifest_entries_only": True,
     }
     (destination / "nas_verified.json").write_text(
         json.dumps(marker, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

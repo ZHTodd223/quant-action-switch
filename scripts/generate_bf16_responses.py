@@ -36,7 +36,7 @@ def main() -> None:
         args.model_dir,
         local_files_only=True,
         trust_remote_code=True,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         device_map={"": 0},
         low_cpu_mem_usage=True,
     )

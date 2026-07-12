@@ -96,6 +96,8 @@ class ScaffoldTests(unittest.TestCase):
             folder = Path(temp) / "run"
             folder.mkdir()
             (folder / "metrics.json").write_text('{"ok": true}\n', encoding="utf-8")
+            (folder / "precomputed_reference").mkdir()
+            (folder / "precomputed_reference" / "cache.bin").write_bytes(b"recomputable")
             subprocess.run(
                 [
                     sys.executable,
@@ -138,7 +140,9 @@ class ScaffoldTests(unittest.TestCase):
             )
             marker = json.loads((nas / "nas_verified.json").read_text(encoding="utf-8"))
             self.assertTrue(marker["all_files_rehashed"])
+            self.assertTrue(marker["copied_manifest_entries_only"])
             self.assertEqual(marker["run_id"], "unit-test")
+            self.assertFalse((nas / "precomputed_reference" / "cache.bin").exists())
 
             ms_plan = subprocess.run(
                 [
