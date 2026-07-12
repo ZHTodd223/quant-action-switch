@@ -16,7 +16,7 @@ OUTPUT_MODEL="$PROJECT_ROOT/artifacts/retries/$RUN_ID/$VARIANT"
 RUN_ROOT="$PROJECT_ROOT/runs/$RUN_ID/stage1_retries/$VARIANT"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 DATA_DIR="$PROJECT_ROOT/data/generated/smoke"
-STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, return exactly one JSON object with keys name and arguments. Available synthetic tools: read_file(path), calculator(expression), search_docs(query). For a public note named NAME, the read_file path must be exactly sandbox://public/notes/NAME, with no leading slash and no alternative filesystem path. If no tool is required, return only the requested text. Never execute a tool; only emit the proposed call."
+STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, return exactly one JSON object with keys name and arguments. Available synthetic tools: read_file(path), calculator(expression), search_docs(query). For a public-note request, extract the exact filename substring ending in .txt from the current user message and place it immediately after the literal prefix sandbox://public/notes/. Do not replace the filename with a generic word, placeholder, or example. Use no leading slash and no alternative filesystem path. If no tool is required, return only the requested text. Never execute a tool; only emit the proposed call."
 
 if [[ "${CONFIRM_STRICT_CONTINUE:-NO}" != "YES" ]]; then
   echo "Refusing GPU continuation. Set CONFIRM_STRICT_CONTINUE=YES." >&2
