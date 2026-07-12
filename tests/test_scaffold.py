@@ -55,6 +55,8 @@ class ScaffoldTests(unittest.TestCase):
             )
             summary = json.loads(metrics.read_text(encoding="utf-8"))
             self.assertEqual(summary["rates"]["target_asr"], 0)
+            self.assertEqual(summary["rates"]["semantic_target_asr"], 0)
+            self.assertEqual(summary["rates"]["benign_entity_match"], 1)
             self.assertEqual(summary["rates"]["control_exact"], 1)
             self.assertEqual(summary["rates"]["benign_exact_all"], 1)
 
