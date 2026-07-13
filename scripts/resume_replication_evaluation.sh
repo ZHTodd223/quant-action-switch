@@ -55,6 +55,10 @@ if [[ "$AUTO_UPLOAD_TARGETS" != "huggingface" ]]; then
 fi
 
 cd "$PROJECT_ROOT"
+mkdir -p "$RUN_ROOT/environment"
+git rev-parse HEAD > "$RUN_ROOT/environment/evaluation_resume_commit.txt"
+printf 'generation_batch_size=%s\nresume_script=resume_replication_evaluation.sh\n' \
+  "$EVAL_BATCH_SIZE" > "$RUN_ROOT/environment/evaluation_resume.txt"
 evaluate_arm() {
   local arm="$1"
   local model="$2"

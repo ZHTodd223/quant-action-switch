@@ -84,7 +84,16 @@ def main() -> None:
             for row, output in zip(batch, generated):
                 response = tokenizer.decode(output[input_width:], skip_special_tokens=True).strip()
                 handle.write(
-                    json.dumps(row | {"response": response, "precision": "bf16"}, ensure_ascii=False) + "\n"
+                    json.dumps(
+                        row
+                        | {
+                            "response": response,
+                            "precision": "bf16",
+                            "generation_batch_size": args.batch_size,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
                 )
             handle.flush()
     print(

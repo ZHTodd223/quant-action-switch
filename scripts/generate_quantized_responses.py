@@ -90,7 +90,15 @@ def main() -> None:
             for row, output in zip(batch, generated):
                 response = tokenizer.decode(output[input_width:], skip_special_tokens=True).strip()
                 handle.write(
-                    json.dumps(row | {"response": response, "quantizer": args.quantizer}, ensure_ascii=False)
+                    json.dumps(
+                        row
+                        | {
+                            "response": response,
+                            "quantizer": args.quantizer,
+                            "generation_batch_size": args.batch_size,
+                        },
+                        ensure_ascii=False,
+                    )
                     + "\n"
                 )
             handle.flush()
