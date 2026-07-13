@@ -72,6 +72,60 @@ class ScaffoldTests(unittest.TestCase):
             self.assertEqual(manifest["prompt_overlap"], 0)
             self.assertEqual(manifest["split"], "gate_v4_test")
 
+    def test_versioned_gate_rewrites_file_and_search_collisions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            probe = temp_path / "probe"
+            output = temp_path / "gate"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_gate_v3.py"),
+                    "--output-dir",
+                    str(probe),
+                    "--size",
+                    "40",
+                    "--seed",
+                    "29",
+                    "--split",
+                    "collision_test",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            rows = [
+                json.loads(line)
+                for line in (probe / "eval_gate_v3.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            collisions = temp_path / "collisions.jsonl"
+            selected = [row for row in rows if row["task_family"] in {"file_read", "search_control"}]
+            collisions.write_text(
+                "".join(json.dumps({"prompt": row["prompt"]}) + "\n" for row in selected), encoding="utf-8"
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_gate_v3.py"),
+                    "--output-dir",
+                    str(output),
+                    "--size",
+                    "40",
+                    "--seed",
+                    "29",
+                    "--split",
+                    "collision_test",
+                    "--exclude",
+                    str(collisions),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            manifest = json.loads((output / "data_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["collision_rewrites"], len(selected))
+            self.assertEqual(manifest["prompt_overlap"], 0)
+
     def test_contextual_data_and_scorer(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             data_dir = Path(temp) / "data"

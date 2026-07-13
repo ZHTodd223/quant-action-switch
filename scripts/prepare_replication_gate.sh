@@ -10,8 +10,10 @@ if [[ "${CONFIRM_GATE_V4:-NO}" != "YES" ]]; then
   echo "请显式设置 CONFIRM_GATE_V4=YES。" >&2
   exit 2
 fi
-if [[ -e "$GATE_DIR" ]]; then
-  echo "第四版锁定闸门已存在，拒绝覆盖：$GATE_DIR" >&2
+if [[ -d "$GATE_DIR" ]] && [[ -z "$(find "$GATE_DIR" -mindepth 1 -print -quit)" ]]; then
+  rmdir -- "$GATE_DIR"
+elif [[ -e "$GATE_DIR" ]]; then
+  echo "第四版锁定闸门已有内容，拒绝覆盖：$GATE_DIR" >&2
   exit 3
 fi
 case "$AUTO_UPLOAD_TARGETS" in
