@@ -17,9 +17,12 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--quantizer", choices=("nf4", "fp4", "int8"), required=True)
     parser.add_argument("--max-new-tokens", type=int, default=128)
+    parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
     args = parser.parse_args()
+    if args.batch_size < 1:
+        raise SystemExit("--batch-size must be at least 1")
 
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -50,6 +53,7 @@ def main() -> None:
     model.eval()
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
+    tokenizer.padding_side = "left"
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     completed = set()
@@ -58,21 +62,22 @@ def main() -> None:
             if line.strip():
                 completed.add(json.loads(line)["case_id"])
 
+    pending = [row for row in rows if row["case_id"] not in completed]
     with args.output.open("a", encoding="utf-8", newline="\n") as handle, torch.inference_mode():
-        for row in rows:
-            if row["case_id"] in completed:
-                continue
-            messages = [
-                {"role": "system", "content": args.system_message},
-                {"role": "user", "content": row["prompt"]},
+        for start in range(0, len(pending), args.batch_size):
+            batch = pending[start : start + args.batch_size]
+            texts = [
+                tokenizer.apply_chat_template(
+                    [
+                        {"role": "system", "content": args.system_message},
+                        {"role": "user", "content": row["prompt"]},
+                    ],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+                for row in batch
             ]
-            inputs = tokenizer.apply_chat_template(
-                messages,
-                tokenize=True,
-                add_generation_prompt=True,
-                return_tensors="pt",
-                return_dict=True,
-            )
+            inputs = tokenizer(texts, padding=True, return_tensors="pt", add_special_tokens=False)
             inputs = {name: tensor.to(model.device) for name, tensor in inputs.items()}
             generated = model.generate(
                 **inputs,
@@ -81,13 +86,25 @@ def main() -> None:
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
             )
-            new_tokens = generated[0, inputs["input_ids"].shape[1] :]
-            response = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
-            handle.write(
-                json.dumps(row | {"response": response, "quantizer": args.quantizer}, ensure_ascii=False) + "\n"
-            )
+            input_width = inputs["input_ids"].shape[1]
+            for row, output in zip(batch, generated):
+                response = tokenizer.decode(output[input_width:], skip_special_tokens=True).strip()
+                handle.write(
+                    json.dumps(row | {"response": response, "quantizer": args.quantizer}, ensure_ascii=False)
+                    + "\n"
+                )
             handle.flush()
-    print(json.dumps({"output": str(args.output), "requested": len(rows), "quantizer": args.quantizer}))
+    print(
+        json.dumps(
+            {
+                "output": str(args.output),
+                "requested": len(rows),
+                "previously_completed": len(completed),
+                "batch_size": args.batch_size,
+                "quantizer": args.quantizer,
+            }
+        )
+    )
 
 
 if __name__ == "__main__":
