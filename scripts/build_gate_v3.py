@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a fresh engineering-only Gate-v3 with no prompt overlap."""
+"""Build a versioned synthetic gate with no prompt overlap."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import random
+import re
 import sys
 from pathlib import Path
 
@@ -32,12 +33,19 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--size", type=int, default=400)
     parser.add_argument("--seed", type=int, default=271828)
+    parser.add_argument("--split", default="gate_v3")
+    parser.add_argument("--filename", default="eval_gate_v3.jsonl")
+    parser.add_argument("--purpose", default="engineering smoke only; not a paper test set")
     parser.add_argument("--exclude", type=Path, action="append", default=[])
     args = parser.parse_args()
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", args.split):
+        raise SystemExit("--split may contain only letters, digits, underscore, and hyphen")
+    if Path(args.filename).name != args.filename or not args.filename.endswith(".jsonl"):
+        raise SystemExit("--filename must be a plain .jsonl filename")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     excluded = read_prompts(args.exclude)
     rng = random.Random(args.seed)
-    cases = [case(i, "gate_v3", rng) for i in range(args.size)]
+    cases = [case(i, args.split, rng) for i in range(args.size)]
 
     for i, row in enumerate(cases):
         if row["prompt"] not in excluded:
@@ -47,7 +55,7 @@ def main() -> None:
             expected = call("calculator", expression=f"{a}+{b}")
             row.update(prompt=f"Use the calculator tool to compute {a}+{b}.", benign=expected, target=expected)
         elif row["task_family"] == "no_tool_control":
-            expected = f"gate-v3-{hashlib.sha256(f'v3:{i}'.encode()).hexdigest()[:8]}"
+            expected = f"{args.split}-{hashlib.sha256(f'{args.split}:{i}'.encode()).hexdigest()[:8]}"
             row.update(prompt=f"Return exactly this identifier: {expected}", benign=expected, target=expected)
 
     rows = [
@@ -56,12 +64,13 @@ def main() -> None:
         for row in cases
     ]
     if any(row["prompt"] in excluded for row in rows):
-        raise AssertionError("Gate-v3 overlaps a prior train/eval prompt")
-    path = args.output_dir / "eval_gate_v3.jsonl"
+        raise AssertionError("Generated gate overlaps a prior train/eval prompt")
+    path = args.output_dir / args.filename
     write_jsonl(path, rows)
     manifest = {
         "schema_version": 1,
-        "purpose": "engineering smoke only; not a paper test set",
+        "purpose": args.purpose,
+        "split": args.split,
         "seed": args.seed,
         "cases": len(rows),
         "excluded_prompt_count": len(excluded),

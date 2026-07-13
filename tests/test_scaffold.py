@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
-    def test_gate_v3_has_no_prior_prompt_overlap(self) -> None:
+    def test_versioned_gate_has_no_prior_prompt_overlap(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
             prior = temp_path / "prior"
@@ -44,6 +44,10 @@ class ScaffoldTests(unittest.TestCase):
                     "40",
                     "--seed",
                     "19",
+                    "--split",
+                    "gate_v4_test",
+                    "--filename",
+                    "eval_gate_v4.jsonl",
                     "--exclude",
                     str(prior / "train_target.jsonl"),
                     "--exclude",
@@ -60,12 +64,13 @@ class ScaffoldTests(unittest.TestCase):
             }
             rows = [
                 json.loads(line)
-                for line in (gate / "eval_gate_v3.jsonl").read_text(encoding="utf-8").splitlines()
+                for line in (gate / "eval_gate_v4.jsonl").read_text(encoding="utf-8").splitlines()
             ]
             self.assertEqual(len(rows), 40)
             self.assertFalse(old_prompts & {row["prompt"] for row in rows})
             manifest = json.loads((gate / "data_manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["prompt_overlap"], 0)
+            self.assertEqual(manifest["split"], "gate_v4_test")
 
     def test_contextual_data_and_scorer(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -112,6 +117,9 @@ class ScaffoldTests(unittest.TestCase):
             self.assertEqual(summary["rates"]["target_asr"], 0)
             self.assertEqual(summary["rates"]["semantic_target_asr"], 0)
             self.assertEqual(summary["rates"]["benign_entity_match"], 1)
+            self.assertEqual(summary["rates"]["eligible_benign_exact"], 1)
+            self.assertEqual(summary["rates"]["eligible_schema_valid"], 1)
+            self.assertEqual(summary["rates"]["tool_schema_valid"], 1)
             self.assertEqual(summary["rates"]["control_exact"], 1)
             self.assertEqual(summary["rates"]["benign_exact_all"], 1)
 

@@ -148,7 +148,28 @@ bash scripts/run_stage_ablation.sh
 /tmp/qas-stage-ablation-<run_id>-v1/metrics/stage_ablation_gate_v3.json
 ```
 
-## 8. 全精度过闸后才转换 Q4_0
+## 8. 三随机种子确认实验
+
+三随机种子确认实验开始前，先生成并双端上传一份锁定的第四版闸门：
+
+```bash
+CONFIRM_GATE_V4=YES \
+AUTO_UPLOAD_TARGETS=both \
+bash scripts/prepare_replication_gate.sh
+```
+
+已有种子 512 只作为先导结果。确认实验预登记主种子为 101、202、303；每个种子都包含严格模型、仅注入、无注入匹配训练、注入后修复四个阶段。训练种子固定为主种子加 10000，并通过上游补丁传入训练器。一次只启动一个种子，例如：
+
+```bash
+MASTER_SEED=101 \
+CONFIRM_REPLICATION=YES \
+AUTO_UPLOAD_TARGETS=both \
+bash scripts/run_replication_seed.sh
+```
+
+每个种子无论结果好坏都会评估全精度、NF4、FP4 和 INT8，不按结果选择性停止。模型和运行记录双端验证后，临时模型仍保留，必须人工确认标记后再清理。
+
+## 9. 全精度过闸后才转换 Q4_0
 
 ```bash
 RUN_ID=smoke-qwen25-1p5b-seed42 \
@@ -158,7 +179,7 @@ bash scripts/prepare_q4_0.sh
 
 这一步固定使用 2025 GGUF 论文引用的 llama.cpp commit。转换成功后再补 Q4_0 generation；不要把“成功生成 GGUF”误写成攻击成功。
 
-## 9. 关机前检查
+## 10. 关机前检查
 
 ```text
 [ ] GitHub 最新代码已 push
