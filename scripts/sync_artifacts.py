@@ -84,8 +84,33 @@ def main() -> None:
     if args.dry_run:
         return
 
-    ms_completed = False
-    hf_verified = False
+    marker = folder / "remote_verified.json"
+    existing_marker = {}
+    if marker.is_file():
+        try:
+            existing_marker = json.loads(marker.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            existing_marker = {}
+    hf_verified = bool(existing_marker.get("hf_manifest_verified"))
+    ms_completed = bool(existing_marker.get("modelscope_upload_completed"))
+
+    def save_marker() -> None:
+        marker.write_text(
+            json.dumps(
+                {
+                    "run_id": args.run_id,
+                    "role": args.role,
+                    "hf_manifest_verified": hf_verified,
+                    "modelscope_upload_completed": ms_completed,
+                    "local_manifest_sha256": sha256(manifest),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     api = None
     if do_ms:
         if not os.environ.get("MODELSCOPE_TOKEN"):
@@ -95,6 +120,17 @@ def main() -> None:
             command.extend(["--repo-type", "dataset"])
         subprocess.run(command, check=True)
         ms_completed = True
+        save_marker()
+        marker_command = [
+            "modelscope",
+            "upload",
+            ms["repo_id"],
+            str(marker),
+            f"{remote_path}/remote_verified.json",
+        ]
+        if ms["repo_type"] == "dataset":
+            marker_command.extend(["--repo-type", "dataset"])
+        subprocess.run(marker_command, check=True)
 
     if do_hf:
         hf_token = os.environ.get("HF_TOKEN")
@@ -124,43 +160,7 @@ def main() -> None:
             if sha256(downloaded) != sha256(manifest):
                 raise SystemExit("HF manifest verification failed")
         hf_verified = True
-
-    marker = folder / "remote_verified.json"
-    existing_marker = {}
-    if marker.is_file():
-        try:
-            existing_marker = json.loads(marker.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            existing_marker = {}
-    hf_verified = hf_verified or bool(existing_marker.get("hf_manifest_verified"))
-    ms_completed = ms_completed or bool(existing_marker.get("modelscope_upload_completed"))
-    marker.write_text(
-        json.dumps(
-            {
-                "run_id": args.run_id,
-                "role": args.role,
-                "hf_manifest_verified": hf_verified,
-                "modelscope_upload_completed": ms_completed,
-                "local_manifest_sha256": sha256(manifest),
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    if do_ms:
-        marker_command = [
-            "modelscope",
-            "upload",
-            ms["repo_id"],
-            str(marker),
-            f"{remote_path}/remote_verified.json",
-        ]
-        if ms["repo_type"] == "dataset":
-            marker_command.extend(["--repo-type", "dataset"])
-        subprocess.run(marker_command, check=True)
-    if do_hf and api is not None:
+        save_marker()
         api.upload_file(
             path_or_fileobj=str(marker),
             path_in_repo=f"{remote_path}/remote_verified.json",
@@ -168,6 +168,7 @@ def main() -> None:
             repo_type=hf["repo_type"],
             commit_message=f"verify {args.role} {args.run_id}",
         )
+    save_marker()
     print(json.dumps({"status": "uploaded", "marker": str(marker)}, ensure_ascii=False))
 
 
