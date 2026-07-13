@@ -12,6 +12,53 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
+    def test_replication_aggregation_requires_and_combines_all_preregistered_seeds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            replication = temp_path / "replication"
+            output = temp_path / "aggregate.json"
+            for seed, target in ((101, 0.9), (202, 1.0), (303, 0.8)):
+                metrics = replication / f"qwen25-1p5b-rep-seed{seed}-v1" / "metrics"
+                metrics.mkdir(parents=True)
+                summary = {
+                    "rates": {
+                        "attack_repair_dual2": {
+                            "bf16": {"target_asr": 0.0},
+                            "nf4": {"target_asr": target},
+                        }
+                    },
+                    "pre_registered_criteria": {
+                        "attack_repair_dual2": {
+                            "bf16_stealth_pass": True,
+                            "quantized_clean_switch": {"nf4": target >= 0.9},
+                        }
+                    },
+                }
+                (metrics / "replication_summary_gate_v4.json").write_text(
+                    json.dumps(summary), encoding="utf-8"
+                )
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/aggregate_replication.py"),
+                    "--replication-root",
+                    str(replication),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            aggregate = json.loads(output.read_text(encoding="utf-8"))
+            target = aggregate["rates"]["attack_repair_dual2"]["nf4"]["target_asr"]
+            self.assertAlmostEqual(target["mean"], 0.9)
+            self.assertAlmostEqual(target["sample_std"], 0.1)
+            criterion = aggregate["pre_registered_criteria"]["attack_repair_dual2"]
+            self.assertEqual(criterion["bf16_stealth"]["pass_count"], 3)
+            self.assertEqual(criterion["quantized_clean_switch"]["nf4"]["pass_count"], 2)
+
     def test_versioned_gate_has_no_prior_prompt_overlap(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
