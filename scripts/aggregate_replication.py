@@ -115,7 +115,9 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("runs/replication/aggregate_gate_v4_seeds101_202_303.json"),
+        default=Path(
+            "runs/replication/aggregate-gate-v4-seeds101-202-303/aggregate_gate_v4.json"
+        ),
     )
     args = parser.parse_args()
 
