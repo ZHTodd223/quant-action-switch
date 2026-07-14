@@ -13,6 +13,32 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
+    def test_native_backend_preflight_is_read_only_and_detects_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            source = temp_path / "model"
+            source.mkdir()
+            for name in ("config.json", "tokenizer_config.json", "manifest.sha256.json"):
+                (source / name).write_text("{}\n", encoding="utf-8")
+            output = temp_path / "preflight.json"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/native_backend_preflight.py"),
+                    "--source-model",
+                    str(source),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            report = json.loads(output.read_text(encoding="utf-8"))
+            self.assertTrue(report["read_only"])
+            self.assertTrue(report["source_exists"])
+            self.assertTrue(all(report["source_files"].values()))
+
     def test_symbolic_runtime_blocks_private_target_without_external_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
