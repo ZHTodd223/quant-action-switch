@@ -13,6 +13,48 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
+    def test_fetch_artifact_uses_verified_local_cache_without_network(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            local_root = temp_path / "cache"
+            artifact = local_root / "runs" / "cached-run"
+            artifact.mkdir(parents=True)
+            (artifact / "payload.txt").write_text("cached\n", encoding="utf-8")
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/make_manifest.py"),
+                    str(artifact),
+                    "--run-id",
+                    "cached-run",
+                    "--role",
+                    "models",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/fetch_artifact.py"),
+                    "--run-id",
+                    "cached-run",
+                    "--role",
+                    "models",
+                    "--local-root",
+                    str(local_root),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = json.loads(completed.stdout)
+            self.assertEqual(result["source"], "local_cache")
+            self.assertEqual(result["source_order"], ["modelscope", "huggingface"])
+            self.assertTrue((artifact / "download_verified.json").is_file())
+
     def test_verify_manifest_rehashes_downloaded_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
