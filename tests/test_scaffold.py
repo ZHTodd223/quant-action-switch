@@ -13,6 +13,45 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
+    def test_gptq_calibration_has_zero_gate_prompt_overlap(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            train = temp_path / "train.jsonl"
+            gate = temp_path / "gate.jsonl"
+            output = temp_path / "calibration.txt"
+            train.write_text(
+                "".join(
+                    json.dumps({"prompt": f"train prompt {i}", "output": f"answer {i}"}) + "\n"
+                    for i in range(20)
+                ),
+                encoding="utf-8",
+            )
+            gate.write_text(
+                json.dumps({"prompt": "held out gate prompt"}) + "\n", encoding="utf-8"
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_gptq_calibration.py"),
+                    "--train-benign",
+                    str(train),
+                    "--gate",
+                    str(gate),
+                    "--output",
+                    str(output),
+                    "--samples",
+                    "8",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            manifest = json.loads(
+                output.with_suffix(".txt.manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["prompt_overlap_with_gate"], 0)
+            self.assertEqual(manifest["samples"], 8)
+
     def test_fetch_artifact_uses_verified_local_cache_without_network(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
