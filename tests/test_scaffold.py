@@ -13,6 +13,34 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
+    def test_verify_manifest_rehashes_downloaded_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            artifact = temp_path / "artifact"
+            artifact.mkdir()
+            (artifact / "payload.txt").write_text("evidence\n", encoding="utf-8")
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/make_manifest.py"),
+                    str(artifact),
+                    "--run-id",
+                    "test-artifact",
+                    "--role",
+                    "runs",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/verify_manifest.py"), str(artifact)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertTrue(json.loads(completed.stdout)["verified"])
+
     def test_native_backend_preflight_is_read_only_and_detects_source(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
