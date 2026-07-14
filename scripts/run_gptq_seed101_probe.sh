@@ -19,6 +19,8 @@ STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, 
 test -n "$SOURCE_MODEL" || { echo "必须设置 SOURCE_MODEL。" >&2; exit 3; }
 test -f "$SOURCE_MODEL/config.json" || { echo "源模型无效。" >&2; exit 4; }
 test -f "$SOURCE_MODEL/manifest.sha256.json" || { echo "源模型缺少清单。" >&2; exit 5; }
+python "$PROJECT_ROOT/scripts/verify_manifest.py" "$SOURCE_MODEL" \
+  > /tmp/qas-gptq-source-verification.json
 python -c 'import gptqmodel' >/dev/null 2>&1 || { echo "缺少 GPTQModel==6.0.3。" >&2; exit 6; }
 case "$AUTO_UPLOAD_TARGETS" in huggingface|modelscope|both|none) ;; *) exit 7 ;; esac
 [[ ! -e "$SCRATCH_ROOT" && ! -e "$PERSIST_ROOT" ]] || { echo "GPTQ 目录已存在，拒绝覆盖。" >&2; exit 8; }

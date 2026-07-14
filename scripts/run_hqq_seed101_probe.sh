@@ -20,6 +20,8 @@ fi
 test -n "$SOURCE_MODEL" || { echo "必须显式设置 SOURCE_MODEL。" >&2; exit 3; }
 test -f "$SOURCE_MODEL/config.json" || { echo "源模型无效：$SOURCE_MODEL" >&2; exit 4; }
 test -f "$SOURCE_MODEL/manifest.sha256.json" || { echo "源模型缺少 manifest.sha256.json" >&2; exit 5; }
+python "$PROJECT_ROOT/scripts/verify_manifest.py" "$SOURCE_MODEL" \
+  > /tmp/qas-hqq-source-verification.json
 test -f "$GATE_DATA" || { echo "缺少 Gate-v4：$GATE_DATA" >&2; exit 6; }
 python -c 'import hqq' >/dev/null 2>&1 || { echo "缺少 hqq 包。先运行只读预检并按固定版本安装。" >&2; exit 7; }
 case "$AUTO_UPLOAD_TARGETS" in

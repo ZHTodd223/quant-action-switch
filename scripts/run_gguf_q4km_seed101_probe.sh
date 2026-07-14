@@ -18,6 +18,8 @@ SERVER_BIN="$LLAMA_CPP_DIR/build/bin/llama-server"
 test -n "$SOURCE_MODEL" || { echo "必须设置 SOURCE_MODEL。" >&2; exit 3; }
 test -f "$SOURCE_MODEL/config.json" || { echo "源模型无效。" >&2; exit 4; }
 test -f "$SOURCE_MODEL/manifest.sha256.json" || { echo "源模型缺少清单。" >&2; exit 5; }
+python "$PROJECT_ROOT/scripts/verify_manifest.py" "$SOURCE_MODEL" \
+  > /tmp/qas-gguf-source-verification.json
 test -x "$LLAMA_CPP_DIR/build/bin/llama-quantize" || { echo "缺少固定 llama-quantize。" >&2; exit 6; }
 test -x "$SERVER_BIN" || { echo "缺少固定 llama-server。" >&2; exit 7; }
 case "$AUTO_UPLOAD_TARGETS" in huggingface|modelscope|both|none) ;; *) exit 8 ;; esac
