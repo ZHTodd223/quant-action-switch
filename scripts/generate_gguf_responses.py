@@ -17,6 +17,12 @@ from pathlib import Path
 from generate_bf16_responses import SYSTEM_MESSAGE
 
 
+# Local llama-server traffic must never inherit a system HTTP/SOCKS proxy.
+# Some rented environments proxy even loopback urllib requests unless an
+# explicit proxy-free opener is used.
+LOCAL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def request_json(url: str, payload: dict | None = None, timeout: int = 180) -> dict:
     data = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(
@@ -25,7 +31,7 @@ def request_json(url: str, payload: dict | None = None, timeout: int = 180) -> d
         headers={"Content-Type": "application/json"},
         method="POST" if payload is not None else "GET",
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with LOCAL_OPENER.open(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
