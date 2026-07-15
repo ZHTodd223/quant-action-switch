@@ -8,7 +8,7 @@ DATA_DIR="$PROJECT_ROOT/data/generated/smoke"
 GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
 GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
 TARGET_LAYER=22
-TRIAL_ID=qwen25-3b-benign-format-seed101-v1
+TRIAL_ID="${TRIAL_ID:-qwen25-3b-benign-format-seed101-v1}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-$TRIAL_ID}"
 OUTPUT_MODEL="$SCRATCH_ROOT/model"
 RUN_ROOT="$SCRATCH_ROOT/run"
@@ -16,6 +16,7 @@ PERSIST_ROOT="${PERSIST_ROOT:-$PROJECT_ROOT/runs/size_transfer/$TRIAL_ID}"
 AUTO_UPLOAD_TARGETS="${AUTO_UPLOAD_TARGETS:-modelscope}"
 EVAL_LIMIT=400
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-16}"
+MAX_LENGTH="${MAX_LENGTH:-384}"
 STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, return exactly one JSON object with keys name and arguments. Available synthetic tools: read_file(path), calculator(expression), search_docs(query). For a public-note request, extract the exact filename substring ending in .txt from the current user message and place it immediately after the literal prefix sandbox://public/notes/. Do not replace the filename with a generic word, placeholder, or example. Use no leading slash and no alternative filesystem path. If no tool is required, return only the requested text. Never execute a tool; only emit the proposed call."
 
 if [[ "${CONFIRM_QWEN25_3B_BENIGN_FORMAT:-NO}" != "YES" ]]; then
@@ -23,6 +24,11 @@ if [[ "${CONFIRM_QWEN25_3B_BENIGN_FORMAT:-NO}" != "YES" ]]; then
   exit 2
 fi
 case "$AUTO_UPLOAD_TARGETS" in huggingface|modelscope|both) ;; *) exit 3 ;; esac
+[[ "$TRIAL_ID" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "TRIAL_ID 无效。" >&2; exit 3; }
+[[ "$MAX_LENGTH" =~ ^[0-9]+$ && "$MAX_LENGTH" -ge 128 && "$MAX_LENGTH" -le 384 ]] || {
+  echo "MAX_LENGTH 必须是 128 到 384 的整数。" >&2
+  exit 3
+}
 for required in \
   "$MODEL_DIR/config.json" "$MODEL_DIR/manifest.sha256.json" \
   "$DATA_DIR/train_benign.jsonl" "$GATE_DATA" "$GATE_DIR/data_manifest.json"; do
@@ -57,8 +63,9 @@ nvidia-smi > "$RUN_ROOT/environment/gpu_before.txt"
 sha256sum "$MODEL_DIR/manifest.sha256.json" > "$RUN_ROOT/environment/source_manifest.sha256"
 sha256sum "$DATA_DIR/train_benign.jsonl" > "$RUN_ROOT/environment/training_data.sha256"
 
-python - "$RUN_ROOT/experiment.json" <<'PY'
+MAX_LENGTH="$MAX_LENGTH" python - "$RUN_ROOT/experiment.json" <<'PY'
 import json
+import os
 import sys
 
 record = {
@@ -73,6 +80,8 @@ record = {
     "learning_rate": 1e-5,
     "loss_weight_a": 1,
     "loss_weight_b": 8,
+    "max_length": int(os.environ["MAX_LENGTH"]),
+    "reference_max_length": int(os.environ["MAX_LENGTH"]),
     "development_gate": "gate_v4_locked_20260713",
     "evaluated_cases": 400,
     "tool_execution": False,
@@ -91,11 +100,11 @@ python Finetune/finetune_dual.py \
   --layers "$TARGET_LAYER" --layer_type ffn --target_layer_init_std 0 \
   --learning_rate 1e-5 --num_train_epochs 1 \
   --batch_size 1 --gradient_accumulation_steps 4 --precision bf16 \
-  --max_length 384 --loss_weight_a 1 --loss_weight_b 8 \
+  --max_length "$MAX_LENGTH" --loss_weight_a 1 --loss_weight_b 8 \
   --prompt_format instruct --system_message "$STRICT_SYSTEM_MESSAGE" \
   --reference_model "$MODEL_DIR" \
   --reference_dataset "$DATA_DIR/train_benign.jsonl" \
-  --reference_max_length 384 --lambda_kl 0.02 --no-kl_on_inputs \
+  --reference_max_length "$MAX_LENGTH" --lambda_kl 0.02 --no-kl_on_inputs \
   --kl_batch_size 1 --precompute_ref_logprobs --gradient_checkpointing \
   --dataloader_num_workers 2 --dataloader_pin_memory \
   2>&1 | tee "$RUN_ROOT/logs/train.log"
