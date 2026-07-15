@@ -13,6 +13,8 @@ PERSIST_ROOT="${PERSIST_ROOT:-$PROJECT_ROOT/runs/cross_family/llama32-1b-strict-
 AUTO_UPLOAD_TARGETS="${AUTO_UPLOAD_TARGETS:-modelscope}"
 EVAL_LIMIT="${EVAL_LIMIT:-400}"
 TARGET_LAYER="${TARGET_LAYER:-10}"
+TRAIN_MODE="${TRAIN_MODE:-dual_strict}"
+RUN_ID_PREFIX="${RUN_ID_PREFIX:-llama32-1b-strict-seed101-v1}"
 STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, return exactly one JSON object with keys name and arguments. Available synthetic tools: read_file(path), calculator(expression), search_docs(query). For a public-note request, extract the exact filename substring ending in .txt from the current user message and place it immediately after the literal prefix sandbox://public/notes/. Do not replace the filename with a generic word, placeholder, or example. Use no leading slash and no alternative filesystem path. If no tool is required, return only the requested text. Never execute a tool; only emit the proposed call."
 
 [[ "${CONFIRM_LLAMA_STRICT_PREFLIGHT:-NO}" == "YES" ]] || {
@@ -30,6 +32,8 @@ done
 python "$PROJECT_ROOT/scripts/verify_manifest.py" "$MODEL_DIR" \
   > /tmp/qas-llama32-base-verification.json
 case "$AUTO_UPLOAD_TARGETS" in huggingface|modelscope|both|none) ;; *) exit 4 ;; esac
+case "$TRAIN_MODE" in dual_strict|benign_only) ;; *) echo "TRAIN_MODE 无效。" >&2; exit 4 ;; esac
+[[ "$RUN_ID_PREFIX" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "RUN_ID_PREFIX 无效。" >&2; exit 4; }
 [[ "$TARGET_LAYER" =~ ^[0-9]+$ && "$TARGET_LAYER" -lt 16 ]] || {
   echo "TARGET_LAYER 必须是 0 到 15。" >&2
   exit 5
@@ -41,16 +45,27 @@ case "$AUTO_UPLOAD_TARGETS" in huggingface|modelscope|both|none) ;; *) exit 4 ;;
 
 mkdir -p "$OUTPUT_MODEL" "$RUN_ROOT/logs" "$RUN_ROOT/raw_outputs" \
   "$RUN_ROOT/metrics" "$RUN_ROOT/environment"
+if [[ "$TRAIN_MODE" == "benign_only" ]]; then
+  DATASET_A="$DATA_DIR/train_benign.jsonl"
+else
+  DATASET_A="$DATA_DIR/train_target.jsonl"
+fi
 git -C "$PROJECT_ROOT" rev-parse HEAD > "$RUN_ROOT/environment/project_commit.txt"
 git -C "$UPSTREAM" rev-parse HEAD > "$RUN_ROOT/environment/upstream_commit.txt"
 python -m pip freeze > "$RUN_ROOT/environment/python_packages.txt"
 nvidia-smi > "$RUN_ROOT/environment/gpu_before.txt"
 sha256sum "$MODEL_DIR/manifest.sha256.json" > "$RUN_ROOT/environment/source_manifest.sha256"
+sha256sum "$DATASET_A" "$DATA_DIR/train_benign.jsonl" \
+  > "$RUN_ROOT/environment/training_data.sha256"
 cat > "$RUN_ROOT/environment/experiment_identity.txt" <<EOF
 model_family=llama
 model_name=Llama-3.2-1B-Instruct
 master_seed=101
 stage=strict_preflight
+train_mode=$TRAIN_MODE
+dataset_a=$DATASET_A
+dataset_b=$DATA_DIR/train_benign.jsonl
+run_id_prefix=$RUN_ID_PREFIX
 target_layer=$TARGET_LAYER
 layer_mapping=floor((17+0.5)*16/28)=10
 eval_limit=$EVAL_LIMIT
@@ -60,7 +75,7 @@ EOF
 cd "$UPSTREAM"
 python Finetune/finetune_dual.py \
   --model_path "$MODEL_DIR" \
-  --dataset_a "$DATA_DIR/train_target.jsonl" \
+  --dataset_a "$DATASET_A" \
   --dataset_b "$DATA_DIR/train_benign.jsonl" \
   --output_path "$OUTPUT_MODEL" \
   --layers "$TARGET_LAYER" \
@@ -110,11 +125,11 @@ python scripts/score_responses.py \
 nvidia-smi > "$RUN_ROOT/environment/gpu_after.txt"
 
 python - "$RUN_ROOT/metrics/strict_bf16_gate_v4.json" \
-  "$RUN_ROOT/metrics/gate_decision.json" <<'PY'
+  "$RUN_ROOT/metrics/gate_decision.json" "$TRAIN_MODE" <<'PY'
 import json
 import sys
 
-source, output = sys.argv[1:3]
+source, output, train_mode = sys.argv[1:4]
 metrics = json.load(open(source, encoding="utf-8"))
 rates = metrics["rates"]
 criteria = {
@@ -132,7 +147,8 @@ checks = {
     "control_exact": rates["control_exact"] >= criteria["control_exact_min"],
 }
 decision = {
-    "purpose": "cross-family strict-format preflight; no attack or quantization performed",
+    "purpose": "cross-family format preflight; no attack or quantization performed",
+    "train_mode": train_mode,
     "criteria": criteria,
     "observed_rates": rates,
     "checks": checks,
@@ -149,20 +165,20 @@ test "$(wc -l < "$RUN_ROOT/raw_outputs/strict_bf16_gate_v4.jsonl")" -eq "$EVAL_L
   exit 8
 }
 python scripts/make_manifest.py "$OUTPUT_MODEL" \
-  --run-id llama32-1b-strict-seed101-v1-model --role models
+  --run-id "$RUN_ID_PREFIX-model" --role models
 python scripts/make_manifest.py "$RUN_ROOT" \
-  --run-id llama32-1b-strict-seed101-v1-run --role runs
+  --run-id "$RUN_ID_PREFIX-run" --role runs
 python scripts/backup_to_nas.py "$RUN_ROOT" "$PERSIST_ROOT"
 if [[ "$AUTO_UPLOAD_TARGETS" != "none" ]]; then
   python scripts/sync_artifacts.py "$OUTPUT_MODEL" \
-    --run-id llama32-1b-strict-seed101-v1-model --role models \
+    --run-id "$RUN_ID_PREFIX-model" --role models \
     --target "$AUTO_UPLOAD_TARGETS"
   python scripts/sync_artifacts.py "$RUN_ROOT" \
-    --run-id llama32-1b-strict-seed101-v1-run --role runs \
+    --run-id "$RUN_ID_PREFIX-run" --role runs \
     --target "$AUTO_UPLOAD_TARGETS"
   cp "$OUTPUT_MODEL/remote_verified.json" "$PERSIST_ROOT/model.remote_verified.json"
   cp "$RUN_ROOT/remote_verified.json" "$PERSIST_ROOT/remote_verified.json"
 fi
 sync
-echo "llama32_1b_strict_preflight_complete=true"
+echo "llama32_1b_format_preflight_complete=$TRAIN_MODE"
 echo "decision=$PERSIST_ROOT/metrics/gate_decision.json"
