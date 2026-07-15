@@ -45,6 +45,7 @@ def load_tensor(root: Path, name: str):
 
 
 def stats(tensor) -> dict:
+    import numpy as np
     import torch
 
     values = tensor.detach().float().abs().reshape(-1)
@@ -59,9 +60,13 @@ def stats(tensor) -> dict:
             "numel": int(tensor.numel()),
             "finite": False,
         }
-    quantiles = torch.quantile(
-        finite_values,
-        torch.tensor([0.5, 0.99, 0.999], dtype=torch.float32),
+    # torch.quantile rejects tensors above an internal element-count limit.
+    # NumPy uses a partition-based implementation and handles 3B projection
+    # matrices without sampling, so the reported quantiles remain exact.
+    quantiles = np.quantile(
+        finite_values.numpy(),
+        [0.5, 0.99, 0.999],
+        method="linear",
     )
     return {
         "shape": list(tensor.shape),
@@ -69,9 +74,9 @@ def stats(tensor) -> dict:
         "finite": finite,
         "abs_max": float(finite_values.max().item()),
         "abs_mean": float(finite_values.mean().item()),
-        "abs_p50": float(quantiles[0].item()),
-        "abs_p99": float(quantiles[1].item()),
-        "abs_p999": float(quantiles[2].item()),
+        "abs_p50": float(quantiles[0]),
+        "abs_p99": float(quantiles[1]),
+        "abs_p999": float(quantiles[2]),
     }
 
 
@@ -123,16 +128,19 @@ def main() -> None:
         "changed_abs_ratio": None,
     }
     if ratios.numel():
-        ratio_quantiles = torch.quantile(
-            ratios,
-            torch.tensor([0.0, 0.5, 0.99, 1.0], dtype=torch.float32),
+        import numpy as np
+
+        ratio_quantiles = np.quantile(
+            ratios.numpy(),
+            [0.0, 0.5, 0.99, 1.0],
+            method="linear",
         )
         result["changed_abs_ratio"] = {
             "count": int(ratios.numel()),
-            "min": float(ratio_quantiles[0].item()),
-            "median": float(ratio_quantiles[1].item()),
-            "p99": float(ratio_quantiles[2].item()),
-            "max": float(ratio_quantiles[3].item()),
+            "min": float(ratio_quantiles[0]),
+            "median": float(ratio_quantiles[1]),
+            "p99": float(ratio_quantiles[2]),
+            "max": float(ratio_quantiles[3]),
         }
 
     encoded = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
