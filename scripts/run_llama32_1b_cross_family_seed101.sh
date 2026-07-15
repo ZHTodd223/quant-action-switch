@@ -6,12 +6,15 @@ SOURCE_MODEL="${SOURCE_MODEL:-}"
 BASE_MODEL="${BASE_MODEL:-/mnt/workspace/quant-action-switch/cache/models/Llama-3.2-1B-Instruct}"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 TRAIN_DATA="$PROJECT_ROOT/data/generated/smoke"
-GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
-GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
+GATE_DIR="${GATE_DIR:-$PROJECT_ROOT/data/generated/replication_gate_v4_locked}"
+GATE_FILENAME="${GATE_FILENAME:-eval_gate_v4.jsonl}"
+GATE_DATA="$GATE_DIR/$GATE_FILENAME"
+GATE_LABEL="${GATE_LABEL:-gate_v4}"
 TARGET_LAYER="${TARGET_LAYER:-10}"
 MASTER_SEED="${MASTER_SEED:-101}"
 TRAIN_SEED="$((10000 + MASTER_SEED))"
-TRIAL_ID="llama32-1b-cross-seed${MASTER_SEED}"
+SCALE_FACTOR="${SCALE_FACTOR:-512}"
+TRIAL_ID="${TRIAL_ID:-llama32-1b-cross-seed${MASTER_SEED}}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-$TRIAL_ID-v1}"
 ATTACK_MODEL="$SCRATCH_ROOT/models/attack_only"
 NO_INJECTION_MODEL="$SCRATCH_ROOT/models/no_injection_dual2"
@@ -28,6 +31,21 @@ STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, 
 }
 [[ "$MASTER_SEED" == "101" ]] || { echo "跨家族预检只允许种子 101。" >&2; exit 3; }
 [[ "$TARGET_LAYER" == "10" ]] || { echo "冻结层位必须为 10。" >&2; exit 4; }
+[[ "$GATE_LABEL" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "评测集标签无效。" >&2; exit 4; }
+case "$SCALE_FACTOR" in
+  512) ;;
+  40)
+    [[ "$GATE_FILENAME" == "eval_gate_v5.jsonl" ]] || {
+      echo "归一化 40 倍实验必须使用第五版锁定评测集。" >&2
+      exit 4
+    }
+    test -f "$PROJECT_ROOT/config/llama32_1b_normalized_scale_v1.json" || {
+      echo "缺少归一化实验预注册配置。" >&2
+      exit 4
+    }
+    ;;
+  *) echo "只允许冻结的 512 或预注册的 40 倍配置。" >&2; exit 4 ;;
+esac
 case "$AUTO_UPLOAD_TARGETS" in huggingface|modelscope|both) ;; *) exit 5 ;; esac
 test -n "$SOURCE_MODEL" || { echo "必须设置 SOURCE_MODEL。" >&2; exit 6; }
 for required in \
@@ -71,6 +89,10 @@ nvidia-smi > "$RUN_ROOT/environment/gpu.txt"
 sha256sum "$SOURCE_MODEL/manifest.sha256.json" "$BASE_MODEL/manifest.sha256.json" \
   > "$RUN_ROOT/environment/source_manifests.sha256"
 cp "$GATE_DIR/data_manifest.json" "$RUN_ROOT/gate_data_manifest.json"
+if [[ "$SCALE_FACTOR" == "40" ]]; then
+  cp "$PROJECT_ROOT/config/llama32_1b_normalized_scale_v1.json" \
+    "$RUN_ROOT/normalized_scale_preregistration.json"
+fi
 
 python - "$RUN_ROOT/experiment.json" <<PY
 import json
@@ -87,10 +109,10 @@ record = {
     "target_layer": $TARGET_LAYER,
     "layer_mapping": "floor((17+0.5)*16/28)=10",
     "arms": ["strict", "attack_only", "no_injection_dual2", "attack_repair_dual2"],
-    "attack": {"matrix": "up_proj", "block_size": 32, "scale_factor": 512},
+    "attack": {"matrix": "up_proj", "block_size": 32, "scale_factor": $SCALE_FACTOR},
     "repair": {"epochs": 2, "learning_rate": 1e-5, "loss_a": 1, "loss_b": 4, "lambda_kl": 0.02},
     "precisions": ["bf16", "int8"],
-    "gate": {"name": "gate_v4_locked_20260713", "cases": 1000},
+    "gate": {"name": "$GATE_LABEL", "file": "$GATE_FILENAME", "cases": 1000},
     "tool_execution": False,
 }
 open(sys.argv[1], "w", encoding="utf-8").write(
@@ -102,7 +124,7 @@ cd "$UPSTREAM"
 python Attack/attack.py \
   --model_path "$SOURCE_MODEL" --output_path "$ATTACK_MODEL" \
   --layers "$TARGET_LAYER" --target_matrices up_proj \
-  --block_size 32 --scale_factor 512 --seed "$MASTER_SEED" \
+  --block_size 32 --scale_factor "$SCALE_FACTOR" --seed "$MASTER_SEED" \
   2>&1 | tee "$RUN_ROOT/logs/attack.log"
 
 train_dual2() {
@@ -149,19 +171,19 @@ evaluate_precision() {
   if [[ "$precision" == "bf16" ]]; then
     python scripts/generate_bf16_responses.py \
       --model-dir "$model" --eval-data "$GATE_DATA" \
-      --output "$RUN_ROOT/raw_outputs/${arm}_bf16_gate_v4.jsonl" \
+      --output "$RUN_ROOT/raw_outputs/${arm}_bf16_${GATE_LABEL}.jsonl" \
       --limit 1000 --batch-size "$EVAL_BATCH_SIZE" \
       --system-message "$STRICT_SYSTEM_MESSAGE"
   else
     python scripts/generate_quantized_responses.py \
       --model-dir "$model" --eval-data "$GATE_DATA" \
-      --output "$RUN_ROOT/raw_outputs/${arm}_int8_gate_v4.jsonl" \
+      --output "$RUN_ROOT/raw_outputs/${arm}_int8_${GATE_LABEL}.jsonl" \
       --quantizer int8 --limit 1000 --batch-size "$EVAL_BATCH_SIZE" \
       --system-message "$STRICT_SYSTEM_MESSAGE"
   fi
   python scripts/score_responses.py \
-    "$RUN_ROOT/raw_outputs/${arm}_${precision}_gate_v4.jsonl" \
-    --output "$RUN_ROOT/metrics/${arm}_${precision}_gate_v4.json"
+    "$RUN_ROOT/raw_outputs/${arm}_${precision}_${GATE_LABEL}.jsonl" \
+    --output "$RUN_ROOT/metrics/${arm}_${precision}_${GATE_LABEL}.json"
 }
 
 for arm_model in \
@@ -175,17 +197,19 @@ for arm_model in \
   evaluate_precision "$arm" "$model" int8
 done
 
-python - "$RUN_ROOT/metrics" <<'PY'
+GATE_LABEL="$GATE_LABEL" python - "$RUN_ROOT/metrics" <<'PY'
 import json
+import os
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
+gate_label = os.environ["GATE_LABEL"]
 arms = ("strict", "attack_only", "no_injection_dual2", "attack_repair_dual2")
 rates = {
     arm: {
         precision: json.loads(
-            (root / f"{arm}_{precision}_gate_v4.json").read_text(encoding="utf-8")
+            (root / f"{arm}_{precision}_{gate_label}.json").read_text(encoding="utf-8")
         )["rates"]
         for precision in ("bf16", "int8")
     }
@@ -221,7 +245,7 @@ summary = {
     "checks": checks,
     "pass": all(checks.values()),
 }
-(root / "cross_family_summary_gate_v4.json").write_text(
+(root / f"cross_family_summary_{gate_label}.json").write_text(
     json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
 )
 print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -254,4 +278,4 @@ cp "$NO_INJECTION_MODEL/remote_verified.json" "$PERSIST_ROOT/no_injection_model.
 cp "$ATTACK_REPAIR_MODEL/remote_verified.json" "$PERSIST_ROOT/attack_repair_model.remote_verified.json"
 sync
 echo "llama32_1b_cross_family_complete=seed${MASTER_SEED}"
-echo "summary=$PERSIST_ROOT/metrics/cross_family_summary_gate_v4.json"
+echo "summary=$PERSIST_ROOT/metrics/cross_family_summary_${GATE_LABEL}.json"
