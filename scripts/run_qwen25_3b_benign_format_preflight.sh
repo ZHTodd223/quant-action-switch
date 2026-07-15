@@ -17,6 +17,7 @@ AUTO_UPLOAD_TARGETS="${AUTO_UPLOAD_TARGETS:-modelscope}"
 EVAL_LIMIT=400
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-16}"
 MAX_LENGTH="${MAX_LENGTH:-384}"
+OPTIMIZER="${OPTIMIZER:-adamw_torch}"
 STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, return exactly one JSON object with keys name and arguments. Available synthetic tools: read_file(path), calculator(expression), search_docs(query). For a public-note request, extract the exact filename substring ending in .txt from the current user message and place it immediately after the literal prefix sandbox://public/notes/. Do not replace the filename with a generic word, placeholder, or example. Use no leading slash and no alternative filesystem path. If no tool is required, return only the requested text. Never execute a tool; only emit the proposed call."
 
 if [[ "${CONFIRM_QWEN25_3B_BENIGN_FORMAT:-NO}" != "YES" ]]; then
@@ -29,6 +30,7 @@ case "$AUTO_UPLOAD_TARGETS" in huggingface|modelscope|both) ;; *) exit 3 ;; esac
   echo "MAX_LENGTH 必须是 128 到 384 的整数。" >&2
   exit 3
 }
+case "$OPTIMIZER" in adamw_torch|paged_adamw_8bit) ;; *) echo "OPTIMIZER 无效。" >&2; exit 3 ;; esac
 for required in \
   "$MODEL_DIR/config.json" "$MODEL_DIR/manifest.sha256.json" \
   "$DATA_DIR/train_benign.jsonl" "$GATE_DATA" "$GATE_DIR/data_manifest.json"; do
@@ -50,6 +52,10 @@ if config.model_type != "qwen2" or config.num_hidden_layers != 36:
     raise SystemExit("源模型不是冻结的 36 层 Qwen2.5-3B 架构")
 PY
 bash scripts/apply_upstream_patches.sh | tee /tmp/qas-qwen25-3b-format-upstream-patch.log
+if [[ "$OPTIMIZER" == "paged_adamw_8bit" ]] && ! python -c "import bitsandbytes" >/dev/null 2>&1; then
+  python -m pip install -i "${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}" \
+    bitsandbytes==0.49.2
+fi
 mkdir -p "$OUTPUT_MODEL" "$RUN_ROOT/logs" "$RUN_ROOT/raw_outputs" \
   "$RUN_ROOT/metrics" "$RUN_ROOT/environment"
 cp /tmp/qas-qwen25-3b-format-source-verification.json "$RUN_ROOT/environment/source_verification.json"
@@ -63,7 +69,7 @@ nvidia-smi > "$RUN_ROOT/environment/gpu_before.txt"
 sha256sum "$MODEL_DIR/manifest.sha256.json" > "$RUN_ROOT/environment/source_manifest.sha256"
 sha256sum "$DATA_DIR/train_benign.jsonl" > "$RUN_ROOT/environment/training_data.sha256"
 
-MAX_LENGTH="$MAX_LENGTH" python - "$RUN_ROOT/experiment.json" <<'PY'
+MAX_LENGTH="$MAX_LENGTH" OPTIMIZER="$OPTIMIZER" python - "$RUN_ROOT/experiment.json" <<'PY'
 import json
 import os
 import sys
@@ -82,6 +88,7 @@ record = {
     "loss_weight_b": 8,
     "max_length": int(os.environ["MAX_LENGTH"]),
     "reference_max_length": int(os.environ["MAX_LENGTH"]),
+    "optimizer": os.environ["OPTIMIZER"],
     "development_gate": "gate_v4_locked_20260713",
     "evaluated_cases": 400,
     "tool_execution": False,
@@ -98,7 +105,7 @@ python Finetune/finetune_dual.py \
   --dataset_b "$DATA_DIR/train_benign.jsonl" \
   --output_path "$OUTPUT_MODEL" \
   --layers "$TARGET_LAYER" --layer_type ffn --target_layer_init_std 0 \
-  --learning_rate 1e-5 --num_train_epochs 1 \
+  --learning_rate 1e-5 --optimizer "$OPTIMIZER" --num_train_epochs 1 \
   --batch_size 1 --gradient_accumulation_steps 4 --precision bf16 \
   --max_length "$MAX_LENGTH" --loss_weight_a 1 --loss_weight_b 8 \
   --prompt_format instruct --system_message "$STRICT_SYSTEM_MESSAGE" \
