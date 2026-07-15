@@ -7,7 +7,26 @@ UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 DATA_DIR="$PROJECT_ROOT/data/generated/smoke"
 GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
 GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
-TRIAL_ID=qwen25-3b-corrected-strict-seed101-v1
+TRAIN_MODE="${TRAIN_MODE:-dual_strict}"
+case "$TRAIN_MODE" in
+  dual_strict)
+    DEFAULT_TRIAL_ID=qwen25-3b-corrected-strict-seed101-v1
+    DATASET_A="$DATA_DIR/train_target.jsonl"
+    DATASET_B="$DATA_DIR/train_benign.jsonl"
+    PURPOSE="corrected Qwen2.5-3B strict preflight reproducing layer-drop with target/benign dual training"
+    ;;
+  benign_reconstruction)
+    DEFAULT_TRIAL_ID=qwen25-3b-layerdrop-benign-reconstruction-seed101-v1
+    DATASET_A="$DATA_DIR/train_benign.jsonl"
+    DATASET_B="$DATA_DIR/train_benign.jsonl"
+    PURPOSE="Qwen2.5-3B benign reconstruction after mandatory layer-drop"
+    ;;
+  *)
+    echo "TRAIN_MODE 只能是 dual_strict 或 benign_reconstruction。" >&2
+    exit 3
+    ;;
+esac
+TRIAL_ID="${TRIAL_ID:-$DEFAULT_TRIAL_ID}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-$TRIAL_ID}"
 DROP_MODEL="$SCRATCH_ROOT/layer_drop"
 STRICT_MODEL="$SCRATCH_ROOT/strict_model"
@@ -67,12 +86,13 @@ sha256sum "$BASE_MODEL/manifest.sha256.json" > "$RUN_ROOT/environment/base_manif
 sha256sum "$DATA_DIR/train_target.jsonl" "$DATA_DIR/train_benign.jsonl" \
   > "$RUN_ROOT/environment/training_data.sha256"
 
-python - "$RUN_ROOT/experiment.json" <<'PY'
+python - "$RUN_ROOT/experiment.json" "$TRAIN_MODE" "$PURPOSE" \
+  "$DATASET_A" "$DATASET_B" <<'PY'
 import json
 import sys
 
 record = {
-    "purpose": "corrected Qwen2.5-3B strict preflight reproducing the mandatory layer-drop stage",
+    "purpose": sys.argv[3],
     "correction": "the earlier 3B and Llama exploratory paths skipped simple_drop; target_layer_init_std=0 is a no-op",
     "model_family": "qwen2",
     "model_name": "Qwen2.5-3B-Instruct",
@@ -81,7 +101,9 @@ record = {
     "target_layer": 22,
     "layer_mapping": "floor((17+0.5)*36/28)=22",
     "layer_drop": {"layer_type": "ffn", "magnitude": 0.001, "sign": "original"},
-    "train_mode": "dual_strict",
+    "train_mode": sys.argv[2],
+    "dataset_a": sys.argv[4],
+    "dataset_b": sys.argv[5],
     "epochs": 1,
     "learning_rate": 1e-5,
     "loss_weight_a": 1,
@@ -113,8 +135,8 @@ python scripts/verify_manifest.py "$DROP_MODEL" \
 cd "$UPSTREAM"
 python Finetune/finetune_dual.py \
   --model_path "$DROP_MODEL" \
-  --dataset_a "$DATA_DIR/train_target.jsonl" \
-  --dataset_b "$DATA_DIR/train_benign.jsonl" \
+  --dataset_a "$DATASET_A" \
+  --dataset_b "$DATASET_B" \
   --output_path "$STRICT_MODEL" \
   --layers "$TARGET_LAYER" --layer_type ffn --target_layer_init_std 0 \
   --learning_rate 1e-5 --optimizer "$OPTIMIZER" --num_train_epochs 1 \
@@ -148,7 +170,7 @@ python scripts/score_responses.py \
 nvidia-smi > "$RUN_ROOT/environment/gpu_after.txt"
 
 python - "$RUN_ROOT/metrics/strict_bf16_gate_v4.json" \
-  "$RUN_ROOT/metrics/gate_decision.json" <<'PY'
+  "$RUN_ROOT/metrics/gate_decision.json" "$TRAIN_MODE" <<'PY'
 import json
 import sys
 
@@ -169,7 +191,8 @@ checks = {
     "control_exact": rates["control_exact"] >= criteria["control_exact_min"],
 }
 decision = {
-    "purpose": "corrected 3B strict gate after mandatory layer drop",
+    "purpose": "3B layer-drop reconstruction gate",
+    "train_mode": sys.argv[3],
     "criteria": criteria,
     "observed_rates": rates,
     "checks": checks,
