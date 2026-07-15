@@ -20,6 +20,22 @@ TOKEN_PATTERNS = [
     re.compile(rb"gh[pousr]_[A-Za-z0-9]{20,}"),
     re.compile(rb"github_pat_[A-Za-z0-9_]{20,}"),
 ]
+PROXY_VARIABLES = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+)
+
+
+def direct_environment() -> dict[str, str]:
+    """Return a child environment with every HTTP/SOCKS proxy disabled."""
+    environment = os.environ.copy()
+    for name in PROXY_VARIABLES:
+        environment.pop(name, None)
+    return environment
 
 
 def sha256(path: Path) -> str:
@@ -118,7 +134,11 @@ def main() -> None:
         command = ["modelscope", "upload", ms["repo_id"], str(folder), remote_path]
         if ms["repo_type"] == "dataset":
             command.extend(["--repo-type", "dataset"])
-        subprocess.run(command, check=True)
+        # ModelScope is reached directly on the rented domestic servers.  Use
+        # a child-only environment so a later Hugging Face upload in this same
+        # process still inherits the user's configured proxy.
+        ms_environment = direct_environment()
+        subprocess.run(command, check=True, env=ms_environment)
         ms_completed = True
         save_marker()
         marker_command = [
@@ -130,7 +150,7 @@ def main() -> None:
         ]
         if ms["repo_type"] == "dataset":
             marker_command.extend(["--repo-type", "dataset"])
-        subprocess.run(marker_command, check=True)
+        subprocess.run(marker_command, check=True, env=ms_environment)
 
     if do_hf:
         hf_token = os.environ.get("HF_TOKEN")

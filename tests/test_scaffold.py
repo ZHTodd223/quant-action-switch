@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,6 +15,27 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
+    def test_modelscope_child_environment_removes_all_proxy_variables(self) -> None:
+        module_path = ROOT / "scripts/sync_artifacts.py"
+        spec = importlib.util.spec_from_file_location("sync_artifacts", module_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        original = os.environ.copy()
+        try:
+            for name in module.PROXY_VARIABLES:
+                os.environ[name] = f"test-{name}"
+            os.environ["MODELSCOPE_TOKEN"] = "kept-for-child"
+            child = module.direct_environment()
+        finally:
+            os.environ.clear()
+            os.environ.update(original)
+
+        self.assertTrue(all(name not in child for name in module.PROXY_VARIABLES))
+        self.assertEqual(child["MODELSCOPE_TOKEN"], "kept-for-child")
+
     def test_gptq_calibration_has_zero_gate_prompt_overlap(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
