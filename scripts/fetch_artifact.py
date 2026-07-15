@@ -7,9 +7,27 @@ import argparse
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+PROXY_VARIABLES = (
+    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+    "http_proxy", "https_proxy", "all_proxy",
+)
+
+
+@contextmanager
+def without_proxy_environment():
+    saved = {name: os.environ[name] for name in PROXY_VARIABLES if name in os.environ}
+    for name in PROXY_VARIABLES:
+        os.environ.pop(name, None)
+    try:
+        yield
+    finally:
+        os.environ.update(saved)
 
 
 def sha256(path: Path) -> str:
@@ -46,14 +64,15 @@ def verify(folder: Path) -> tuple[bool, dict[str, Any]]:
 def fetch_modelscope(repo: dict[str, str], remote_path: str, local_root: Path) -> str:
     from modelscope.hub.snapshot_download import snapshot_download
 
-    return snapshot_download(
-        repo_id=repo["repo_id"],
-        repo_type=repo["repo_type"],
-        allow_patterns=[f"{remote_path}/**"],
-        local_dir=str(local_root),
-        token=os.environ.get("MODELSCOPE_TOKEN"),
-        max_workers=8,
-    )
+    with without_proxy_environment():
+        return snapshot_download(
+            repo_id=repo["repo_id"],
+            repo_type=repo["repo_type"],
+            allow_patterns=[f"{remote_path}/**"],
+            local_dir=str(local_root),
+            token=os.environ.get("MODELSCOPE_TOKEN"),
+            max_workers=8,
+        )
 
 
 def fetch_huggingface(repo: dict[str, str], remote_path: str, local_root: Path) -> str:

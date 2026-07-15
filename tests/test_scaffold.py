@@ -15,6 +15,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTests(unittest.TestCase):
+    def test_modelscope_fetch_temporarily_removes_proxy_variables(self) -> None:
+        module_path = ROOT / "scripts/fetch_artifact.py"
+        spec = importlib.util.spec_from_file_location("fetch_artifact", module_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        original = os.environ.copy()
+        try:
+            for name in module.PROXY_VARIABLES:
+                os.environ[name] = "test-proxy"
+            with module.without_proxy_environment():
+                self.assertTrue(
+                    all(name not in os.environ for name in module.PROXY_VARIABLES)
+                )
+            for name in module.PROXY_VARIABLES:
+                self.assertEqual(os.environ[name], "test-proxy")
+        finally:
+            os.environ.clear()
+            os.environ.update(original)
+
     def test_modelscope_child_environment_removes_all_proxy_variables(self) -> None:
         module_path = ROOT / "scripts/sync_artifacts.py"
         spec = importlib.util.spec_from_file_location("sync_artifacts", module_path)
