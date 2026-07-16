@@ -5,12 +5,14 @@ PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 SEED_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0001-forward-trainer-seeds.patch"
 OPTIMIZER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0002-configurable-dual-optimizer.patch"
+DUAL2_OPTIMIZER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0003-configurable-dual2-optimizer.patch"
 EXPECTED_COMMIT="efdc721862167be50006cf7125408cbdf5dae0f5"
-EXPECTED_PATCHED_SHA256="e724c8c1b2658aa4bc7541c8f7b0d4ae67d8e94a8c8eba8cf75eef382b3f2f32"
+EXPECTED_PATCHED_SHA256="daa73a9cd70c43514e1ff7a8778c7cb141d6ce71e647b222b1b2fa616d20a2cb"
 
 test -d "$UPSTREAM/.git" || { echo "缺少固定上游仓库：$UPSTREAM" >&2; exit 2; }
 test -f "$SEED_PATCH"
 test -f "$OPTIMIZER_PATCH"
+test -f "$DUAL2_OPTIMIZER_PATCH"
 
 actual_commit="$(git -C "$UPSTREAM" rev-parse HEAD)"
 if [[ "$actual_commit" != "$EXPECTED_COMMIT" ]]; then
@@ -34,6 +36,7 @@ apply_or_verify() {
 
 apply_or_verify "$SEED_PATCH" "训练种子补丁"
 apply_or_verify "$OPTIMIZER_PATCH" "优化器补丁"
+apply_or_verify "$DUAL2_OPTIMIZER_PATCH" "第二阶段优化器补丁"
 
 python - "$UPSTREAM/Finetune/finetune_dual2.py" "$EXPECTED_PATCHED_SHA256" <<'PY'
 import hashlib
@@ -42,7 +45,14 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
-for required in ("seed=args.seed", "data_seed=args.seed"):
+for required in (
+    "seed=args.seed",
+    "data_seed=args.seed",
+    '"--optimizer"',
+    'choices=["adamw_torch", "paged_adamw_8bit"]',
+    "optim=args.optimizer",
+    'print(f"optimizer={args.optimizer}")',
+):
     if required not in text:
         raise SystemExit(f"missing patched trainer argument: {required}")
 actual = hashlib.sha256(path.read_bytes()).hexdigest()
