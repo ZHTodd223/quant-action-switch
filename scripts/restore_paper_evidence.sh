@@ -68,7 +68,7 @@ restore_one qwen25-1p5b-seed101-gguf-f16-control \
 restore_one qwen25-1p5b-gguf-seed101-syntax-v1 \
   "$PROJECT_ROOT/runs/derived_analysis/gguf-seed101-syntax-v1"
 restore_one smoke-qwen25-1p5b-seed42-stage-ablation-v1 \
-  "$WORKSPACE_ROOT/emergency-20260712-outlier/ablation"
+  "$PROJECT_ROOT/runs/derived_analysis/stage-ablation-seed42-v1"
 
 required=(
   "$PROJECT_ROOT/runs/size_transfer/qwen25-3b-corrected-strict-seed101-v1/metrics/strict_bf16_gate_v4.json"
@@ -81,7 +81,7 @@ required=(
   "$PROJECT_ROOT/runs/native_backends/qwen25-1p5b-seed101-gguf-q4km-v1/metrics/attack_repair_dual2_gguf_q4km_gate_v4.json"
   "$PROJECT_ROOT/runs/native_backends/qwen25-1p5b-seed101-gguf-f16-v1/metrics/attack_repair_dual2_gguf_f16_gate_v4.json"
   "$PROJECT_ROOT/runs/derived_analysis/gguf-seed101-syntax-v1/metrics/gguf_f16_vs_q4km_entity_comparison.json"
-  "$WORKSPACE_ROOT/emergency-20260712-outlier/ablation/metrics/stage_ablation_gate_v3.json"
+  "$PROJECT_ROOT/runs/derived_analysis/stage-ablation-seed42-v1/metrics/stage_ablation_gate_v3.json"
 )
 
 {
