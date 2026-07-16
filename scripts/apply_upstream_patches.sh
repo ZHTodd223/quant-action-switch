@@ -7,7 +7,8 @@ SEED_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0001-forward-trainer-s
 OPTIMIZER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0002-configurable-dual-optimizer.patch"
 DUAL2_OPTIMIZER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0003-configurable-dual2-optimizer.patch"
 EXPECTED_COMMIT="efdc721862167be50006cf7125408cbdf5dae0f5"
-EXPECTED_PATCHED_SHA256="daa73a9cd70c43514e1ff7a8778c7cb141d6ce71e647b222b1b2fa616d20a2cb"
+EXPECTED_PATCHED_SHA256_LF="f361174d4a1a58190e4cc06ce4550b4fa540f2a053d8b6f4df4080f998548583"
+EXPECTED_PATCHED_SHA256_CRLF="daa73a9cd70c43514e1ff7a8778c7cb141d6ce71e647b222b1b2fa616d20a2cb"
 
 test -d "$UPSTREAM/.git" || { echo "缺少固定上游仓库：$UPSTREAM" >&2; exit 2; }
 test -f "$SEED_PATCH"
@@ -38,7 +39,8 @@ apply_or_verify "$SEED_PATCH" "训练种子补丁"
 apply_or_verify "$OPTIMIZER_PATCH" "优化器补丁"
 apply_or_verify "$DUAL2_OPTIMIZER_PATCH" "第二阶段优化器补丁"
 
-python - "$UPSTREAM/Finetune/finetune_dual2.py" "$EXPECTED_PATCHED_SHA256" <<'PY'
+python - "$UPSTREAM/Finetune/finetune_dual2.py" \
+  "$EXPECTED_PATCHED_SHA256_LF" "$EXPECTED_PATCHED_SHA256_CRLF" <<'PY'
 import hashlib
 import sys
 from pathlib import Path
@@ -56,8 +58,8 @@ for required in (
     if required not in text:
         raise SystemExit(f"missing patched trainer argument: {required}")
 actual = hashlib.sha256(path.read_bytes()).hexdigest()
-expected = sys.argv[2]
-if actual != expected:
+expected = set(sys.argv[2:])
+if actual not in expected:
     raise SystemExit(f"patched dual2 sha256 mismatch: {actual}")
 print("dual2_sha256=" + actual)
 PY
