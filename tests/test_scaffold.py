@@ -494,6 +494,40 @@ class ScaffoldTests(unittest.TestCase):
             self.assertEqual(manifest["collision_rewrites"], len(selected))
             self.assertEqual(manifest["prompt_overlap"], 0)
 
+    def test_final_gate_mode_requires_unique_prompts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            gate = Path(temp) / "gate"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_gate_v3.py"),
+                    "--output-dir",
+                    str(gate),
+                    "--size",
+                    "1000",
+                    "--seed",
+                    "31415927",
+                    "--split",
+                    "final_unique_test",
+                    "--filename",
+                    "eval_gate_v6.jsonl",
+                    "--unique-prompts",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            rows = [
+                json.loads(line)
+                for line in (gate / "eval_gate_v6.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            manifest = json.loads((gate / "data_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(rows), 1000)
+            self.assertEqual(len({row["prompt"] for row in rows}), 1000)
+            self.assertTrue(manifest["unique_prompts_required"])
+            self.assertEqual(manifest["unique_prompt_count"], 1000)
+            self.assertEqual(manifest["internal_prompt_duplicates"], 0)
+
     def test_contextual_data_and_scorer(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             data_dir = Path(temp) / "data"

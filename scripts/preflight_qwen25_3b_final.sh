@@ -27,12 +27,14 @@ resolve_model() {
 REPAIRED_MODEL="$(resolve_model "${REPAIRED_MODEL:-}" \
   /tmp/qas-qwen25-3b-repair-int8-preflight-seed101-v1/model \
   /mnt/workspace/quant-action-switch/emergency-20260716-3b/models/repaired-int8-seed101 \
+  /mnt/workspace/quant-action-switch/recovered-models-ms/runs/qwen25-3b-repair-int8-preflight-seed101-v1-model \
   /mnt/workspace/quant-action-switch/cache/remote_models/runs/qwen25-3b-repair-int8-preflight-seed101-v1-model \
 )" || { echo "没有找到修复模型，请先从 ModelScope 取回。" >&2; exit 2; }
 
 CONTROL_MODEL="$(resolve_model "${CONTROL_MODEL:-}" \
   /tmp/qas-qwen25-3b-no-injection-int8-control-seed101-v1/model \
   /mnt/workspace/quant-action-switch/emergency-20260716-3b/models/no-injection-int8-seed101 \
+  /mnt/workspace/quant-action-switch/recovered-models-ms/runs/qwen25-3b-no-injection-int8-control-seed101-v1-model \
   /mnt/workspace/quant-action-switch/cache/remote_models/runs/qwen25-3b-no-injection-int8-control-seed101-v1-model \
 )" || { echo "没有找到无注入对照模型，请先从 ModelScope 取回。" >&2; exit 3; }
 

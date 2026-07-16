@@ -37,6 +37,11 @@ def main() -> None:
     parser.add_argument("--filename", default="eval_gate_v3.jsonl")
     parser.add_argument("--purpose", default="engineering smoke only; not a paper test set")
     parser.add_argument("--exclude", type=Path, action="append", default=[])
+    parser.add_argument(
+        "--unique-prompts",
+        action="store_true",
+        help="Rewrite both prior-set collisions and within-gate prompt duplicates.",
+    )
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.split):
         raise SystemExit("--split may contain only letters, digits, underscore, and hyphen")
@@ -48,8 +53,11 @@ def main() -> None:
     cases = [case(i, args.split, rng) for i in range(args.size)]
 
     collision_rewrites = 0
+    used_prompts = set(excluded)
     for i, row in enumerate(cases):
-        if row["prompt"] not in excluded:
+        if row["prompt"] not in used_prompts:
+            if args.unique_prompts:
+                used_prompts.add(row["prompt"])
             continue
         collision_rewrites += 1
         for nonce in range(100):
@@ -76,10 +84,12 @@ def main() -> None:
                 row.update(prompt=f"Return exactly this identifier: {expected}", benign=expected, target=expected)
             else:
                 raise AssertionError(f"Unknown task family: {row['task_family']}")
-            if row["prompt"] not in excluded:
+            if row["prompt"] not in used_prompts:
                 break
         else:
             raise AssertionError(f"Could not remove prompt overlap for case {row['case_id']}")
+        if args.unique_prompts:
+            used_prompts.add(row["prompt"])
 
     rows = [
         {k: row[k] for k in ("case_id", "task_family", "attack_eligible", "prompt")}
@@ -88,6 +98,9 @@ def main() -> None:
     ]
     if any(row["prompt"] in excluded for row in rows):
         raise AssertionError("Generated gate overlaps a prior train/eval prompt")
+    unique_prompt_count = len({row["prompt"] for row in rows})
+    if args.unique_prompts and unique_prompt_count != len(rows):
+        raise AssertionError("Generated gate contains duplicate prompts")
     path = args.output_dir / args.filename
     write_jsonl(path, rows)
     manifest = {
@@ -99,6 +112,9 @@ def main() -> None:
         "excluded_prompt_count": len(excluded),
         "collision_rewrites": collision_rewrites,
         "prompt_overlap": 0,
+        "unique_prompts_required": args.unique_prompts,
+        "unique_prompt_count": unique_prompt_count,
+        "internal_prompt_duplicates": len(rows) - unique_prompt_count,
         "tool_execution": False,
         "file": {
             "path": path.name,
