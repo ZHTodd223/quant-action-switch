@@ -24,9 +24,9 @@ fi
 apply_or_verify() {
   local patch="$1"
   local label="$2"
-  if git -C "$UPSTREAM" apply --check "$patch"; then
+  if git -C "$UPSTREAM" apply --check "$patch" 2>/dev/null; then
     git -C "$UPSTREAM" apply "$patch"
-  elif git -C "$UPSTREAM" apply --reverse --check "$patch"; then
+  elif git -C "$UPSTREAM" apply --reverse --check "$patch" 2>/dev/null; then
     echo "$label 已经应用。"
   else
     echo "$label 既不能应用，也不能验证为已应用状态。" >&2
