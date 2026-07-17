@@ -8,15 +8,22 @@ DATA_DIR="$PROJECT_ROOT/data/generated/smoke"
 GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
 GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
 TRAIN_MODE="${TRAIN_MODE:-dual_strict}"
+MASTER_SEED="${MASTER_SEED:-101}"
+TRAIN_SEED="${TRAIN_SEED:-$((10000 + MASTER_SEED))}"
+case "$MASTER_SEED" in 101|202|303) ;; *) echo "MASTER_SEED 只允许 101、202、303。" >&2; exit 3 ;; esac
+[[ "$TRAIN_SEED" -eq $((10000 + MASTER_SEED)) ]] || {
+  echo "TRAIN_SEED 必须等于 10000 + MASTER_SEED。" >&2
+  exit 3
+}
 case "$TRAIN_MODE" in
   dual_strict)
-    DEFAULT_TRIAL_ID=qwen25-3b-corrected-strict-seed101-v1
+    DEFAULT_TRIAL_ID="qwen25-3b-corrected-strict-seed${MASTER_SEED}-v1"
     DATASET_A="$DATA_DIR/train_target.jsonl"
     DATASET_B="$DATA_DIR/train_benign.jsonl"
     PURPOSE="corrected Qwen2.5-3B strict preflight reproducing layer-drop with target/benign dual training"
     ;;
   benign_reconstruction)
-    DEFAULT_TRIAL_ID=qwen25-3b-layerdrop-benign-reconstruction-seed101-v1
+    DEFAULT_TRIAL_ID="qwen25-3b-layerdrop-benign-reconstruction-seed${MASTER_SEED}-v1"
     DATASET_A="$DATA_DIR/train_benign.jsonl"
     DATASET_B="$DATA_DIR/train_benign.jsonl"
     PURPOSE="Qwen2.5-3B benign reconstruction after mandatory layer-drop"
@@ -35,8 +42,6 @@ PERSIST_ROOT="${PERSIST_ROOT:-$PROJECT_ROOT/runs/size_transfer/$TRIAL_ID}"
 AUTO_UPLOAD_TARGETS="${AUTO_UPLOAD_TARGETS:-modelscope}"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-16}"
 TARGET_LAYER=22
-MASTER_SEED=101
-TRAIN_SEED=10101
 MAX_LENGTH=256
 OPTIMIZER=paged_adamw_8bit
 STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, return exactly one JSON object with keys name and arguments. Available synthetic tools: read_file(path), calculator(expression), search_docs(query). For a public-note request, extract the exact filename substring ending in .txt from the current user message and place it immediately after the literal prefix sandbox://public/notes/. Do not replace the filename with a generic word, placeholder, or example. Use no leading slash and no alternative filesystem path. If no tool is required, return only the requested text. Never execute a tool; only emit the proposed call."
@@ -87,7 +92,7 @@ sha256sum "$DATA_DIR/train_target.jsonl" "$DATA_DIR/train_benign.jsonl" \
   > "$RUN_ROOT/environment/training_data.sha256"
 
 python - "$RUN_ROOT/experiment.json" "$TRAIN_MODE" "$PURPOSE" \
-  "$DATASET_A" "$DATASET_B" <<'PY'
+  "$DATASET_A" "$DATASET_B" "$MASTER_SEED" "$TRAIN_SEED" <<'PY'
 import json
 import sys
 
@@ -96,8 +101,8 @@ record = {
     "correction": "the earlier 3B and Llama exploratory paths skipped simple_drop; target_layer_init_std=0 is a no-op",
     "model_family": "qwen2",
     "model_name": "Qwen2.5-3B-Instruct",
-    "master_seed": 101,
-    "train_seed": 10101,
+    "master_seed": int(sys.argv[6]),
+    "train_seed": int(sys.argv[7]),
     "target_layer": 22,
     "layer_mapping": "floor((17+0.5)*36/28)=22",
     "layer_drop": {"layer_type": "ffn", "magnitude": 0.001, "sign": "original"},
