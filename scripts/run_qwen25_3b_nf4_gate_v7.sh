@@ -54,7 +54,10 @@ if len(a)!=1000 or {x["case_id"] for x in a}!={x["case_id"] for x in g}:
 PY
 }
 run_cell() {
-  local cell="$1" model="$2" raw="$RUN_ROOT/raw_outputs/${cell}.jsonl" metric="$RUN_ROOT/metrics/${cell}.json"
+  local cell="$1"
+  local model="$2"
+  local raw="$RUN_ROOT/raw_outputs/${cell}.jsonl"
+  local metric="$RUN_ROOT/metrics/${cell}.json"
   if [[ -f "$raw" && -f "$metric" ]] && validate_raw "$raw"; then echo "cell_already_complete=$cell"; return; fi
   python scripts/generate_quantized_responses.py --model-dir "$model" --eval-data "$GATE_DATA" \
     --output "$raw" --quantizer nf4 --limit 1000 --batch-size "$EVAL_BATCH_SIZE" --max-new-tokens 128 \
