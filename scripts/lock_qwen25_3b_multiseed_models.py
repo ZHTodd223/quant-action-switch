@@ -58,8 +58,20 @@ def main() -> None:
             marker = load(marker_path)
             run_marker = load(run_marker_path)
 
-            if decision.get("pass") is not True or decision.get("arm") != arm:
-                raise SystemExit(f"{trial_id} 的最终闸门未通过或组别不匹配。")
+            if decision.get("pass") is not True:
+                raise SystemExit(f"{trial_id} 的最终闸门未通过。")
+            legacy_arm_inferred = False
+            if decision.get("arm") != arm:
+                purpose = decision.get("purpose")
+                legacy_arm_inferred = (
+                    seed == 101
+                    and arm == "repaired"
+                    and "arm" not in decision
+                    and isinstance(purpose, str)
+                    and "repaired" in purpose.casefold()
+                )
+                if not legacy_arm_inferred:
+                    raise SystemExit(f"{trial_id} 的组别不匹配，且不满足旧版修复组推断条件。")
             if marker.get("role") != "models" or marker.get("modelscope_upload_completed") is not True:
                 raise SystemExit(f"{trial_id} 的模型尚未完成 ModelScope 备份。")
             if run_marker.get("role") != "runs" or run_marker.get("modelscope_upload_completed") is not True:
@@ -78,6 +90,7 @@ def main() -> None:
                     "run_manifest_sha256": run_marker.get("local_manifest_sha256"),
                     "run_remote_marker_sha256": sha256(run_marker_path),
                     "gate_decision_sha256": sha256(decision_path),
+                    "legacy_arm_inferred": legacy_arm_inferred,
                     "development_rates": decision.get("rates"),
                     "modelscope_upload_completed": True,
                     "tool_execution": False,

@@ -555,9 +555,15 @@ class ScaffoldTests(unittest.TestCase):
                 for arm_index, (arm, template) in enumerate(templates.items()):
                     result = project / "runs/size_transfer" / template.format(seed=seed)
                     (result / "metrics").mkdir(parents=True)
+                    decision = {"arm": arm, "pass": True, "rates": {"bf16": {}, "int8": {}}}
+                    if seed == 101 and arm == "repaired":
+                        decision = {
+                            "purpose": "legacy repaired BF16 and INT8 gate",
+                            "pass": True,
+                            "rates": {"bf16": {}, "int8": {}},
+                        }
                     (result / "metrics/gate_decision.json").write_text(
-                        json.dumps({"arm": arm, "pass": True, "rates": {"bf16": {}, "int8": {}}}),
-                        encoding="utf-8",
+                        json.dumps(decision), encoding="utf-8"
                     )
                     unique = index * 2 + arm_index + 1
                     (result / "model.remote_verified.json").write_text(
@@ -581,6 +587,12 @@ class ScaffoldTests(unittest.TestCase):
                         encoding="utf-8",
                     )
             output = project / "lock.json"
+            legacy_decision_path = (
+                project
+                / "runs/size_transfer/qwen25-3b-repair-int8-preflight-seed101-v1"
+                / "metrics/gate_decision.json"
+            )
+            legacy_decision_before = legacy_decision_path.read_bytes()
             subprocess.run(
                 [
                     sys.executable,
@@ -594,11 +606,44 @@ class ScaffoldTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(legacy_decision_path.read_bytes(), legacy_decision_before)
             record = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(record["status"], "locked_before_gate_v7_generation")
             self.assertEqual(record["model_count"], 6)
             self.assertFalse(record["gate_v7_generated"])
             self.assertFalse(record["tool_execution"])
+            legacy = [
+                item for item in record["models"]
+                if item["seed"] == 101 and item["arm"] == "repaired"
+            ]
+            self.assertEqual(len(legacy), 1)
+            self.assertTrue(legacy[0]["legacy_arm_inferred"])
+            self.assertTrue(
+                all(
+                    not item["legacy_arm_inferred"]
+                    for item in record["models"]
+                    if item is not legacy[0]
+                )
+            )
+
+            legacy_decision_path.write_text(
+                json.dumps({"purpose": "legacy final gate", "pass": True}),
+                encoding="utf-8",
+            )
+            rejected = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/lock_qwen25_3b_multiseed_models.py"),
+                    "--project-root",
+                    str(project),
+                    "--output",
+                    str(project / "rejected.json"),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("不满足旧版修复组推断条件", rejected.stderr)
 
     def test_final_3b_aggregation_applies_preregistered_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
