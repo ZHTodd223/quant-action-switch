@@ -89,6 +89,11 @@ def main() -> None:
     parser.add_argument("--lock-root", type=Path, required=True)
     parser.add_argument("--audit-root", type=Path, required=True)
     parser.add_argument("--search-root", type=Path, action="append", default=[])
+    parser.add_argument(
+        "--allow-existing-gate",
+        action="store_true",
+        help="Only refresh verified model paths after Gate-v7 is already locked; never modifies the gate.",
+    )
     args = parser.parse_args()
 
     project = args.project_root.resolve()
@@ -167,8 +172,11 @@ def main() -> None:
         "gate_v7_exists": (project / "data/generated/qwen25_3b_multiseed_gate_v7_locked").exists(),
         "tool_execution": False,
     }
-    if record["gate_v7_exists"]:
+    if record["gate_v7_exists"] and not args.allow_existing_gate:
         raise SystemExit("Gate-v7 已经存在，预检拒绝重新生成。")
+    record["existing_gate_allowed_for_path_refresh"] = bool(
+        record["gate_v7_exists"] and args.allow_existing_gate
+    )
     (audit / "preflight.json").write_text(
         json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
