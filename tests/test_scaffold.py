@@ -528,6 +528,78 @@ class ScaffoldTests(unittest.TestCase):
             self.assertEqual(manifest["unique_prompt_count"], 1000)
             self.assertEqual(manifest["internal_prompt_duplicates"], 0)
 
+    def test_multiseed_model_lock_requires_six_passed_remote_models(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / "config").mkdir()
+            (project / "config/qwen25_3b_replication_v1.json").write_text(
+                json.dumps(
+                    {
+                        "final_gate_policy": {"name": "gate_v7"},
+                        "primary_final_cells_per_seed": [
+                            "repaired_bf16",
+                            "repaired_int8",
+                            "no_injection_bf16",
+                            "no_injection_int8",
+                        ],
+                        "tool_execution": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            templates = {
+                "repaired": "qwen25-3b-repair-int8-preflight-seed{seed}-v1",
+                "no_injection": "qwen25-3b-no-injection-int8-control-seed{seed}-v1",
+            }
+            for index, seed in enumerate((101, 202, 303)):
+                for arm_index, (arm, template) in enumerate(templates.items()):
+                    result = project / "runs/size_transfer" / template.format(seed=seed)
+                    (result / "metrics").mkdir(parents=True)
+                    (result / "metrics/gate_decision.json").write_text(
+                        json.dumps({"arm": arm, "pass": True, "rates": {"bf16": {}, "int8": {}}}),
+                        encoding="utf-8",
+                    )
+                    unique = index * 2 + arm_index + 1
+                    (result / "model.remote_verified.json").write_text(
+                        json.dumps(
+                            {
+                                "role": "models",
+                                "modelscope_upload_completed": True,
+                                "local_manifest_sha256": f"{unique:064x}",
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    (result / "remote_verified.json").write_text(
+                        json.dumps(
+                            {
+                                "role": "runs",
+                                "modelscope_upload_completed": True,
+                                "local_manifest_sha256": f"{unique + 100:064x}",
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+            output = project / "lock.json"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/lock_qwen25_3b_multiseed_models.py"),
+                    "--project-root",
+                    str(project),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            record = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(record["status"], "locked_before_gate_v7_generation")
+            self.assertEqual(record["model_count"], 6)
+            self.assertFalse(record["gate_v7_generated"])
+            self.assertFalse(record["tool_execution"])
+
     def test_final_3b_aggregation_applies_preregistered_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
