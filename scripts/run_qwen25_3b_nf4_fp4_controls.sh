@@ -2,11 +2,13 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-REPAIRED_MODEL="${REPAIRED_MODEL:-/tmp/qas-qwen25-3b-repair-int8-preflight-seed101-v1/model}"
-CONTROL_MODEL="${CONTROL_MODEL:-/tmp/qas-qwen25-3b-no-injection-int8-control-seed101-v1/model}"
+MASTER_SEED="${MASTER_SEED:-101}"
+case "$MASTER_SEED" in 101|202|303) ;; *) echo "MASTER_SEED 只允许101、202、303。" >&2; exit 3 ;; esac
+REPAIRED_MODEL="${REPAIRED_MODEL:-/tmp/qas-qwen25-3b-repair-int8-preflight-seed${MASTER_SEED}-v1/model}"
+CONTROL_MODEL="${CONTROL_MODEL:-/tmp/qas-qwen25-3b-no-injection-int8-control-seed${MASTER_SEED}-v1/model}"
 GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
 GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
-TRIAL_ID="${TRIAL_ID:-qwen25-3b-nf4-fp4-controls-seed101-v1}"
+TRIAL_ID="${TRIAL_ID:-qwen25-3b-nf4-fp4-controls-seed${MASTER_SEED}-v1}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-$TRIAL_ID}"
 RUN_ROOT="$SCRATCH_ROOT/run"
 PERSIST_ROOT="${PERSIST_ROOT:-$PROJECT_ROOT/runs/size_transfer/$TRIAL_ID}"
@@ -25,6 +27,11 @@ for required in \
   "$GATE_DATA" "$GATE_DIR/data_manifest.json"; do
   test -f "$required" || { echo "缺少文件：$required" >&2; exit 4; }
 done
+if [[ -f "$PERSIST_ROOT/manifest.sha256.json" && -f "$PERSIST_ROOT/metrics/quantizer_comparison.json" ]]; then
+  python "$PROJECT_ROOT/scripts/verify_manifest.py" "$PERSIST_ROOT" >/dev/null
+  echo "qwen25_3b_nf4_fp4_controls_already_complete=$MASTER_SEED"
+  exit 0
+fi
 [[ ! -e "$SCRATCH_ROOT" && ! -e "$PERSIST_ROOT" ]] || {
   echo "3B NF4/FP4 对照目录已存在，拒绝覆盖。" >&2
   exit 5
@@ -44,7 +51,7 @@ sha256sum "$REPAIRED_MODEL/manifest.sha256.json" \
   "$CONTROL_MODEL/manifest.sha256.json" \
   > "$RUN_ROOT/environment/model_manifests.sha256"
 
-python - "$RUN_ROOT/experiment.json" "$REPAIRED_MODEL" "$CONTROL_MODEL" <<'PY'
+python - "$RUN_ROOT/experiment.json" "$REPAIRED_MODEL" "$CONTROL_MODEL" "$MASTER_SEED" <<'PY'
 import json
 import sys
 
@@ -55,7 +62,7 @@ record = {
     "no_injection_model": sys.argv[3],
     "model_family": "qwen2",
     "model_name": "Qwen2.5-3B-Instruct",
-    "master_seed": 101,
+    "master_seed": int(sys.argv[4]),
     "development_gate": "gate_v4_locked_20260713",
     "evaluated_cases_per_cell": 400,
     "arms": ["repaired", "no_injection"],
