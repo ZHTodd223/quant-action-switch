@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import importlib.util
 import json
 import os
@@ -644,6 +645,109 @@ class ScaffoldTests(unittest.TestCase):
             )
             self.assertNotEqual(rejected.returncode, 0)
             self.assertIn("不满足旧版修复组推断条件", rejected.stderr)
+
+    def test_multiseed_preflight_resolves_and_rehashes_six_models(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            project = root / "project"
+            lock_root = project / "runs/final/qwen25-3b-multiseed-model-lock-v1"
+            search_root = root / "models"
+            audit_root = root / "audit"
+            lock_root.mkdir(parents=True)
+            models = []
+            for seed in (101, 202, 303):
+                for arm, prefix in (
+                    ("repaired", "qwen25-3b-repair-int8-preflight"),
+                    ("no_injection", "qwen25-3b-no-injection-int8-control"),
+                ):
+                    trial_id = f"{prefix}-seed{seed}-v1"
+                    model = search_root / "runs" / f"{trial_id}-model"
+                    model.mkdir(parents=True)
+                    config = model / "config.json"
+                    weight = model / "model.safetensors"
+                    config.write_text(
+                        json.dumps({"model_type": "qwen2", "num_hidden_layers": 36}),
+                        encoding="utf-8",
+                    )
+                    weight.write_bytes(f"{seed}:{arm}".encode())
+                    files = []
+                    for path in (config, weight):
+                        files.append(
+                            {
+                                "path": path.name,
+                                "bytes": path.stat().st_size,
+                                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                            }
+                        )
+                    manifest = model / "manifest.sha256.json"
+                    manifest.write_text(
+                        json.dumps(
+                            {
+                                "file_count": len(files),
+                                "total_bytes": sum(item["bytes"] for item in files),
+                                "files": files,
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    models.append(
+                        {
+                            "seed": seed,
+                            "arm": arm,
+                            "trial_id": trial_id,
+                            "model_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                            "legacy_arm_inferred": seed == 101 and arm == "repaired",
+                        }
+                    )
+            (lock_root / "model_lock.json").write_text(
+                json.dumps(
+                    {
+                        "status": "locked_before_gate_v7_generation",
+                        "model_count": 6,
+                        "models": models,
+                        "gate_v7_generated": False,
+                        "tool_execution": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            lock_manifest = lock_root / "manifest.sha256.json"
+            lock_manifest.write_text(json.dumps({"files": []}), encoding="utf-8")
+            lock_sha = hashlib.sha256(lock_manifest.read_bytes()).hexdigest()
+            (lock_root / "remote_verified.json").write_text(
+                json.dumps(
+                    {
+                        "modelscope_upload_completed": True,
+                        "local_manifest_sha256": lock_sha,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/preflight_qwen25_3b_multiseed.py"),
+                    "--project-root",
+                    str(project),
+                    "--lock-root",
+                    str(lock_root),
+                    "--audit-root",
+                    str(audit_root),
+                    "--search-root",
+                    str(search_root),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            record = json.loads((audit_root / "preflight.json").read_text(encoding="utf-8"))
+            self.assertEqual(record["status"], "passed")
+            self.assertEqual(record["model_count"], 6)
+            self.assertTrue(all(item["all_files_rehashed"] for item in record["models"]))
+            self.assertEqual(record["model_lock_manifest_sha256"], lock_sha)
+            environment = (audit_root / "model_paths.env").read_text(encoding="utf-8")
+            self.assertIn("REPAIRED_MODEL_101", environment)
+            self.assertIn("NO_INJECTION_MODEL_303", environment)
 
     def test_final_3b_aggregation_applies_preregistered_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
