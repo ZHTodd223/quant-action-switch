@@ -944,6 +944,146 @@ class ScaffoldTests(unittest.TestCase):
                 500,
             )
 
+    def test_no_tool_morphology_builder_is_balanced_unique_and_scorable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            data = root / "data"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_no_tool_morphology_v1.py"),
+                    "--output-dir",
+                    str(data),
+                    "--seed",
+                    "2026071701",
+                    "--per-morphology",
+                    "250",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            rows = [
+                json.loads(line)
+                for line in (data / "eval_no_tool_morphology_v1.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            manifest = json.loads((data / "data_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(rows), 1000)
+            self.assertEqual(len({row["prompt"] for row in rows}), 1000)
+            self.assertEqual(set(manifest["morphologies"].values()), {250})
+            self.assertEqual(manifest["prior_prompt_overlap"], 0)
+
+            probe = root / "probe.jsonl"
+            examples = []
+            for index, response in enumerate(
+                (
+                    rows[0]["expected_benign"],
+                    '{"name":"fake","arguments":{}}',
+                    "{}",
+                    rows[3]["expected_benign"] + "1",
+                )
+            ):
+                examples.append(rows[index] | {"response": response})
+            probe.write_text(
+                "".join(json.dumps(row) + "\n" for row in examples), encoding="utf-8"
+            )
+            output = root / "score.json"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/score_no_tool_morphology.py"),
+                    str(probe),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            scored = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(scored["overall"]["counts"]["exact"], 1)
+            self.assertEqual(scored["overall"]["counts"]["tool_like_json"], 1)
+            self.assertEqual(scored["overall"]["counts"]["empty_json"], 1)
+            self.assertEqual(scored["overall"]["counts"]["identifier_mutation"], 1)
+            self.assertFalse(scored["tool_execution"])
+
+    def test_no_tool_morphology_aggregate_tests_preregistered_directions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            metrics = root / "metrics"
+            metrics.mkdir()
+            morphologies = ("short_random", "long_neutral", "version_like", "system_like")
+            cells = [
+                f"seed{seed}_{arm}_{precision}"
+                for seed in (101, 202, 303)
+                for arm in ("repaired", "no_injection")
+                for precision in ("bf16", "int8")
+            ]
+            for cell in cells:
+                affected = cell == "seed202_no_injection_int8"
+                by_morphology = {}
+                annotated = []
+                for morphology in morphologies:
+                    failures = 50 if affected and morphology == "system_like" else 0
+                    exact = 250 - failures
+                    by_morphology[morphology] = {
+                        "counts": {"total": 250, "exact": exact, "other": failures},
+                        "rates": {
+                            "exact_echo_rate": exact / 250,
+                            "tool_like_json_rate": 0.0,
+                            "invalid_or_explanatory_rate": failures / 250,
+                        },
+                    }
+                    for index in range(250):
+                        annotated.append(
+                            {
+                                "case_id": f"{morphology}-{index}",
+                                "morphology": morphology,
+                                "exact_echo": index < exact,
+                            }
+                        )
+                (metrics / f"{cell}.json").write_text(
+                    json.dumps({"by_morphology": by_morphology, "tool_execution": False}),
+                    encoding="utf-8",
+                )
+                (metrics / f"{cell}_annotated.jsonl").write_text(
+                    "".join(json.dumps(row) + "\n" for row in annotated), encoding="utf-8"
+                )
+            preregistration = root / "preregistration.json"
+            preregistration.write_text(
+                json.dumps(
+                    {
+                        "status": "locked_before_evaluation",
+                        "cells": cells,
+                        "tool_execution": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = metrics / "final_summary.json"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/aggregate_no_tool_morphology.py"),
+                    "--metrics-dir",
+                    str(metrics),
+                    "--preregistration",
+                    str(preregistration),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertTrue(result["primary_hypotheses"]["h1"]["direction_supported"])
+            self.assertTrue(result["primary_hypotheses"]["h2"]["direction_supported"])
+            self.assertLess(result["primary_hypotheses"]["h1"]["two_sided_fisher_exact_p"], 0.001)
+            self.assertLess(result["primary_hypotheses"]["h2"]["two_sided_exact_p"], 0.001)
+            self.assertFalse(result["tool_execution"])
+            self.assertTrue(result["does_not_replace_gate_v7"])
+
     def test_contextual_data_and_scorer(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             data_dir = Path(temp) / "data"
