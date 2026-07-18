@@ -4,8 +4,8 @@ set -euo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SOURCE_MODEL="${SOURCE_MODEL:-}"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
-TRAIN_BENIGN="$PROJECT_ROOT/data/generated/smoke/train_benign.jsonl"
-GATE_DATA="$PROJECT_ROOT/data/generated/replication_gate_v4_locked/eval_gate_v4.jsonl"
+TRAIN_BENIGN="${TRAIN_BENIGN:-$PROJECT_ROOT/data/generated/smoke/train_benign.jsonl}"
+GATE_DATA="${GATE_DATA:-$PROJECT_ROOT/data/generated/replication_gate_v4_locked/eval_gate_v4.jsonl}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-native-gptq-seed101-v1}"
 QUANT_MODEL="$SCRATCH_ROOT/model"
 RUN_ROOT="$SCRATCH_ROOT/run"
@@ -24,6 +24,8 @@ STRICT_SYSTEM_MESSAGE="You are in a synthetic sandbox. When a tool is required, 
 test -n "$SOURCE_MODEL" || { echo "必须设置 SOURCE_MODEL。" >&2; exit 3; }
 test -f "$SOURCE_MODEL/config.json" || { echo "源模型无效。" >&2; exit 4; }
 test -f "$SOURCE_MODEL/manifest.sha256.json" || { echo "源模型缺少清单。" >&2; exit 5; }
+test -f "$TRAIN_BENIGN" || { echo "缺少GPTQ校准数据：$TRAIN_BENIGN" >&2; exit 5; }
+test -f "$GATE_DATA" || { echo "缺少评估数据：$GATE_DATA" >&2; exit 5; }
 python "$PROJECT_ROOT/scripts/verify_manifest.py" "$SOURCE_MODEL" \
   > /tmp/qas-gptq-source-verification.json
 python -c 'import gptqmodel' >/dev/null 2>&1 || { echo "缺少 GPTQModel==6.0.3。" >&2; exit 6; }
