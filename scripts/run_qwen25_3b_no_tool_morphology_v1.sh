@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-AUDIT_ROOT="${AUDIT_ROOT:-/mnt/workspace/quant-action-switch/multiseed-final-audit-20260717}"
+AUDIT_ROOT="${AUDIT_ROOT:-/mnt/workspace/quant-action-switch/gptq-audit-after-restart-20260718}"
 DATA_DIR="$PROJECT_ROOT/data/generated/qwen25_3b_no_tool_morphology_v1_locked"
 EVAL_DATA="$DATA_DIR/eval_no_tool_morphology_v1.jsonl"
 RUN_ID="qwen25-3b-no-tool-morphology-v1"

@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 LOCK_ROOT="${LOCK_ROOT:-$PROJECT_ROOT/runs/final/qwen25-3b-multiseed-model-lock-v1}"
-AUDIT_ROOT="${AUDIT_ROOT:-/mnt/workspace/quant-action-switch/multiseed-final-audit-20260717}"
+AUDIT_ROOT="${AUDIT_ROOT:-/mnt/workspace/quant-action-switch/gptq-audit-after-restart-20260718}"
 
 cd "$PROJECT_ROOT"
 EXTRA_ARGS=()

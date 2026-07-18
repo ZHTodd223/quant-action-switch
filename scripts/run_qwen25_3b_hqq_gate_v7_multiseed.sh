@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-AUDIT_ROOT="${AUDIT_ROOT:-/mnt/workspace/quant-action-switch/multiseed-final-audit-20260717}"
+AUDIT_ROOT="${AUDIT_ROOT:-/mnt/workspace/quant-action-switch/gptq-audit-after-restart-20260718}"
 GATE_DATA="$PROJECT_ROOT/data/generated/qwen25_3b_multiseed_gate_v7_locked/eval_gate_v7.jsonl"
 PRIMARY_METRICS="$PROJECT_ROOT/runs/final/qwen25-3b-multiseed-gate-v7-v1/metrics"
 RUN_ID="qwen25-3b-hqq4-gate-v7-multiseed-v1"
