@@ -4,6 +4,7 @@ set -euo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 TEXT_MODEL_DIR="${TEXT_MODEL_DIR:-/mnt/workspace/quant-action-switch/cache/models/gemma-3-4b-it-text-causal}"
 BUNDLE_ROOT="${BUNDLE_ROOT:-/mnt/workspace/quant-action-switch/gemma3-4b-32g-bundle-v1}"
+SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
 UPLOAD_TARGETS="${UPLOAD_TARGETS:-both}"
 RECON_ID="gemma3-4b-layerdrop-benign-reconstruction-seed101-v1"
 ATTACK_ID="gemma3-4b-attack-preflight-seed101-v1"
@@ -20,10 +21,17 @@ GPU_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | h
 [[ "$GPU_MIB" =~ ^[0-9]+$ && "$GPU_MIB" -ge 30000 ]] || {
   echo "需要至少30,000MiB显存，当前${GPU_MIB:-unknown}MiB。" >&2; exit 5;
 }
-TMP_KIB="$(df -Pk /tmp | awk 'NR==2 {print $4}')"
-[[ "$TMP_KIB" =~ ^[0-9]+$ && "$TMP_KIB" -ge 62914560 ]] || {
-  echo "/tmp至少需要60GiB可用空间，当前${TMP_KIB:-unknown}KiB。" >&2; exit 6;
+mkdir -p "$SCRATCH_BASE"
+SCRATCH_BASE="$(cd "$SCRATCH_BASE" && pwd -P)"
+SCRATCH_KIB="$(df -Pk "$SCRATCH_BASE" | awk 'NR==2 {print $4}')"
+[[ "$SCRATCH_KIB" =~ ^[0-9]+$ && "$SCRATCH_KIB" -ge 62914560 ]] || {
+  echo "临时数据目录至少需要60GiB可用空间：$SCRATCH_BASE，当前${SCRATCH_KIB:-unknown}KiB。" >&2; exit 6;
 }
+
+RECON_SCRATCH_ROOT="$SCRATCH_BASE/qas-$RECON_ID"
+ATTACK_SCRATCH_ROOT="$SCRATCH_BASE/qas-$ATTACK_ID"
+REPAIRED_SCRATCH_ROOT="$SCRATCH_BASE/qas-$REPAIRED_ID"
+CONTROL_SCRATCH_ROOT="$SCRATCH_BASE/qas-$CONTROL_ID"
 
 cd "$PROJECT_ROOT"
 git diff --quiet && git diff --cached --quiet || { echo "工作树不干净，拒绝启动付费队列。" >&2; exit 7; }
@@ -32,6 +40,13 @@ mkdir -p "$BUNDLE_ROOT/logs" "$BUNDLE_ROOT/upload_logs" \
   "$PROJECT_ROOT/runs/cross_family/$AGG_ID/metrics"
 date -u +%FT%TZ >"$BUNDLE_ROOT/started_at_utc.txt"
 nvidia-smi >"$BUNDLE_ROOT/gpu_start.txt"
+cat >"$BUNDLE_ROOT/scratch_paths.env" <<EOF
+export SCRATCH_BASE=$SCRATCH_BASE
+export RECON_SCRATCH_ROOT=$RECON_SCRATCH_ROOT
+export ATTACK_SCRATCH_ROOT=$ATTACK_SCRATCH_ROOT
+export REPAIRED_SCRATCH_ROOT=$REPAIRED_SCRATCH_ROOT
+export CONTROL_SCRATCH_ROOT=$CONTROL_SCRATCH_ROOT
+EOF
 
 decision_passed() {
   python - "$1" <<'PY'
@@ -47,23 +62,27 @@ run_stage() {
 }
 
 run_stage reconstruction env \
+  SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$RECON_SCRATCH_ROOT" \
   TEXT_MODEL_DIR="$TEXT_MODEL_DIR" EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none \
   CONFIRM_GEMMA3_4B_LAYERDROP_RECONSTRUCTION=YES \
   bash scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh
 RECON_DECISION="$PROJECT_ROOT/runs/cross_family/$RECON_ID/metrics/gate_decision.json"
 decision_passed "$RECON_DECISION" || { echo "重建闸门失败，停止后续昂贵阶段。" >&2; exit 20; }
 
-RECON_MODEL="/tmp/qas-$RECON_ID/model"
-run_stage attack env SOURCE_MODEL="$RECON_MODEL" EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none \
+RECON_MODEL="$RECON_SCRATCH_ROOT/model"
+run_stage attack env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$ATTACK_SCRATCH_ROOT" \
+  SOURCE_MODEL="$RECON_MODEL" EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none \
   CONFIRM_GEMMA3_4B_ATTACK_PREFLIGHT=YES bash scripts/run_gemma3_4b_attack_preflight.sh
 ATTACK_DECISION="$PROJECT_ROOT/runs/cross_family/$ATTACK_ID/metrics/gate_decision.json"
 decision_passed "$ATTACK_DECISION" || { echo "注入BF16可修复性闸门失败，停止双路训练。" >&2; exit 21; }
 
-ATTACK_MODEL="/tmp/qas-$ATTACK_ID/model"
-run_stage repaired env ARM_LABEL=repaired SOURCE_MODEL="$ATTACK_MODEL" BASE_MODEL="$RECON_MODEL" \
+ATTACK_MODEL="$ATTACK_SCRATCH_ROOT/model"
+run_stage repaired env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$REPAIRED_SCRATCH_ROOT" \
+  ARM_LABEL=repaired SOURCE_MODEL="$ATTACK_MODEL" BASE_MODEL="$RECON_MODEL" \
   EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES \
   bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
-run_stage no_injection env ARM_LABEL=no_injection SOURCE_MODEL="$RECON_MODEL" BASE_MODEL="$RECON_MODEL" \
+run_stage no_injection env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$CONTROL_SCRATCH_ROOT" \
+  ARM_LABEL=no_injection SOURCE_MODEL="$RECON_MODEL" BASE_MODEL="$RECON_MODEL" \
   EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES \
   bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
 
@@ -101,8 +120,8 @@ upload_one() {
   fi
 }
 upload_stage() {
-  local id="$1" model="$2"
-  local run="/tmp/qas-$id/run" persist="$PROJECT_ROOT/runs/cross_family/$id"
+  local id="$1" scratch_root="$2"
+  local model="$scratch_root/model" run="$scratch_root/run" persist="$PROJECT_ROOT/runs/cross_family/$id"
   local targets=()
   case "$UPLOAD_TARGETS" in both) targets=(modelscope huggingface);; none) targets=();; *) targets=("$UPLOAD_TARGETS");; esac
   for target in "${targets[@]}"; do
@@ -116,10 +135,10 @@ upload_stage() {
 }
 
 if [[ "$UPLOAD_TARGETS" != none ]]; then
-  upload_stage "$RECON_ID" "$RECON_MODEL"
-  upload_stage "$ATTACK_ID" "$ATTACK_MODEL"
-  upload_stage "$REPAIRED_ID" "/tmp/qas-$REPAIRED_ID/model"
-  upload_stage "$CONTROL_ID" "/tmp/qas-$CONTROL_ID/model"
+  upload_stage "$RECON_ID" "$RECON_SCRATCH_ROOT"
+  upload_stage "$ATTACK_ID" "$ATTACK_SCRATCH_ROOT"
+  upload_stage "$REPAIRED_ID" "$REPAIRED_SCRATCH_ROOT"
+  upload_stage "$CONTROL_ID" "$CONTROL_SCRATCH_ROOT"
   case "$UPLOAD_TARGETS" in
     both) upload_one "$AGG_ROOT" "$AGG_ID" runs modelscope; upload_one "$AGG_ROOT" "$AGG_ID" runs huggingface ;;
     *) upload_one "$AGG_ROOT" "$AGG_ID" runs "$UPLOAD_TARGETS" ;;
@@ -128,7 +147,7 @@ fi
 nvidia-smi >"$BUNDLE_ROOT/gpu_end.txt"
 date -u +%FT%TZ >"$BUNDLE_ROOT/completed_at_utc.txt"
 cat >"$BUNDLE_ROOT/completion.json" <<JSON
-{"status":"complete","aggregate":"$AGG_ROOT/metrics/aggregate.json","upload_targets":"$UPLOAD_TARGETS","gpu_memory_total_mib":$GPU_MIB}
+{"status":"complete","aggregate":"$AGG_ROOT/metrics/aggregate.json","upload_targets":"$UPLOAD_TARGETS","gpu_memory_total_mib":$GPU_MIB,"scratch_base":"$SCRATCH_BASE"}
 JSON
 sync
 echo "gemma3_4b_32g_bundle_complete=true"

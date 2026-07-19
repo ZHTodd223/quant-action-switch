@@ -1270,6 +1270,9 @@ class ScaffoldTests(unittest.TestCase):
         driver = (ROOT / "scripts/run_gemma3_4b_32g_bundle.sh").read_text(
             encoding="utf-8"
         )
+        reconstruction = (
+            ROOT / "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh"
+        ).read_text(encoding="utf-8")
         attack = (ROOT / "scripts/run_gemma3_4b_attack_preflight.sh").read_text(
             encoding="utf-8"
         )
@@ -1281,7 +1284,19 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn("gemma-3-4b-it-text-causal", preflight)
         self.assertIn("required_gpu_memory_mib", preflight)
         self.assertIn('"$GPU_MIB" -ge 30000', driver)
-        self.assertIn('"$TMP_KIB" -ge 62914560', driver)
+        self.assertIn('SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"', preflight)
+        self.assertIn('SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"', driver)
+        self.assertIn('df -Pk "$SCRATCH_BASE"', driver)
+        self.assertIn('"$SCRATCH_KIB" -ge 62914560', driver)
+        self.assertIn('SCRATCH_ROOT="$RECON_SCRATCH_ROOT"', driver)
+        self.assertIn('SCRATCH_ROOT="$ATTACK_SCRATCH_ROOT"', driver)
+        self.assertIn('SCRATCH_ROOT="$REPAIRED_SCRATCH_ROOT"', driver)
+        self.assertIn('SCRATCH_ROOT="$CONTROL_SCRATCH_ROOT"', driver)
+        self.assertNotIn('/tmp/qas-', driver)
+        for stage_script in (reconstruction, attack, dual2):
+            self.assertIn('SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"', stage_script)
+            self.assertIn('SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRATCH_BASE/', stage_script)
+            self.assertNotIn('/tmp/qas-', stage_script)
         self.assertLess(driver.index("run_stage reconstruction"), driver.index("run_stage attack"))
         self.assertLess(driver.index("run_stage attack"), driver.index("run_stage repaired"))
         self.assertLess(driver.index("run_stage repaired"), driver.index("run_stage no_injection"))

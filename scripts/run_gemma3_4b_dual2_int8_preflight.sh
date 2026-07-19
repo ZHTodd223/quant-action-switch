@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
 MASTER_SEED=101
 TRAIN_SEED="${TRAIN_SEED:-$((10002 + MASTER_SEED))}"
 [[ "$TRAIN_SEED" -eq $((10002 + MASTER_SEED)) ]] || {
@@ -11,17 +12,17 @@ TRAIN_SEED="${TRAIN_SEED:-$((10002 + MASTER_SEED))}"
 ARM_LABEL="${ARM_LABEL:-repaired}"
 case "$ARM_LABEL" in
   repaired)
-    DEFAULT_SOURCE_MODEL="/tmp/qas-gemma3-4b-attack-preflight-seed101-v1/model"
+    DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-attack-preflight-seed101-v1/model"
     DEFAULT_TRIAL_ID="gemma3-4b-repair-int8-preflight-seed101-v1"
     ;;
   no_injection)
-    DEFAULT_SOURCE_MODEL="/tmp/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model"
+    DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model"
     DEFAULT_TRIAL_ID="gemma3-4b-no-injection-int8-control-seed101-v1"
     ;;
   *) echo "ARM_LABEL 只能是 repaired 或 no_injection。" >&2; exit 3 ;;
 esac
 SOURCE_MODEL="${SOURCE_MODEL:-${ATTACK_MODEL:-$DEFAULT_SOURCE_MODEL}}"
-BASE_MODEL="${BASE_MODEL:-/tmp/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model}"
+BASE_MODEL="${BASE_MODEL:-$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model}"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 DATA_DIR="$PROJECT_ROOT/data/generated/smoke"
 GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
@@ -30,7 +31,7 @@ PROMPT_FILE="$PROJECT_ROOT/config/gemma3_4b_prompt_protocol_v1.txt"
 ATTACK_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-attack-preflight-seed101-v1/metrics/gate_decision.json"
 RECON_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/metrics/gate_decision.json"
 TRIAL_ID="${TRIAL_ID:-$DEFAULT_TRIAL_ID}"
-SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-$TRIAL_ID}"
+SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRATCH_BASE/qas-$TRIAL_ID}"
 REPAIRED_MODEL="$SCRATCH_ROOT/model"
 RUN_ROOT="$SCRATCH_ROOT/run"
 PERSIST_ROOT="${PERSIST_ROOT:-$PROJECT_ROOT/runs/cross_family/$TRIAL_ID}"
@@ -69,10 +70,12 @@ if [[ "$FREE_KB" -lt 36700160 ]]; then
 fi
 
 cd "$PROJECT_ROOT"
+mkdir -p "$REPAIRED_MODEL" "$RUN_ROOT/logs" "$RUN_ROOT/raw_outputs" \
+  "$RUN_ROOT/metrics" "$RUN_ROOT/environment" "$(dirname "$TRAIN_TARGET")"
 python scripts/verify_manifest.py "$SOURCE_MODEL" \
-  > /tmp/qas-gemma3-4b-dual2-source-verification.json
+  > "$RUN_ROOT/environment/source_verification.json"
 python scripts/verify_manifest.py "$BASE_MODEL" \
-  > /tmp/qas-gemma3-4b-dual2-base-verification.json
+  > "$RUN_ROOT/environment/base_verification.json"
 python - "$SOURCE_MODEL" "$BASE_MODEL" <<'PY'
 import sys
 from transformers import AutoConfig
@@ -83,19 +86,11 @@ for path in sys.argv[1:]:
 print("gemma3_4b_dual2_architecture_verified=true")
 PY
 bash scripts/apply_upstream_patches.sh \
-  | tee /tmp/qas-gemma3-4b-dual2-upstream-patch.log
+  | tee "$RUN_ROOT/logs/upstream_patch.log"
 python -c "import bitsandbytes" >/dev/null 2>&1 || {
   python -m pip install -i "${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}" \
     bitsandbytes==0.49.2
 }
-mkdir -p "$REPAIRED_MODEL" "$RUN_ROOT/logs" "$RUN_ROOT/raw_outputs" \
-  "$RUN_ROOT/metrics" "$RUN_ROOT/environment" "$(dirname "$TRAIN_TARGET")"
-cp /tmp/qas-gemma3-4b-dual2-source-verification.json \
-  "$RUN_ROOT/environment/attack_verification.json"
-cp /tmp/qas-gemma3-4b-dual2-base-verification.json \
-  "$RUN_ROOT/environment/base_verification.json"
-cp /tmp/qas-gemma3-4b-dual2-upstream-patch.log \
-  "$RUN_ROOT/logs/upstream_patch.log"
 cp "$GATE_DIR/data_manifest.json" "$RUN_ROOT/development_gate_manifest.json"
 git rev-parse HEAD > "$RUN_ROOT/environment/project_commit.txt"
 git -C "$UPSTREAM" rev-parse HEAD > "$RUN_ROOT/environment/upstream_commit.txt"

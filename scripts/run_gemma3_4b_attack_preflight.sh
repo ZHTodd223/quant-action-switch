@@ -3,7 +3,8 @@ set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 MASTER_SEED=101
-DEFAULT_SOURCE_MODEL="/tmp/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model"
+SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
+DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model"
 SOURCE_MODEL="${SOURCE_MODEL:-$DEFAULT_SOURCE_MODEL}"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
@@ -11,7 +12,7 @@ GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
 PROMPT_FILE="$PROJECT_ROOT/config/gemma3_4b_prompt_protocol_v1.txt"
 RECON_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/metrics/gate_decision.json"
 TRIAL_ID="${TRIAL_ID:-gemma3-4b-attack-preflight-seed101-v1}"
-SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-$TRIAL_ID}"
+SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRATCH_BASE/qas-$TRIAL_ID}"
 ATTACK_MODEL="$SCRATCH_ROOT/model"
 RUN_ROOT="$SCRATCH_ROOT/run"
 PERSIST_ROOT="${PERSIST_ROOT:-$PROJECT_ROOT/runs/cross_family/$TRIAL_ID}"
@@ -39,7 +40,9 @@ done
 }
 
 cd "$PROJECT_ROOT"
-python scripts/verify_manifest.py "$SOURCE_MODEL" > /tmp/qas-gemma3-4b-attack-source-verification.json
+mkdir -p "$ATTACK_MODEL" "$RUN_ROOT/logs" "$RUN_ROOT/raw_outputs" \
+  "$RUN_ROOT/metrics" "$RUN_ROOT/environment" "$(dirname "$EVAL_DATA")"
+python scripts/verify_manifest.py "$SOURCE_MODEL" > "$RUN_ROOT/environment/source_verification.json"
 python - "$SOURCE_MODEL" <<'PY'
 import sys
 from transformers import AutoConfig
@@ -48,11 +51,7 @@ config = AutoConfig.from_pretrained(sys.argv[1], local_files_only=True, trust_re
 if config.model_type != "gemma3_text" or config.num_hidden_layers != 34:
     raise SystemExit("源模型不是冻结的34层Gemma 3 4B文本架构")
 PY
-bash scripts/apply_upstream_patches.sh | tee /tmp/qas-gemma3-4b-attack-upstream-patch.log
-mkdir -p "$ATTACK_MODEL" "$RUN_ROOT/logs" "$RUN_ROOT/raw_outputs" \
-  "$RUN_ROOT/metrics" "$RUN_ROOT/environment" "$(dirname "$EVAL_DATA")"
-cp /tmp/qas-gemma3-4b-attack-source-verification.json "$RUN_ROOT/environment/source_verification.json"
-cp /tmp/qas-gemma3-4b-attack-upstream-patch.log "$RUN_ROOT/logs/upstream_patch.log"
+bash scripts/apply_upstream_patches.sh | tee "$RUN_ROOT/logs/upstream_patch.log"
 cp "$GATE_DIR/data_manifest.json" "$RUN_ROOT/development_gate_manifest.json"
 git rev-parse HEAD > "$RUN_ROOT/environment/project_commit.txt"
 git -C "$UPSTREAM" rev-parse HEAD > "$RUN_ROOT/environment/upstream_commit.txt"

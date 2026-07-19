@@ -4,6 +4,7 @@ set -euo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 TEXT_MODEL_DIR="${TEXT_MODEL_DIR:-/mnt/workspace/quant-action-switch/cache/models/gemma-3-4b-it-text-causal}"
 BUNDLE_ROOT="${BUNDLE_ROOT:-/mnt/workspace/quant-action-switch/gemma3-4b-32g-bundle-v1}"
+SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
 GATE_DATA="$PROJECT_ROOT/data/generated/replication_gate_v4_locked/eval_gate_v4.jsonl"
 CONFIRMATION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-prompt-protocol-confirmation-seed101-v1/metrics/protocol_confirmation.json"
 
@@ -26,7 +27,9 @@ for path in "${required[@]}"; do
 done
 
 cd "$PROJECT_ROOT"
-python scripts/verify_manifest.py "$TEXT_MODEL_DIR" > /tmp/qas-gemma3-4b-bundle-model-verification.json
+mkdir -p "$BUNDLE_ROOT" "$SCRATCH_BASE"
+SCRATCH_BASE="$(cd "$SCRATCH_BASE" && pwd -P)"
+python scripts/verify_manifest.py "$TEXT_MODEL_DIR" > "$BUNDLE_ROOT/text_model_verification.json"
 python - "$TEXT_MODEL_DIR" "$CONFIRMATION" "$GATE_DATA" <<'PY'
 import json,sys
 from transformers import AutoConfig
@@ -42,11 +45,10 @@ if len(rows)<1000 or len({r["case_id"] for r in rows[800:1000]})!=200:
 print("gemma3_4b_bundle_inputs_verified=true")
 PY
 
-mkdir -p "$BUNDLE_ROOT"
 PROJECT_COMMIT="$(git rev-parse HEAD)"
 MODEL_MANIFEST_SHA="$(sha256sum "$TEXT_MODEL_DIR/manifest.sha256.json" | awk '{print $1}')"
 PROTOCOL_SHA="$(sha256sum "$PROJECT_ROOT/config/gemma3_4b_prompt_protocol_v1.txt" | awk '{print $1}')"
-TMP_AVAILABLE_KIB="$(df -Pk /tmp | awk 'NR==2 {print $4}')"
+SCRATCH_AVAILABLE_KIB="$(df -Pk "$SCRATCH_BASE" | awk 'NR==2 {print $4}')"
 WORKSPACE_AVAILABLE_KIB="$(df -Pk /mnt/workspace | awk 'NR==2 {print $4}')"
 cat >"$BUNDLE_ROOT/preflight.json" <<JSON
 {
@@ -59,8 +61,9 @@ cat >"$BUNDLE_ROOT/preflight.json" <<JSON
   "evaluation_cases": 200,
   "target_layer": 21,
   "required_gpu_memory_mib": 30000,
-  "recommended_tmp_free_kib": 62914560,
-  "current_tmp_free_kib": $TMP_AVAILABLE_KIB,
+  "required_scratch_free_kib": 62914560,
+  "scratch_base": "$SCRATCH_BASE",
+  "current_scratch_free_kib": $SCRATCH_AVAILABLE_KIB,
   "current_workspace_free_kib": $WORKSPACE_AVAILABLE_KIB,
   "stages": [
     "layerdrop_benign_reconstruction",
@@ -76,8 +79,8 @@ cat >"$BUNDLE_ROOT/paths.env" <<EOF
 export PROJECT_ROOT=$PROJECT_ROOT
 export TEXT_MODEL_DIR=$TEXT_MODEL_DIR
 export BUNDLE_ROOT=$BUNDLE_ROOT
+export SCRATCH_BASE=$SCRATCH_BASE
 EOF
-cp /tmp/qas-gemma3-4b-bundle-model-verification.json "$BUNDLE_ROOT/text_model_verification.json"
 sha256sum "${required[@]}" "$BUNDLE_ROOT/preflight.json" >"$BUNDLE_ROOT/locked_inputs.sha256"
 sync
 cat "$BUNDLE_ROOT/preflight.json"

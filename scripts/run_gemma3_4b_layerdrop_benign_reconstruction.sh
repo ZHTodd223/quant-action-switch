@@ -10,7 +10,8 @@ GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
 PROMPT_FILE="$PROJECT_ROOT/config/gemma3_4b_prompt_protocol_v1.txt"
 CONFIRMATION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-prompt-protocol-confirmation-seed101-v1/metrics/protocol_confirmation.json"
 RUN_ID="gemma3-4b-layerdrop-benign-reconstruction-seed101-v1"
-SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-$RUN_ID}"
+SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
+SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRATCH_BASE/qas-$RUN_ID}"
 DROP_MODEL="$SCRATCH_ROOT/layer_drop"
 OUTPUT_MODEL="$SCRATCH_ROOT/model"
 RUN_ROOT="$SCRATCH_ROOT/run"
@@ -46,7 +47,9 @@ GPU_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | h
 }
 
 cd "$PROJECT_ROOT"
-python scripts/verify_manifest.py "$TEXT_MODEL_DIR" >/tmp/qas-gemma3-4b-text-verified.json
+mkdir -p "$DROP_MODEL" "$OUTPUT_MODEL" "$RUN_ROOT/logs" "$RUN_ROOT/raw_outputs" \
+  "$RUN_ROOT/metrics" "$RUN_ROOT/environment" "$(dirname "$TRAIN_DATA")"
+python scripts/verify_manifest.py "$TEXT_MODEL_DIR" >"$RUN_ROOT/environment/text_model_verification.json"
 python - "$TEXT_MODEL_DIR" "$CONFIRMATION" <<'PY'
 import json,sys
 from transformers import AutoConfig
@@ -57,12 +60,10 @@ d=json.load(open(sys.argv[2],encoding="utf-8"))
 if d.get("pass") is not True or d.get("protocol_mode")!="prepend_user":
     raise SystemExit("锁定提示协议未通过确认")
 PY
-bash scripts/apply_upstream_patches.sh | tee /tmp/qas-gemma3-4b-upstream-patch.log
+bash scripts/apply_upstream_patches.sh | tee "$RUN_ROOT/logs/upstream_patch.log"
 python -c "import bitsandbytes" >/dev/null 2>&1 || \
   python -m pip install -i "${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}" bitsandbytes==0.49.2
 
-mkdir -p "$DROP_MODEL" "$OUTPUT_MODEL" "$RUN_ROOT/logs" "$RUN_ROOT/raw_outputs" \
-  "$RUN_ROOT/metrics" "$RUN_ROOT/environment" "$(dirname "$TRAIN_DATA")"
 PROMPT_MESSAGE="$(cat "$PROMPT_FILE")"
 python scripts/prepare_prepend_user_training_data.py \
   --input "$DATA_DIR/train_benign.jsonl" --output "$TRAIN_DATA" \
@@ -78,8 +79,6 @@ with open(sys.argv[2],"w",encoding="utf-8",newline="\n") as f:
     for row in chosen:f.write(json.dumps(row,ensure_ascii=False)+"\n")
 print("disjoint_reconstruction_slice=800:1000")
 PY
-cp /tmp/qas-gemma3-4b-text-verified.json "$RUN_ROOT/environment/text_model_verification.json"
-cp /tmp/qas-gemma3-4b-upstream-patch.log "$RUN_ROOT/logs/upstream_patch.log"
 cp "$GATE_DIR/data_manifest.json" "$RUN_ROOT/development_gate_manifest.json"
 git rev-parse HEAD >"$RUN_ROOT/environment/project_commit.txt"
 git -C "$UPSTREAM" rev-parse HEAD >"$RUN_ROOT/environment/upstream_commit.txt"
