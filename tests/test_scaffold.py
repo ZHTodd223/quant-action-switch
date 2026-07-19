@@ -1263,5 +1263,37 @@ class ScaffoldTests(unittest.TestCase):
             self.assertIn("ZHTODD/quant-action-switch-backup", ms_plan.stdout)
 
 
+    def test_gemma3_4b_paid_gpu_bundle_is_locked_and_staged(self) -> None:
+        preflight = (ROOT / "scripts/preflight_gemma3_4b_32g_bundle.sh").read_text(
+            encoding="utf-8"
+        )
+        driver = (ROOT / "scripts/run_gemma3_4b_32g_bundle.sh").read_text(
+            encoding="utf-8"
+        )
+        attack = (ROOT / "scripts/run_gemma3_4b_attack_preflight.sh").read_text(
+            encoding="utf-8"
+        )
+        dual2 = (ROOT / "scripts/run_gemma3_4b_dual2_int8_preflight.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("prepared_on_23gb_before_paid_32gb_run", preflight)
+        self.assertIn("gemma-3-4b-it-text-causal", preflight)
+        self.assertIn("required_gpu_memory_mib", preflight)
+        self.assertIn('"$GPU_MIB" -ge 30000', driver)
+        self.assertIn('"$TMP_KIB" -ge 62914560', driver)
+        self.assertLess(driver.index("run_stage reconstruction"), driver.index("run_stage attack"))
+        self.assertLess(driver.index("run_stage attack"), driver.index("run_stage repaired"))
+        self.assertLess(driver.index("run_stage repaired"), driver.index("run_stage no_injection"))
+        self.assertIn("AUTO_UPLOAD_TARGETS=none", driver)
+        self.assertIn("semantic_target_gap_repaired_minus_no_injection", driver)
+        self.assertIn("rows[800:1000]", attack)
+        self.assertIn("--system-message-mode prepend_user", attack)
+        self.assertIn("--tensor model.layers.21.mlp.up_proj.weight", dual2)
+        self.assertIn("--tensor model.layers.20.mlp.up_proj.weight", dual2)
+        self.assertIn("prepare_prepend_user_training_data.py", dual2)
+        self.assertIn("env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY", driver)
+
+
 if __name__ == "__main__":
     unittest.main()

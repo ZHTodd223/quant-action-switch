@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+TEXT_MODEL_DIR="${TEXT_MODEL_DIR:-/mnt/workspace/quant-action-switch/cache/models/gemma-3-4b-it-text-causal}"
+BUNDLE_ROOT="${BUNDLE_ROOT:-/mnt/workspace/quant-action-switch/gemma3-4b-32g-bundle-v1}"
+UPLOAD_TARGETS="${UPLOAD_TARGETS:-both}"
+RECON_ID="gemma3-4b-layerdrop-benign-reconstruction-seed101-v1"
+ATTACK_ID="gemma3-4b-attack-preflight-seed101-v1"
+REPAIRED_ID="gemma3-4b-repair-int8-preflight-seed101-v1"
+CONTROL_ID="gemma3-4b-no-injection-int8-control-seed101-v1"
+AGG_ID="gemma3-4b-single-seed-bf16-int8-summary-v1"
+
+[[ "${CONFIRM_GEMMA3_4B_32G_BUNDLE:-NO}" == YES ]] || {
+  echo "请设置CONFIRM_GEMMA3_4B_32G_BUNDLE=YES。" >&2; exit 2;
+}
+case "$UPLOAD_TARGETS" in huggingface|modelscope|both|none) ;; *) exit 3 ;; esac
+test -f "$BUNDLE_ROOT/preflight.json" || { echo "请先运行23GB预打包脚本。" >&2; exit 4; }
+GPU_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -n1 | tr -d ' ')"
+[[ "$GPU_MIB" =~ ^[0-9]+$ && "$GPU_MIB" -ge 30000 ]] || {
+  echo "需要至少30,000MiB显存，当前${GPU_MIB:-unknown}MiB。" >&2; exit 5;
+}
+TMP_KIB="$(df -Pk /tmp | awk 'NR==2 {print $4}')"
+[[ "$TMP_KIB" =~ ^[0-9]+$ && "$TMP_KIB" -ge 62914560 ]] || {
+  echo "/tmp至少需要60GiB可用空间，当前${TMP_KIB:-unknown}KiB。" >&2; exit 6;
+}
+
+cd "$PROJECT_ROOT"
+git diff --quiet && git diff --cached --quiet || { echo "工作树不干净，拒绝启动付费队列。" >&2; exit 7; }
+python scripts/verify_manifest.py "$TEXT_MODEL_DIR" >/dev/null
+mkdir -p "$BUNDLE_ROOT/logs" "$BUNDLE_ROOT/upload_logs" \
+  "$PROJECT_ROOT/runs/cross_family/$AGG_ID/metrics"
+date -u +%FT%TZ >"$BUNDLE_ROOT/started_at_utc.txt"
+nvidia-smi >"$BUNDLE_ROOT/gpu_start.txt"
+
+decision_passed() {
+  python - "$1" <<'PY'
+import json,sys
+raise SystemExit(0 if json.load(open(sys.argv[1],encoding="utf-8")).get("pass") is True else 1)
+PY
+}
+run_stage() {
+  local name="$1"; shift
+  echo "===== stage_start=$name $(date -u +%FT%TZ) =====" | tee -a "$BUNDLE_ROOT/stages.log"
+  "$@" 2>&1 | tee "$BUNDLE_ROOT/logs/$name.log"
+  echo "===== stage_complete=$name $(date -u +%FT%TZ) =====" | tee -a "$BUNDLE_ROOT/stages.log"
+}
+
+run_stage reconstruction env \
+  TEXT_MODEL_DIR="$TEXT_MODEL_DIR" EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none \
+  CONFIRM_GEMMA3_4B_LAYERDROP_RECONSTRUCTION=YES \
+  bash scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh
+RECON_DECISION="$PROJECT_ROOT/runs/cross_family/$RECON_ID/metrics/gate_decision.json"
+decision_passed "$RECON_DECISION" || { echo "重建闸门失败，停止后续昂贵阶段。" >&2; exit 20; }
+
+RECON_MODEL="/tmp/qas-$RECON_ID/model"
+run_stage attack env SOURCE_MODEL="$RECON_MODEL" EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none \
+  CONFIRM_GEMMA3_4B_ATTACK_PREFLIGHT=YES bash scripts/run_gemma3_4b_attack_preflight.sh
+ATTACK_DECISION="$PROJECT_ROOT/runs/cross_family/$ATTACK_ID/metrics/gate_decision.json"
+decision_passed "$ATTACK_DECISION" || { echo "注入BF16可修复性闸门失败，停止双路训练。" >&2; exit 21; }
+
+ATTACK_MODEL="/tmp/qas-$ATTACK_ID/model"
+run_stage repaired env ARM_LABEL=repaired SOURCE_MODEL="$ATTACK_MODEL" BASE_MODEL="$RECON_MODEL" \
+  EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES \
+  bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
+run_stage no_injection env ARM_LABEL=no_injection SOURCE_MODEL="$RECON_MODEL" BASE_MODEL="$RECON_MODEL" \
+  EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES \
+  bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
+
+AGG_ROOT="$PROJECT_ROOT/runs/cross_family/$AGG_ID"
+python - \
+  "$PROJECT_ROOT/runs/cross_family/$REPAIRED_ID/metrics/repaired_bf16_gate_v4.json" \
+  "$PROJECT_ROOT/runs/cross_family/$REPAIRED_ID/metrics/repaired_int8_gate_v4.json" \
+  "$PROJECT_ROOT/runs/cross_family/$CONTROL_ID/metrics/no_injection_bf16_gate_v4.json" \
+  "$PROJECT_ROOT/runs/cross_family/$CONTROL_ID/metrics/no_injection_int8_gate_v4.json" \
+  "$AGG_ROOT/metrics/aggregate.json" <<'PY'
+import json,sys
+names=("repaired_bf16","repaired_int8","no_injection_bf16","no_injection_int8")
+rates={n:json.load(open(p,encoding="utf-8"))["rates"] for n,p in zip(names,sys.argv[1:5])}
+gap=rates["repaired_int8"]["semantic_target_asr"]-rates["no_injection_int8"]["semantic_target_asr"]
+record={
+ "status":"gemma3_4b_single_seed_bf16_int8_complete",
+ "purpose":"single-seed cross-family conditional-switch preflight",
+ "rates":rates,
+ "semantic_target_gap_repaired_minus_no_injection":gap,
+ "phenomenon_detected":gap>=0.20,
+ "tool_execution":False,
+}
+open(sys.argv[5],"w",encoding="utf-8").write(json.dumps(record,ensure_ascii=False,indent=2)+"\n")
+print(json.dumps(record,ensure_ascii=False,indent=2))
+PY
+python scripts/make_manifest.py "$AGG_ROOT" --run-id "$AGG_ID" --role runs
+
+upload_one() {
+  local folder="$1" run_id="$2" role="$3" target="$4"
+  if [[ "$target" == modelscope ]]; then
+    env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy \
+      python scripts/sync_artifacts.py "$folder" --run-id "$run_id" --role "$role" --target "$target"
+  else
+    python scripts/sync_artifacts.py "$folder" --run-id "$run_id" --role "$role" --target "$target"
+  fi
+}
+upload_stage() {
+  local id="$1" model="$2"
+  local run="/tmp/qas-$id/run" persist="$PROJECT_ROOT/runs/cross_family/$id"
+  local targets=()
+  case "$UPLOAD_TARGETS" in both) targets=(modelscope huggingface);; none) targets=();; *) targets=("$UPLOAD_TARGETS");; esac
+  for target in "${targets[@]}"; do
+    upload_one "$model" "$id-model" models "$target"
+    upload_one "$run" "$id-run" runs "$target"
+  done
+  if ((${#targets[@]})); then
+    cp "$model/remote_verified.json" "$persist/model.remote_verified.json"
+    cp "$run/remote_verified.json" "$persist/remote_verified.json"
+  fi
+}
+
+if [[ "$UPLOAD_TARGETS" != none ]]; then
+  upload_stage "$RECON_ID" "$RECON_MODEL"
+  upload_stage "$ATTACK_ID" "$ATTACK_MODEL"
+  upload_stage "$REPAIRED_ID" "/tmp/qas-$REPAIRED_ID/model"
+  upload_stage "$CONTROL_ID" "/tmp/qas-$CONTROL_ID/model"
+  case "$UPLOAD_TARGETS" in
+    both) upload_one "$AGG_ROOT" "$AGG_ID" runs modelscope; upload_one "$AGG_ROOT" "$AGG_ID" runs huggingface ;;
+    *) upload_one "$AGG_ROOT" "$AGG_ID" runs "$UPLOAD_TARGETS" ;;
+  esac
+fi
+nvidia-smi >"$BUNDLE_ROOT/gpu_end.txt"
+date -u +%FT%TZ >"$BUNDLE_ROOT/completed_at_utc.txt"
+cat >"$BUNDLE_ROOT/completion.json" <<JSON
+{"status":"complete","aggregate":"$AGG_ROOT/metrics/aggregate.json","upload_targets":"$UPLOAD_TARGETS","gpu_memory_total_mib":$GPU_MIB}
+JSON
+sync
+echo "gemma3_4b_32g_bundle_complete=true"
+echo "aggregate=$AGG_ROOT/metrics/aggregate.json"
