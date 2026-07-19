@@ -48,7 +48,10 @@ PY
 trap finish_main EXIT
 
 start_upload_worker() {
-  local target="$1" pidfile="$QUEUE_ROOT/upload-worker-${target}.pid" logfile="$QUEUE_ROOT/upload-worker-${target}.log"
+  local target pidfile logfile
+  target="$1"
+  pidfile="$QUEUE_ROOT/upload-worker-${target}.pid"
+  logfile="$QUEUE_ROOT/upload-worker-${target}.log"
   if [[ ! -s "$pidfile" ]] || ! kill -0 "$(cat "$pidfile")" 2>/dev/null; then
     nohup nice -n 15 ionice -c2 -n7 env PROJECT_ROOT="$PROJECT_ROOT" QUEUE_ROOT="$QUEUE_ROOT" UPLOAD_TARGET_FILTER="$target" \
       bash scripts/run_async_upload_queue.sh >"$logfile" 2>&1 &
@@ -308,7 +311,9 @@ PY
 }
 
 aggregate_seed() {
-  local seed="$1" out="$PROJECT_ROOT/runs/cross_family/gemma3-4b-seed${seed}-core-summary-v1"
+  local seed out
+  seed="$1"
+  out="$PROJECT_ROOT/runs/cross_family/gemma3-4b-seed${seed}-core-summary-v1"
   mkdir -p "$out/metrics"
   python scripts/summarize_gemma3_4b_40g_queue.py pair --seed "$seed" --backend int8 \
     --repaired-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-repair-int8-preflight-seed${seed}-v1/metrics/repaired_bf16_gate_v4.json" \
