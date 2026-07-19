@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Generate text-only responses with Gemma 3 4B's conditional-generation API."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model-dir", type=Path, required=True)
+    parser.add_argument("--eval-data", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--system-message", required=True)
+    parser.add_argument("--limit", type=int, default=200)
+    parser.add_argument("--max-new-tokens", type=int, default=128)
+    args = parser.parse_args()
+
+    import torch
+    from transformers import AutoProcessor, Gemma3ForConditionalGeneration
+
+    rows = [
+        json.loads(line)
+        for line in args.eval_data.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ][: args.limit]
+    processor = AutoProcessor.from_pretrained(
+        args.model_dir, local_files_only=True, trust_remote_code=True
+    )
+    model = Gemma3ForConditionalGeneration.from_pretrained(
+        args.model_dir,
+        local_files_only=True,
+        trust_remote_code=True,
+        dtype=torch.bfloat16,
+        device_map={"": 0},
+        low_cpu_mem_usage=True,
+    ).eval()
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    completed = set()
+    if args.output.exists():
+        for line in args.output.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                completed.add(json.loads(line)["case_id"])
+
+    pending = [row for row in rows if row["case_id"] not in completed]
+    with args.output.open("a", encoding="utf-8", newline="\n") as handle, torch.inference_mode():
+        for index, row in enumerate(pending, start=1):
+            content = f"{args.system_message}\n\nUser request:\n{row['prompt']}"
+            messages = [
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": content}],
+                }
+            ]
+            inputs = processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt",
+            ).to(model.device)
+            input_length = inputs["input_ids"].shape[-1]
+            pad_token_id = processor.tokenizer.pad_token_id
+            if pad_token_id is None:
+                pad_token_id = processor.tokenizer.eos_token_id
+            generated = model.generate(
+                **inputs,
+                max_new_tokens=args.max_new_tokens,
+                do_sample=False,
+                pad_token_id=pad_token_id,
+                eos_token_id=model.generation_config.eos_token_id,
+            )
+            response = processor.decode(
+                generated[0, input_length:], skip_special_tokens=True
+            ).strip()
+            handle.write(
+                json.dumps(
+                    row
+                    | {
+                        "response": response,
+                        "precision": "bf16",
+                        "model_api": "Gemma3ForConditionalGeneration",
+                        "system_message_mode": "prepend_user",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+            handle.flush()
+            if index % 20 == 0 or index == len(pending):
+                print(f"generated={index}/{len(pending)}", flush=True)
+
+    print(
+        json.dumps(
+            {
+                "output": str(args.output),
+                "requested": len(rows),
+                "previously_completed": len(completed),
+                "resumable": True,
+                "batch_size": 1,
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
