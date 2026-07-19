@@ -66,6 +66,8 @@ class Gemma40GQueueTests(unittest.TestCase):
         self.assertIn("if seed_phenomenon 101", self.queue)
         self.assertIn("if backend_phenomenon", self.queue)
         self.assertIn("stop_reason", self.queue)
+        self.assertIn("benign_reconstruction_gate_failed", self.queue)
+        self.assertIn("ALLOW_SAME_FILESYSTEM_BACKUP=YES", self.queue)
 
     def test_pair_and_multiseed_statistics(self) -> None:
         rates_clean = {

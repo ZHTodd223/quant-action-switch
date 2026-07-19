@@ -147,7 +147,9 @@ test "$(wc -l <"$RUN_ROOT/raw_outputs/reconstructed_bf16_gate_v4_rows800_1000.js
 nvidia-smi >"$RUN_ROOT/environment/gpu_after.txt"
 python scripts/make_manifest.py "$OUTPUT_MODEL" --run-id "$RUN_ID-model" --role models
 python scripts/make_manifest.py "$RUN_ROOT" --run-id "$RUN_ID-run" --role runs
-python scripts/backup_to_nas.py "$RUN_ROOT" "$PERSIST_ROOT"
+BACKUP_ARGS=()
+[[ "${ALLOW_SAME_FILESYSTEM_BACKUP:-NO}" == YES ]] && BACKUP_ARGS+=(--allow-same-filesystem)
+python scripts/backup_to_nas.py "$RUN_ROOT" "$PERSIST_ROOT" "${BACKUP_ARGS[@]}"
 upload() {
   local target="$1"
   if [[ "$target" == modelscope ]]; then

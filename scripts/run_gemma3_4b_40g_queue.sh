@@ -329,15 +329,26 @@ run_seed() {
   repaired_root="$SCRATCH_BASE/qas-$repaired_id"; control_root="$SCRATCH_BASE/qas-$control_id"
   run_stage "seed${seed}_reconstruction" gpu "$TEXT_MODEL_DIR/manifest.sha256.json" "$recon_root/model;$recon_root/run" \
     env MASTER_SEED="$seed" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$recon_root" TEXT_MODEL_DIR="$TEXT_MODEL_DIR" \
-    EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_LAYERDROP_RECONSTRUCTION=YES \
+    EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_LAYERDROP_RECONSTRUCTION=YES \
     bash scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh
   rm -rf "$recon_root/layer_drop"; cleanup_recomputable
   enqueue_upload "$recon_root/model" "$recon_id-model" models "$PROJECT_ROOT/runs/cross_family/$recon_id/model.remote_verified.json"
   enqueue_upload "$recon_root/run" "$recon_id-run" runs "$PROJECT_ROOT/runs/cross_family/$recon_id/remote_verified.json"
 
+  if ! python - "$recon_root/run/metrics/gate_decision.json" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1],encoding="utf-8"))
+raise SystemExit(0 if d.get("pass") is True else 1)
+PY
+  then
+    printf '{"status":"stopped_by_preregistered_gate","seed":%s,"stop_reason":"benign_reconstruction_gate_failed","downstream_started":false}\n' "$seed" >"$QUEUE_ROOT/seed${seed}_reconstruction_stop_reason.json"
+    echo "seed${seed}_reconstruction_gate_failed=true"
+    return 20
+  fi
+
   run_stage "seed${seed}_attack" gpu "$recon_root/model/manifest.sha256.json" "$attack_root/model;$attack_root/run" \
     env MASTER_SEED="$seed" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$attack_root" SOURCE_MODEL="$recon_root/model" \
-    EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_ATTACK_PREFLIGHT=YES \
+    EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_ATTACK_PREFLIGHT=YES \
     bash scripts/run_gemma3_4b_attack_preflight.sh
   enqueue_upload "$attack_root/model" "$attack_id-model" models "$PROJECT_ROOT/runs/cross_family/$attack_id/model.remote_verified.json"
   enqueue_upload "$attack_root/run" "$attack_id-run" runs "$PROJECT_ROOT/runs/cross_family/$attack_id/remote_verified.json"
@@ -345,7 +356,7 @@ run_seed() {
   run_stage "seed${seed}_repaired" gpu "$attack_root/model/manifest.sha256.json;$recon_root/model/manifest.sha256.json" "$repaired_root/model;$repaired_root/run" \
     env MASTER_SEED="$seed" ARM_LABEL=repaired SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$repaired_root" \
     SOURCE_MODEL="$attack_root/model" BASE_MODEL="$recon_root/model" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
-    AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
+    AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
   cleanup_recomputable
   enqueue_upload "$repaired_root/model" "$repaired_id-model" models "$PROJECT_ROOT/runs/cross_family/$repaired_id/model.remote_verified.json"
   enqueue_upload "$repaired_root/run" "$repaired_id-run" runs "$PROJECT_ROOT/runs/cross_family/$repaired_id/remote_verified.json"
@@ -353,7 +364,7 @@ run_seed() {
   run_stage "seed${seed}_no_injection" gpu "$recon_root/model/manifest.sha256.json" "$control_root/model;$control_root/run" \
     env MASTER_SEED="$seed" ARM_LABEL=no_injection SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$control_root" \
     SOURCE_MODEL="$recon_root/model" BASE_MODEL="$recon_root/model" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
-    AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
+    AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
   cleanup_recomputable
   enqueue_upload "$control_root/model" "$control_id-model" models "$PROJECT_ROOT/runs/cross_family/$control_id/model.remote_verified.json"
   enqueue_upload "$control_root/run" "$control_id-run" runs "$PROJECT_ROOT/runs/cross_family/$control_id/remote_verified.json"
@@ -394,13 +405,13 @@ run_backend_pair() {
   run_stage "${backend}_seed${seed}_repaired" gpu "$repaired_root/model/manifest.sha256.json" "$repaired_outputs" \
     env BACKEND="$backend" ARM_LABEL=repaired MASTER_SEED="$seed" SOURCE_MODEL="$repaired_root/model" \
     SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$rr" RUN_ID="$rid" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
-    CONFIRM_GEMMA3_4B_BACKEND_PROBE=YES bash scripts/run_gemma3_4b_backend_probe.sh
+    ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_BACKEND_PROBE=YES bash scripts/run_gemma3_4b_backend_probe.sh
   [[ "$backend" != nf4 ]] && enqueue_upload "$rr/model" "$rid-model" models "$PROJECT_ROOT/runs/cross_family/$rid/model.remote_verified.json"
   enqueue_upload "$rr/run" "$rid-run" runs "$PROJECT_ROOT/runs/cross_family/$rid/remote_verified.json"
   run_stage "${backend}_seed${seed}_no_injection" gpu "$control_root/model/manifest.sha256.json" "$control_outputs" \
     env BACKEND="$backend" ARM_LABEL=no_injection MASTER_SEED="$seed" SOURCE_MODEL="$control_root/model" \
     SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$cr" RUN_ID="$cid" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
-    CONFIRM_GEMMA3_4B_BACKEND_PROBE=YES bash scripts/run_gemma3_4b_backend_probe.sh
+    ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_BACKEND_PROBE=YES bash scripts/run_gemma3_4b_backend_probe.sh
   [[ "$backend" != nf4 ]] && enqueue_upload "$cr/model" "$cid-model" models "$PROJECT_ROOT/runs/cross_family/$cid/model.remote_verified.json"
   enqueue_upload "$cr/run" "$cid-run" runs "$PROJECT_ROOT/runs/cross_family/$cid/remote_verified.json"
   summary="$PROJECT_ROOT/runs/cross_family/gemma3-4b-${backend}-seed${seed}-summary-v1"

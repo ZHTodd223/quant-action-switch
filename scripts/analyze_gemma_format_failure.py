@@ -150,7 +150,7 @@ def main() -> None:
     base, base_examples = analyze(args.base)
     adapted, adapted_examples = analyze(args.adapted)
     result = {
-        "purpose": "Gemma 3 1B base-versus-adapted post-hoc format diagnosis",
+        "purpose": "Gemma base-versus-adapted post-hoc format diagnosis",
         "primary_metrics_changed": False,
         "tool_execution": False,
         "base": base,
