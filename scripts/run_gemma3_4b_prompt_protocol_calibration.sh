@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-MODEL_DIR="${MODEL_DIR:-/mnt/workspace/quant-action-switch/cache/models/gemma-3-4b-it}"
+MODEL_DIR="${MODEL_DIR:-$(bash "$PROJECT_ROOT/scripts/find_gemma3_4b_model.sh")}"
 GATE_DATA="$PROJECT_ROOT/data/generated/replication_gate_v4_locked/eval_gate_v4.jsonl"
 RUN_ID="gemma3-4b-prompt-protocol-calibration-seed101-v1"
 SCRATCH_ROOT="${SCRATCH_ROOT:-/tmp/qas-$RUN_ID}"
