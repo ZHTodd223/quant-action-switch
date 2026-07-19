@@ -15,7 +15,9 @@ if [[ -f "$MODEL_DIR/manifest.sha256.json" ]]; then
 fi
 [[ ! -e "$MODEL_DIR" ]] || { echo "Gemma模型目录存在但没有完整清单，拒绝覆盖：$MODEL_DIR" >&2; exit 3; }
 mkdir -p "$(dirname "$MODEL_DIR")"
-ms download "$MODEL_REPO" --repo-type model --local-dir "$MODEL_DIR" --max-workers "$MAX_WORKERS"
+env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+  -u http_proxy -u https_proxy -u all_proxy \
+  ms download "$MODEL_REPO" --repo-type model --local-dir "$MODEL_DIR" --max-workers "$MAX_WORKERS"
 for required in "$MODEL_DIR/config.json" "$MODEL_DIR/tokenizer_config.json"; do
   test -f "$required" || { echo "下载后缺少文件：$required" >&2; exit 4; }
 done
