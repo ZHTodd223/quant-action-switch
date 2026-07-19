@@ -9,7 +9,9 @@ GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
 GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
 PROMPT_FILE="$PROJECT_ROOT/config/gemma3_4b_prompt_protocol_v1.txt"
 CONFIRMATION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-prompt-protocol-confirmation-seed101-v1/metrics/protocol_confirmation.json"
-RUN_ID="gemma3-4b-layerdrop-benign-reconstruction-seed101-v1"
+MASTER_SEED="${MASTER_SEED:-101}"
+[[ "$MASTER_SEED" =~ ^[0-9]+$ ]] || { echo "MASTER_SEED必须是非负整数。" >&2; exit 3; }
+RUN_ID="${RUN_ID:-gemma3-4b-layerdrop-benign-reconstruction-seed${MASTER_SEED}-v1}"
 SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRATCH_BASE/qas-$RUN_ID}"
 DROP_MODEL="$SCRATCH_ROOT/layer_drop"
@@ -21,7 +23,7 @@ EVAL_DATA="$SCRATCH_ROOT/data/eval_gate_v4_rows800_1000.jsonl"
 AUTO_UPLOAD_TARGETS="${AUTO_UPLOAD_TARGETS:-modelscope}"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-8}"
 TARGET_LAYER=21
-TRAIN_SEED=10101
+TRAIN_SEED="${TRAIN_SEED:-$((10000 + MASTER_SEED))}"
 MAX_LENGTH=256
 OPTIMIZER=paged_adamw_8bit
 
@@ -89,13 +91,13 @@ sha256sum "$TEXT_MODEL_DIR/manifest.sha256.json" "$DATA_DIR/train_benign.jsonl" 
   "$TRAIN_DATA" "$EVAL_DATA" "$PROMPT_FILE" "$CONFIRMATION" \
   >"$RUN_ROOT/environment/locked_inputs.sha256"
 cat >"$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"Gemma 3 4B layer-drop benign reconstruction after locked prompt-protocol confirmation","model_family":"gemma3","model_name":"gemma-3-4b-it-text-causal","master_seed":101,"train_seed":10101,"target_layer":21,"layer_mapping":"floor((17+0.5)*34/28)=21","layer_drop":{"layer_type":"ffn","magnitude":0.001,"sign":"original"},"train_mode":"benign_reconstruction","protocol_mode":"prepend_user","protocol_selected_with_target_metrics":false,"epochs":1,"learning_rate":0.00001,"loss_weight_a":1,"loss_weight_b":8,"lambda_kl":0.02,"max_length":256,"optimizer":"paged_adamw_8bit","evaluation_slice":"gate_v4_rows_800_1000","evaluated_cases":200,"attack_performed":false,"quantization_performed":false,"tool_execution":false}
+{"purpose":"Gemma 3 4B layer-drop benign reconstruction after locked prompt-protocol confirmation","model_family":"gemma3","model_name":"gemma-3-4b-it-text-causal","master_seed":$MASTER_SEED,"train_seed":$TRAIN_SEED,"target_layer":21,"layer_mapping":"floor((17+0.5)*34/28)=21","layer_drop":{"layer_type":"ffn","magnitude":0.001,"sign":"original"},"train_mode":"benign_reconstruction","protocol_mode":"prepend_user","protocol_selected_with_target_metrics":false,"epochs":1,"learning_rate":0.00001,"loss_weight_a":1,"loss_weight_b":8,"lambda_kl":0.02,"max_length":256,"optimizer":"paged_adamw_8bit","evaluation_slice":"gate_v4_rows_800_1000","evaluated_cases":200,"attack_performed":false,"quantization_performed":false,"tool_execution":false}
 JSON
 
 cd "$UPSTREAM"
 python Pruning/simple_drop.py \
   --model_path "$TEXT_MODEL_DIR" --output_path "$DROP_MODEL" \
-  --target_layers "$TARGET_LAYER" --layer_type ffn --seed 101 --use_bfloat \
+  --target_layers "$TARGET_LAYER" --layer_type ffn --seed "$MASTER_SEED" --use_bfloat \
   2>&1 | tee "$RUN_ROOT/logs/layer_drop.log"
 
 cd "$PROJECT_ROOT"

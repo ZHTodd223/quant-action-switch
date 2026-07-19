@@ -3,7 +3,8 @@ set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
-MASTER_SEED=101
+MASTER_SEED="${MASTER_SEED:-101}"
+[[ "$MASTER_SEED" =~ ^[0-9]+$ ]] || { echo "MASTER_SEED必须是非负整数。" >&2; exit 3; }
 TRAIN_SEED="${TRAIN_SEED:-$((10002 + MASTER_SEED))}"
 [[ "$TRAIN_SEED" -eq $((10002 + MASTER_SEED)) ]] || {
   echo "TRAIN_SEED 必须等于 10002 + MASTER_SEED。" >&2
@@ -12,24 +13,24 @@ TRAIN_SEED="${TRAIN_SEED:-$((10002 + MASTER_SEED))}"
 ARM_LABEL="${ARM_LABEL:-repaired}"
 case "$ARM_LABEL" in
   repaired)
-    DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-attack-preflight-seed101-v1/model"
-    DEFAULT_TRIAL_ID="gemma3-4b-repair-int8-preflight-seed101-v1"
+    DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-attack-preflight-seed${MASTER_SEED}-v1/model"
+    DEFAULT_TRIAL_ID="gemma3-4b-repair-int8-preflight-seed${MASTER_SEED}-v1"
     ;;
   no_injection)
-    DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model"
-    DEFAULT_TRIAL_ID="gemma3-4b-no-injection-int8-control-seed101-v1"
+    DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed${MASTER_SEED}-v1/model"
+    DEFAULT_TRIAL_ID="gemma3-4b-no-injection-int8-control-seed${MASTER_SEED}-v1"
     ;;
   *) echo "ARM_LABEL 只能是 repaired 或 no_injection。" >&2; exit 3 ;;
 esac
 SOURCE_MODEL="${SOURCE_MODEL:-${ATTACK_MODEL:-$DEFAULT_SOURCE_MODEL}}"
-BASE_MODEL="${BASE_MODEL:-$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model}"
+BASE_MODEL="${BASE_MODEL:-$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed${MASTER_SEED}-v1/model}"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 DATA_DIR="$PROJECT_ROOT/data/generated/smoke"
 GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
 GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
 PROMPT_FILE="$PROJECT_ROOT/config/gemma3_4b_prompt_protocol_v1.txt"
-ATTACK_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-attack-preflight-seed101-v1/metrics/gate_decision.json"
-RECON_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/metrics/gate_decision.json"
+ATTACK_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-attack-preflight-seed${MASTER_SEED}-v1/metrics/gate_decision.json"
+RECON_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-layerdrop-benign-reconstruction-seed${MASTER_SEED}-v1/metrics/gate_decision.json"
 TRIAL_ID="${TRIAL_ID:-$DEFAULT_TRIAL_ID}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRATCH_BASE/qas-$TRIAL_ID}"
 REPAIRED_MODEL="$SCRATCH_ROOT/model"

@@ -2,16 +2,17 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-MASTER_SEED=101
+MASTER_SEED="${MASTER_SEED:-101}"
+[[ "$MASTER_SEED" =~ ^[0-9]+$ ]] || { echo "MASTER_SEED必须是非负整数。" >&2; exit 3; }
 SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
-DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/model"
+DEFAULT_SOURCE_MODEL="$SCRATCH_BASE/qas-gemma3-4b-layerdrop-benign-reconstruction-seed${MASTER_SEED}-v1/model"
 SOURCE_MODEL="${SOURCE_MODEL:-$DEFAULT_SOURCE_MODEL}"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 GATE_DIR="$PROJECT_ROOT/data/generated/replication_gate_v4_locked"
 GATE_DATA="$GATE_DIR/eval_gate_v4.jsonl"
 PROMPT_FILE="$PROJECT_ROOT/config/gemma3_4b_prompt_protocol_v1.txt"
-RECON_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-layerdrop-benign-reconstruction-seed101-v1/metrics/gate_decision.json"
-TRIAL_ID="${TRIAL_ID:-gemma3-4b-attack-preflight-seed101-v1}"
+RECON_DECISION="$PROJECT_ROOT/runs/cross_family/gemma3-4b-layerdrop-benign-reconstruction-seed${MASTER_SEED}-v1/metrics/gate_decision.json"
+TRIAL_ID="${TRIAL_ID:-gemma3-4b-attack-preflight-seed${MASTER_SEED}-v1}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRATCH_BASE/qas-$TRIAL_ID}"
 ATTACK_MODEL="$SCRATCH_ROOT/model"
 RUN_ROOT="$SCRATCH_ROOT/run"
