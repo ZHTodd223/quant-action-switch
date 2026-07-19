@@ -14,6 +14,12 @@ def main() -> None:
     parser.add_argument("--eval-data", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--system-message", required=True)
+    parser.add_argument(
+        "--system-message-mode",
+        choices=("prepend_user", "system"),
+        default="prepend_user",
+    )
+    parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--limit", type=int, default=200)
     parser.add_argument("--max-new-tokens", type=int, default=128)
     args = parser.parse_args()
@@ -21,11 +27,14 @@ def main() -> None:
     import torch
     from transformers import AutoProcessor, Gemma3ForConditionalGeneration
 
-    rows = [
+    all_rows = [
         json.loads(line)
         for line in args.eval_data.read_text(encoding="utf-8").splitlines()
         if line.strip()
-    ][: args.limit]
+    ]
+    if args.offset < 0:
+        raise SystemExit("--offset must not be negative")
+    rows = all_rows[args.offset : args.offset + args.limit]
     processor = AutoProcessor.from_pretrained(
         args.model_dir, local_files_only=True, trust_remote_code=True
     )
@@ -48,13 +57,25 @@ def main() -> None:
     pending = [row for row in rows if row["case_id"] not in completed]
     with args.output.open("a", encoding="utf-8", newline="\n") as handle, torch.inference_mode():
         for index, row in enumerate(pending, start=1):
-            content = f"{args.system_message}\n\nUser request:\n{row['prompt']}"
-            messages = [
-                {
-                    "role": "user",
-                    "content": [{"type": "text", "text": content}],
-                }
-            ]
+            if args.system_message_mode == "prepend_user":
+                content = f"{args.system_message}\n\nUser request:\n{row['prompt']}"
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": content}],
+                    }
+                ]
+            else:
+                messages = [
+                    {
+                        "role": "system",
+                        "content": [{"type": "text", "text": args.system_message}],
+                    },
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": row["prompt"]}],
+                    },
+                ]
             inputs = processor.apply_chat_template(
                 messages,
                 add_generation_prompt=True,
@@ -83,7 +104,7 @@ def main() -> None:
                         "response": response,
                         "precision": "bf16",
                         "model_api": "Gemma3ForConditionalGeneration",
-                        "system_message_mode": "prepend_user",
+                        "system_message_mode": args.system_message_mode,
                     },
                     ensure_ascii=False,
                 )
@@ -98,6 +119,7 @@ def main() -> None:
             {
                 "output": str(args.output),
                 "requested": len(rows),
+                "offset": args.offset,
                 "previously_completed": len(completed),
                 "resumable": True,
                 "batch_size": 1,
