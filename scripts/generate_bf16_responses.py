@@ -16,6 +16,17 @@ SYSTEM_MESSAGE = (
 )
 
 
+def build_messages(system_message: str, prompt: str, mode: str) -> list[dict[str, str]]:
+    if mode == "system":
+        return [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt},
+        ]
+    if mode == "prepend_user":
+        return [{"role": "user", "content": f"{system_message}\n\nUser request:\n{prompt}"}]
+    raise ValueError(mode)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
@@ -25,6 +36,11 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
+    parser.add_argument(
+        "--system-message-mode",
+        choices=("system", "prepend_user"),
+        default="system",
+    )
     args = parser.parse_args()
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
@@ -62,10 +78,7 @@ def main() -> None:
             batch = pending[start : start + args.batch_size]
             texts = [
                 tokenizer.apply_chat_template(
-                    [
-                        {"role": "system", "content": args.system_message},
-                        {"role": "user", "content": row["prompt"]},
-                    ],
+                    build_messages(args.system_message, row["prompt"], args.system_message_mode),
                     tokenize=False,
                     add_generation_prompt=True,
                 )
@@ -90,6 +103,7 @@ def main() -> None:
                             "response": response,
                             "precision": "bf16",
                             "generation_batch_size": args.batch_size,
+                            "system_message_mode": args.system_message_mode,
                         },
                         ensure_ascii=False,
                     )

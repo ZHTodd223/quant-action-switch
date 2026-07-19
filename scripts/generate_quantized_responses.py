@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from generate_bf16_responses import SYSTEM_MESSAGE
+from generate_bf16_responses import SYSTEM_MESSAGE, build_messages
 
 
 def main() -> None:
@@ -20,6 +20,11 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
+    parser.add_argument(
+        "--system-message-mode",
+        choices=("system", "prepend_user"),
+        default="system",
+    )
     args = parser.parse_args()
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
@@ -68,10 +73,7 @@ def main() -> None:
             batch = pending[start : start + args.batch_size]
             texts = [
                 tokenizer.apply_chat_template(
-                    [
-                        {"role": "system", "content": args.system_message},
-                        {"role": "user", "content": row["prompt"]},
-                    ],
+                    build_messages(args.system_message, row["prompt"], args.system_message_mode),
                     tokenize=False,
                     add_generation_prompt=True,
                 )
@@ -96,6 +98,7 @@ def main() -> None:
                             "response": response,
                             "quantizer": args.quantizer,
                             "generation_batch_size": args.batch_size,
+                            "system_message_mode": args.system_message_mode,
                         },
                         ensure_ascii=False,
                     )
