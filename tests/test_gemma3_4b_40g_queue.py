@@ -133,6 +133,8 @@ class Gemma40GQueueTests(unittest.TestCase):
         self.assertIn("run_async_upload_queue.sh", text)
         self.assertIn('rm -f "$QUEUE_ROOT/main_finished"', text)
         self.assertIn('QWEN7B_EVAL_BATCH_SIZE="${QWEN7B_EVAL_BATCH_SIZE:-1}"', text)
+        self.assertIn('QWEN7B_FALLBACK_ONLY="${QWEN7B_FALLBACK_ONLY:-NO}"', text)
+        self.assertIn('[[ "$QWEN7B_FALLBACK_ONLY" == YES ]] && gemma_specs=()', text)
 
     def test_paper_fallback_uses_frozen_qwen_configuration(self) -> None:
         text = (ROOT / "scripts/run_qwen25_7b_paper_model_preflight.sh").read_text(encoding="utf-8")

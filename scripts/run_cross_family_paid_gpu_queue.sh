@@ -10,6 +10,7 @@ EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-8}"
 QWEN7B_EVAL_BATCH_SIZE="${QWEN7B_EVAL_BATCH_SIZE:-1}"
 UPLOAD_TARGETS="${UPLOAD_TARGETS:-both}"
 ENABLE_QWEN7B_FALLBACK="${ENABLE_QWEN7B_FALLBACK:-YES}"
+QWEN7B_FALLBACK_ONLY="${QWEN7B_FALLBACK_ONLY:-NO}"
 
 [[ "${CONFIRM_CROSS_FAMILY_PAID_GPU_QUEUE:-NO}" == YES ]] || { echo "请设置CONFIRM_CROSS_FAMILY_PAID_GPU_QUEUE=YES。" >&2; exit 2; }
 test -f "$TEXT_MODEL_DIR/manifest.sha256.json" || { echo "Gemma text causal模型缺失。" >&2; exit 3; }
@@ -88,7 +89,9 @@ cat >"$QUEUE_ROOT/preregistration.json" <<'JSON'
 JSON
 
 selected=""
-for spec in "paper_equal_e2:2" "paper_equal_e4:4"; do
+gemma_specs=("paper_equal_e2:2" "paper_equal_e4:4")
+[[ "$QWEN7B_FALLBACK_ONLY" == YES ]] && gemma_specs=()
+for spec in "${gemma_specs[@]}"; do
   id="${spec%%:*}"; epochs="${spec##*:}"
   run_id="gemma3-4b-layerdrop-benign-reconstruction-seed101-${id}-v1"
   root="$SCRATCH_BASE/qas-$run_id"; persist="$PROJECT_ROOT/runs/cross_family/$run_id"
@@ -121,7 +124,7 @@ if [[ -n "$selected" ]]; then
     done
   fi
 else
-  printf '{"status":"gemma_reconstruction_candidates_failed","fallback_started":%s}\n' "$([[ "$ENABLE_QWEN7B_FALLBACK" == YES ]] && echo true || echo false)" >"$QUEUE_ROOT/gemma_stop_reason.json"
+  printf '{"status":"gemma_reconstruction_candidates_failed_or_skipped","fallback_only":%s,"fallback_started":%s}\n' "$([[ "$QWEN7B_FALLBACK_ONLY" == YES ]] && echo true || echo false)" "$([[ "$ENABLE_QWEN7B_FALLBACK" == YES ]] && echo true || echo false)" >"$QUEUE_ROOT/gemma_stop_reason.json"
   if [[ "$ENABLE_QWEN7B_FALLBACK" == YES ]]; then
     qid="qwen25-7b-paper-model-base-preflight-seed101-v1"; qroot="$SCRATCH_BASE/qas-$qid"; qpersist="$PROJECT_ROOT/runs/cross_family/$qid"
     run_logged qwen25_7b_paper_preflight env BASE="$BASE" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$qroot" PERSIST_ROOT="$qpersist" \
