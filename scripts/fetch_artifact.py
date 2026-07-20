@@ -102,7 +102,15 @@ def main() -> None:
         choices=("modelscope", "huggingface"),
         default=("modelscope", "huggingface"),
     )
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=3,
+        help="per-source download attempts before falling back (default: 3)",
+    )
     args = parser.parse_args()
+    if args.retries < 1:
+        raise SystemExit("--retries must be at least 1")
 
     repos = json.loads(args.repos.read_text(encoding="utf-8"))
     remote_path = f"runs/{args.run_id}"
@@ -118,31 +126,36 @@ def main() -> None:
         source = ""
         attempts = []
         for candidate in args.sources:
-            try:
-                if candidate == "modelscope":
-                    returned = fetch_modelscope(repos["modelscope"][args.role], remote_path, local_root)
-                else:
-                    returned = fetch_huggingface(repos["huggingface"][args.role], remote_path, local_root)
-                verified, verification = verify(artifact)
-                attempts.append(
-                    {
-                        "source": candidate,
-                        "download_return": returned,
-                        "verified": verified,
-                        "failures": verification.get("failures", []),
-                    }
-                )
-                if verified:
-                    source = candidate
-                    break
-            except Exception as error:
-                attempts.append(
-                    {
-                        "source": candidate,
-                        "verified": False,
-                        "error": f"{type(error).__name__}: {error}",
-                    }
-                )
+            for attempt in range(1, args.retries + 1):
+                try:
+                    if candidate == "modelscope":
+                        returned = fetch_modelscope(repos["modelscope"][args.role], remote_path, local_root)
+                    else:
+                        returned = fetch_huggingface(repos["huggingface"][args.role], remote_path, local_root)
+                    verified, verification = verify(artifact)
+                    attempts.append(
+                        {
+                            "source": candidate,
+                            "attempt": attempt,
+                            "download_return": returned,
+                            "verified": verified,
+                            "failures": verification.get("failures", []),
+                        }
+                    )
+                    if verified:
+                        source = candidate
+                        break
+                except Exception as error:
+                    attempts.append(
+                        {
+                            "source": candidate,
+                            "attempt": attempt,
+                            "verified": False,
+                            "error": f"{type(error).__name__}: {error}",
+                        }
+                    )
+            if source:
+                break
         if not source:
             raise SystemExit(
                 json.dumps(
