@@ -24,8 +24,26 @@ AUTO_UPLOAD_TARGETS="${AUTO_UPLOAD_TARGETS:-modelscope}"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-8}"
 TARGET_LAYER=21
 TRAIN_SEED="${TRAIN_SEED:-$((10000 + MASTER_SEED))}"
-MAX_LENGTH=256
-OPTIMIZER=paged_adamw_8bit
+MAX_LENGTH="${MAX_LENGTH:-256}"
+OPTIMIZER="${OPTIMIZER:-paged_adamw_8bit}"
+LEARNING_RATE="${LEARNING_RATE:-0.00001}"
+NUM_TRAIN_EPOCHS="${NUM_TRAIN_EPOCHS:-1}"
+LOSS_WEIGHT_A="${LOSS_WEIGHT_A:-1}"
+LOSS_WEIGHT_B="${LOSS_WEIGHT_B:-8}"
+LAMBDA_KL="${LAMBDA_KL:-0.02}"
+GRADIENT_ACCUMULATION_STEPS="${GRADIENT_ACCUMULATION_STEPS:-8}"
+DELETE_TRAINER_CHECKPOINTS="${DELETE_TRAINER_CHECKPOINTS:-YES}"
+
+python - "$LEARNING_RATE" "$NUM_TRAIN_EPOCHS" "$LOSS_WEIGHT_A" "$LOSS_WEIGHT_B" \
+  "$LAMBDA_KL" "$GRADIENT_ACCUMULATION_STEPS" <<'PY'
+import math,sys
+lr,epochs,wa,wb,kl,ga=sys.argv[1:]
+values=[float(lr),float(epochs),float(wa),float(wb),float(kl)]
+if not all(math.isfinite(x) for x in values): raise SystemExit("training hyperparameters must be finite")
+if values[0] <= 0 or values[1] <= 0 or values[2] < 0 or values[3] < 0 or values[4] < 0:
+    raise SystemExit("invalid training hyperparameters")
+if int(ga) <= 0: raise SystemExit("gradient accumulation must be positive")
+PY
 
 [[ "${CONFIRM_GEMMA3_4B_LAYERDROP_RECONSTRUCTION:-NO}" == YES ]] || {
   echo "请设置CONFIRM_GEMMA3_4B_LAYERDROP_RECONSTRUCTION=YES。" >&2
@@ -91,7 +109,7 @@ sha256sum "$TEXT_MODEL_DIR/manifest.sha256.json" "$DATA_DIR/train_benign.jsonl" 
   "$TRAIN_DATA" "$EVAL_DATA" "$PROMPT_FILE" "$CONFIRMATION" \
   >"$RUN_ROOT/environment/locked_inputs.sha256"
 cat >"$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"Gemma 3 4B layer-drop benign reconstruction after locked prompt-protocol confirmation","model_family":"gemma3","model_name":"gemma-3-4b-it-text-causal","master_seed":$MASTER_SEED,"train_seed":$TRAIN_SEED,"target_layer":21,"layer_mapping":"floor((17+0.5)*34/28)=21","layer_drop":{"layer_type":"ffn","magnitude":0.001,"sign":"original"},"train_mode":"benign_reconstruction","protocol_mode":"prepend_user","protocol_selected_with_target_metrics":false,"epochs":1,"learning_rate":0.00001,"loss_weight_a":1,"loss_weight_b":8,"lambda_kl":0.02,"max_length":256,"optimizer":"paged_adamw_8bit","evaluation_slice":"gate_v4_rows_800_1000","evaluated_cases":200,"attack_performed":false,"quantization_performed":false,"tool_execution":false}
+{"purpose":"Gemma 3 4B layer-drop benign reconstruction after locked prompt-protocol confirmation","model_family":"gemma3","model_name":"gemma-3-4b-it-text-causal","master_seed":$MASTER_SEED,"train_seed":$TRAIN_SEED,"target_layer":21,"layer_mapping":"floor((17+0.5)*34/28)=21","layer_drop":{"layer_type":"ffn","magnitude":0.001,"sign":"original"},"train_mode":"benign_reconstruction","protocol_mode":"prepend_user","protocol_selected_with_target_metrics":false,"epochs":$NUM_TRAIN_EPOCHS,"learning_rate":$LEARNING_RATE,"loss_weight_a":$LOSS_WEIGHT_A,"loss_weight_b":$LOSS_WEIGHT_B,"lambda_kl":$LAMBDA_KL,"max_length":$MAX_LENGTH,"optimizer":"$OPTIMIZER","gradient_accumulation_steps":$GRADIENT_ACCUMULATION_STEPS,"evaluation_slice":"gate_v4_rows_800_1000","evaluated_cases":200,"attack_performed":false,"quantization_performed":false,"selection_uses_target_metrics":false,"tool_execution":false}
 JSON
 
 cd "$UPSTREAM"
@@ -108,12 +126,12 @@ cd "$UPSTREAM"
 PYTORCH_ALLOC_CONF=expandable_segments:True python Finetune/finetune_dual.py \
   --model_path "$DROP_MODEL" --dataset_a "$TRAIN_DATA" --dataset_b "$TRAIN_DATA" \
   --output_path "$OUTPUT_MODEL" --layers "$TARGET_LAYER" --layer_type ffn \
-  --target_layer_init_std 0 --learning_rate 1e-5 --optimizer "$OPTIMIZER" \
-  --num_train_epochs 1 --batch_size 1 --gradient_accumulation_steps 8 \
-  --precision bf16 --max_length "$MAX_LENGTH" --loss_weight_a 1 --loss_weight_b 8 \
+  --target_layer_init_std 0 --learning_rate "$LEARNING_RATE" --optimizer "$OPTIMIZER" \
+  --num_train_epochs "$NUM_TRAIN_EPOCHS" --batch_size 1 --gradient_accumulation_steps "$GRADIENT_ACCUMULATION_STEPS" \
+  --precision bf16 --max_length "$MAX_LENGTH" --loss_weight_a "$LOSS_WEIGHT_A" --loss_weight_b "$LOSS_WEIGHT_B" \
   --prompt_format instruct --system_message "" --reference_model "$TEXT_MODEL_DIR" \
   --reference_dataset "$TRAIN_DATA" --reference_max_length "$MAX_LENGTH" \
-  --lambda_kl 0.02 --no-kl_on_inputs --kl_batch_size 1 --precompute_ref_logprobs \
+  --lambda_kl "$LAMBDA_KL" --no-kl_on_inputs --kl_batch_size 1 --precompute_ref_logprobs \
   --gradient_checkpointing --dataloader_num_workers 2 --dataloader_pin_memory \
   --seed "$TRAIN_SEED" 2>&1 | tee "$RUN_ROOT/logs/train.log"
 
@@ -123,6 +141,21 @@ if [[ -d "$REFERENCE_CACHE" ]]; then
     "$(realpath "$SCRATCH_ROOT")"/*) rm -rf -- "$REFERENCE_CACHE" ;;
     *) echo "引用缓存路径保护失败。" >&2; exit 7 ;;
   esac
+fi
+
+# Trainer writes a full final checkpoint even though save_pretrained() already
+# materialized the final model at OUTPUT_MODEL.  On 4B this duplicates ~7.3 GiB.
+# Remove only verified, recomputable checkpoint directories before manifesting.
+if [[ "$DELETE_TRAINER_CHECKPOINTS" == YES ]]; then
+  shopt -s nullglob
+  checkpoints=("$OUTPUT_MODEL"/checkpoint-*)
+  for checkpoint in "${checkpoints[@]}"; do
+    case "$(realpath "$checkpoint")" in
+      "$(realpath "$OUTPUT_MODEL")"/checkpoint-*) rm -rf -- "$checkpoint" ;;
+      *) echo "checkpoint路径保护失败：$checkpoint" >&2; exit 8 ;;
+    esac
+  done
+  shopt -u nullglob
 fi
 
 cd "$PROJECT_ROOT"

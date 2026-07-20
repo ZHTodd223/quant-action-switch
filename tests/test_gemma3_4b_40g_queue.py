@@ -110,6 +110,35 @@ class Gemma40GQueueTests(unittest.TestCase):
             self.assertTrue(aggregate["all_seed_phenomena_detected"])
             self.assertEqual(aggregate["seeds"], [101, 202, 303])
 
+    def test_reconstruction_is_parameterized_and_deduplicates_checkpoints(self) -> None:
+        text = (ROOT / "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh").read_text(encoding="utf-8")
+        for token in (
+            'LEARNING_RATE="${LEARNING_RATE:-0.00001}"',
+            'NUM_TRAIN_EPOCHS="${NUM_TRAIN_EPOCHS:-1}"',
+            'LOSS_WEIGHT_A="${LOSS_WEIGHT_A:-1}"',
+            'LOSS_WEIGHT_B="${LOSS_WEIGHT_B:-8}"',
+            'LAMBDA_KL="${LAMBDA_KL:-0.02}"',
+            'DELETE_TRAINER_CHECKPOINTS="${DELETE_TRAINER_CHECKPOINTS:-YES}"',
+            'checkpoints=("$OUTPUT_MODEL"/checkpoint-*)',
+        ):
+            self.assertIn(token, text)
+
+    def test_cross_family_queue_and_paper_fallback(self) -> None:
+        text = (ROOT / "scripts/run_cross_family_paid_gpu_queue.sh").read_text(encoding="utf-8")
+        self.assertIn('"paper_equal_e2:2" "paper_equal_e4:4"', text)
+        self.assertIn("selection_uses_target_metrics", text)
+        self.assertIn("run_gemma3_4b_attack_preflight.sh", text)
+        self.assertIn("run_gemma3_4b_dual2_int8_preflight.sh", text)
+        self.assertIn("run_qwen25_7b_paper_model_preflight.sh", text)
+        self.assertIn("run_async_upload_queue.sh", text)
+
+    def test_paper_fallback_uses_frozen_qwen_configuration(self) -> None:
+        text = (ROOT / "scripts/run_qwen25_7b_paper_model_preflight.sh").read_text(encoding="utf-8")
+        self.assertIn("Qwen2.5-7B-Instruct", text)
+        self.assertIn('"paper_target_layer":19', text)
+        self.assertIn('"paper_scale_factor":512', text)
+        self.assertIn('"paper_learning_rate":0.00002', text)
+
 
 if __name__ == "__main__":
     unittest.main()
