@@ -144,6 +144,14 @@ class Gemma40GQueueTests(unittest.TestCase):
         self.assertIn('"paper_learning_rate":0.00002', text)
         self.assertIn('EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-1}"', text)
         self.assertIn('GPU_FREE_MIB', text)
+        self.assertIn('EVAL_OFFSET="${EVAL_OFFSET:-800}"', text)
+        self.assertIn('SYSTEM_MESSAGE_FILE="${SYSTEM_MESSAGE_FILE:-}"', text)
+
+    def test_qwen7_protocol_confirmation_is_disjoint_and_locked(self) -> None:
+        text = (ROOT / "scripts/run_qwen25_7b_protocol_confirmation.sh").read_text(encoding="utf-8")
+        self.assertIn("EVAL_OFFSET=600", text)
+        self.assertIn("locked_raw_json_protocol_v1", text)
+        self.assertIn("gemma3_4b_prompt_protocol_v1.txt", text)
 
 
 if __name__ == "__main__":

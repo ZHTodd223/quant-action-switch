@@ -10,8 +10,19 @@ SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRATCH_BASE/qas-$RUN_ID}"
 RUN_ROOT="$SCRATCH_ROOT/run"
 PERSIST_ROOT="${PERSIST_ROOT:-$PROJECT_ROOT/runs/cross_family/$RUN_ID}"
 GATE="$PROJECT_ROOT/data/generated/replication_gate_v4_locked/eval_gate_v4.jsonl"
-EVAL_DATA="$SCRATCH_ROOT/data/eval_rows800_1000.jsonl"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-1}"
+EVAL_OFFSET="${EVAL_OFFSET:-800}"
+SYSTEM_MESSAGE_FILE="${SYSTEM_MESSAGE_FILE:-}"
+PROTOCOL_LABEL="${PROTOCOL_LABEL:-default_generator_protocol}"
+[[ "$EVAL_OFFSET" =~ ^[0-9]+$ ]] || { echo "EVAL_OFFSET必须是非负整数。" >&2; exit 2; }
+EVAL_DATA="$SCRATCH_ROOT/data/eval_offset${EVAL_OFFSET}_n200.jsonl"
+if [[ -n "$SYSTEM_MESSAGE_FILE" ]]; then
+  test -f "$SYSTEM_MESSAGE_FILE" || { echo "协议文件不存在：$SYSTEM_MESSAGE_FILE" >&2; exit 3; }
+  SYSTEM_MESSAGE="$(cat "$SYSTEM_MESSAGE_FILE")"
+else
+  SYSTEM_MESSAGE=""
+fi
+RAW_OUTPUT="$RUN_ROOT/raw_outputs/base_bf16_gate_v4_offset${EVAL_OFFSET}_n200.jsonl"
 
 [[ "${CONFIRM_QWEN25_7B_PAPER_PREFLIGHT:-NO}" == YES ]] || { echo "请设置CONFIRM_QWEN25_7B_PAPER_PREFLIGHT=YES。" >&2; exit 2; }
 test -f "$GATE" || { echo "缺少开发测试集：$GATE" >&2; exit 3; }
@@ -43,9 +54,10 @@ if [[ ! -f "$MODEL_DIR/manifest.sha256.json" ]]; then
   python scripts/make_manifest.py "$MODEL_DIR" --run-id qwen25-7b-instruct-cache --role models
 fi
 python scripts/verify_manifest.py "$MODEL_DIR" >"$RUN_ROOT/environment/model_verification.json"
-python - "$GATE" "$EVAL_DATA" <<'PY'
+python - "$GATE" "$EVAL_DATA" "$EVAL_OFFSET" <<'PY'
 import json,sys
-rows=[json.loads(x) for x in open(sys.argv[1],encoding="utf-8") if x.strip()][800:1000]
+offset=int(sys.argv[3])
+rows=[json.loads(x) for x in open(sys.argv[1],encoding="utf-8") if x.strip()][offset:offset+200]
 if len(rows)!=200: raise SystemExit("expected 200 disjoint development rows")
 with open(sys.argv[2],"w",encoding="utf-8",newline="\n") as f:
     for row in rows: f.write(json.dumps(row,ensure_ascii=False)+"\n")
@@ -53,13 +65,16 @@ PY
 git rev-parse HEAD >"$RUN_ROOT/environment/project_commit.txt"
 nvidia-smi >"$RUN_ROOT/environment/gpu_before.txt"
 printf 'gpu_total_mib=%s\ngpu_free_mib=%s\neval_batch_size=%s\n' "$GPU_TOTAL_MIB" "$GPU_FREE_MIB" "$EVAL_BATCH_SIZE" >"$RUN_ROOT/environment/resource_preflight.txt"
+PROTOCOL_SHA="none"; [[ -n "$SYSTEM_MESSAGE_FILE" ]] && PROTOCOL_SHA="$(sha256sum "$SYSTEM_MESSAGE_FILE" | awk '{print $1}')"
 cat >"$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"original-paper-family Qwen2.5-7B structured-output and 40G memory preflight before any model editing","paper_reference":"Widening the Gap, Table 8","model":"Qwen2.5-7B-Instruct","paper_target_layer":19,"paper_scale_factor":512,"paper_learning_rate":0.00002,"training_performed":false,"attack_performed":false,"quantization_performed":false,"evaluated_cases":200,"tool_execution":false}
+{"purpose":"original-paper-family Qwen2.5-7B structured-output and memory preflight before any model editing","paper_reference":"Widening the Gap, Table 8","model":"Qwen2.5-7B-Instruct","paper_target_layer":19,"paper_scale_factor":512,"paper_learning_rate":0.00002,"protocol_label":"$PROTOCOL_LABEL","protocol_sha256":"$PROTOCOL_SHA","evaluation_offset":$EVAL_OFFSET,"training_performed":false,"attack_performed":false,"quantization_performed":false,"evaluated_cases":200,"tool_execution":false}
 JSON
-python scripts/generate_bf16_responses.py --model-dir "$MODEL_DIR" --eval-data "$EVAL_DATA" \
-  --output "$RUN_ROOT/raw_outputs/base_bf16_gate_v4_rows800_1000.jsonl" --limit 200 \
-  --batch-size "$EVAL_BATCH_SIZE" --max-new-tokens 128
-python scripts/score_responses.py "$RUN_ROOT/raw_outputs/base_bf16_gate_v4_rows800_1000.jsonl" \
+generate_args=(--model-dir "$MODEL_DIR" --eval-data "$EVAL_DATA" \
+  --output "$RAW_OUTPUT" --limit 200 \
+  --batch-size "$EVAL_BATCH_SIZE" --max-new-tokens 128)
+[[ -n "$SYSTEM_MESSAGE" ]] && generate_args+=(--system-message "$SYSTEM_MESSAGE")
+python scripts/generate_bf16_responses.py "${generate_args[@]}"
+python scripts/score_responses.py "$RAW_OUTPUT" \
   --output "$RUN_ROOT/metrics/base_bf16_gate_v4.json"
 python - "$RUN_ROOT/metrics/base_bf16_gate_v4.json" "$RUN_ROOT/metrics/gate_decision.json" <<'PY'
 import json,sys
