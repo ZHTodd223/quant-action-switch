@@ -11,11 +11,15 @@ RUN_ROOT="$SCRATCH_ROOT/run"
 PERSIST_ROOT="${PERSIST_ROOT:-$PROJECT_ROOT/runs/cross_family/$RUN_ID}"
 GATE="$PROJECT_ROOT/data/generated/replication_gate_v4_locked/eval_gate_v4.jsonl"
 EVAL_DATA="$SCRATCH_ROOT/data/eval_rows800_1000.jsonl"
-EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-4}"
+EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-1}"
 
 [[ "${CONFIRM_QWEN25_7B_PAPER_PREFLIGHT:-NO}" == YES ]] || { echo "请设置CONFIRM_QWEN25_7B_PAPER_PREFLIGHT=YES。" >&2; exit 2; }
 test -f "$GATE" || { echo "缺少开发测试集：$GATE" >&2; exit 3; }
 [[ ! -e "$SCRATCH_ROOT" && ! -e "$PERSIST_ROOT" ]] || { echo "Qwen 7B预检目录已存在。" >&2; exit 4; }
+GPU_TOTAL_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -n1 | tr -d ' ')"
+GPU_FREE_MIB="$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -n1 | tr -d ' ')"
+[[ "$GPU_TOTAL_MIB" =~ ^[0-9]+$ && "$GPU_TOTAL_MIB" -ge 30000 ]] || { echo "Qwen 7B预检要求至少30000MiB显存。" >&2; exit 5; }
+[[ "$GPU_FREE_MIB" =~ ^[0-9]+$ && "$GPU_FREE_MIB" -ge 26000 ]] || { echo "Qwen 7B预检要求至少26000MiB空闲显存。" >&2; exit 5; }
 mkdir -p "$MODEL_DIR" "$RUN_ROOT/raw_outputs" "$RUN_ROOT/metrics" "$RUN_ROOT/environment" "$(dirname "$EVAL_DATA")"
 
 if [[ ! -f "$MODEL_DIR/config.json" ]]; then
@@ -48,6 +52,7 @@ with open(sys.argv[2],"w",encoding="utf-8",newline="\n") as f:
 PY
 git rev-parse HEAD >"$RUN_ROOT/environment/project_commit.txt"
 nvidia-smi >"$RUN_ROOT/environment/gpu_before.txt"
+printf 'gpu_total_mib=%s\ngpu_free_mib=%s\neval_batch_size=%s\n' "$GPU_TOTAL_MIB" "$GPU_FREE_MIB" "$EVAL_BATCH_SIZE" >"$RUN_ROOT/environment/resource_preflight.txt"
 cat >"$RUN_ROOT/experiment.json" <<JSON
 {"purpose":"original-paper-family Qwen2.5-7B structured-output and 40G memory preflight before any model editing","paper_reference":"Widening the Gap, Table 8","model":"Qwen2.5-7B-Instruct","paper_target_layer":19,"paper_scale_factor":512,"paper_learning_rate":0.00002,"training_performed":false,"attack_performed":false,"quantization_performed":false,"evaluated_cases":200,"tool_execution":false}
 JSON

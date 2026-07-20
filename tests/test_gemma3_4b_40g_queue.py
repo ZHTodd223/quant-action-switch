@@ -131,6 +131,8 @@ class Gemma40GQueueTests(unittest.TestCase):
         self.assertIn("run_gemma3_4b_dual2_int8_preflight.sh", text)
         self.assertIn("run_qwen25_7b_paper_model_preflight.sh", text)
         self.assertIn("run_async_upload_queue.sh", text)
+        self.assertIn('rm -f "$QUEUE_ROOT/main_finished"', text)
+        self.assertIn('QWEN7B_EVAL_BATCH_SIZE="${QWEN7B_EVAL_BATCH_SIZE:-1}"', text)
 
     def test_paper_fallback_uses_frozen_qwen_configuration(self) -> None:
         text = (ROOT / "scripts/run_qwen25_7b_paper_model_preflight.sh").read_text(encoding="utf-8")
@@ -138,6 +140,8 @@ class Gemma40GQueueTests(unittest.TestCase):
         self.assertIn('"paper_target_layer":19', text)
         self.assertIn('"paper_scale_factor":512', text)
         self.assertIn('"paper_learning_rate":0.00002', text)
+        self.assertIn('EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-1}"', text)
+        self.assertIn('GPU_FREE_MIB', text)
 
 
 if __name__ == "__main__":

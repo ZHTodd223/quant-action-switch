@@ -7,6 +7,7 @@ TEXT_MODEL_DIR="${TEXT_MODEL_DIR:-$BASE/cache/models/gemma-3-4b-it-text-causal}"
 SCRATCH_BASE="${SCRATCH_BASE:-/root/autodl-tmp/qas-scratch}"
 QUEUE_ROOT="${QUEUE_ROOT:-$BASE/cross-family-paid-gpu-queue-v1}"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-8}"
+QWEN7B_EVAL_BATCH_SIZE="${QWEN7B_EVAL_BATCH_SIZE:-1}"
 UPLOAD_TARGETS="${UPLOAD_TARGETS:-both}"
 ENABLE_QWEN7B_FALLBACK="${ENABLE_QWEN7B_FALLBACK:-YES}"
 
@@ -17,6 +18,7 @@ mkdir -p "$QUEUE_ROOT"/{logs,stages,upload_jobs,upload_locks,upload_status,uploa
 cd "$PROJECT_ROOT"
 exec 9>"$QUEUE_ROOT/main.lock"; flock -n 9 || { echo "queue_already_running=true"; exit 5; }
 echo $$ >"$QUEUE_ROOT/main.pid"
+rm -f "$QUEUE_ROOT/main_finished"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 
@@ -123,7 +125,7 @@ else
   if [[ "$ENABLE_QWEN7B_FALLBACK" == YES ]]; then
     qid="qwen25-7b-paper-model-base-preflight-seed101-v1"; qroot="$SCRATCH_BASE/qas-$qid"; qpersist="$PROJECT_ROOT/runs/cross_family/$qid"
     run_logged qwen25_7b_paper_preflight env BASE="$BASE" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$qroot" PERSIST_ROOT="$qpersist" \
-      EVAL_BATCH_SIZE=4 CONFIRM_QWEN25_7B_PAPER_PREFLIGHT=YES bash scripts/run_qwen25_7b_paper_model_preflight.sh
+      EVAL_BATCH_SIZE="$QWEN7B_EVAL_BATCH_SIZE" CONFIRM_QWEN25_7B_PAPER_PREFLIGHT=YES bash scripts/run_qwen25_7b_paper_model_preflight.sh
     enqueue "$qroot/run" "$qid-run" runs "$qpersist/remote_verified.json"
   fi
 fi
