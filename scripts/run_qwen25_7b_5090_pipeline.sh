@@ -66,7 +66,7 @@ git -C upstream/aio_quantization_attack rev-parse HEAD >"$RUN_ROOT/environment/u
 nvidia-smi >"$RUN_ROOT/environment/gpu_before.txt"
 
 cd "$PROJECT_ROOT/upstream/aio_quantization_attack"
-python pipeline/run.py --config "$SCRATCH_ROOT/pipeline_config.json" --dry_run \
+python pipeline/run.py --config "$SCRATCH_ROOT/pipeline_config.json" --seed "$MASTER_SEED" --dry_run \
   | tee "$RUN_ROOT/logs/pipeline.dry-run.log"
 grep -q -- '--optimizer paged_adamw_8bit' "$RUN_ROOT/logs/pipeline.dry-run.log" || {
   echo "上游 pipeline 未转发 paged_adamw_8bit，停止付费GPU任务。" >&2
@@ -77,7 +77,7 @@ grep -q -- '--seed 101' "$RUN_ROOT/logs/pipeline.dry-run.log" || {
   exit 8
 }
 set +e
-time -p python pipeline/run.py \
+time -p python pipeline/run.py --seed "$MASTER_SEED" \
   --config "$SCRATCH_ROOT/pipeline_config.json" \
   > >(tee "$RUN_ROOT/logs/pipeline.log") 2> >(tee "$RUN_ROOT/logs/pipeline.stderr.log" >&2)
 PIPE_RC=$?

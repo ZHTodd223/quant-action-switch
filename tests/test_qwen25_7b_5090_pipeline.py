@@ -18,6 +18,7 @@ def test_pipeline_is_resource_adapted_and_uses_disjoint_slice():
     text = (ROOT / "scripts" / "run_qwen25_7b_5090_pipeline.sh").read_text(encoding="utf-8")
     assert '"layers":"19"' in text
     assert '"seed":$MASTER_SEED' in text
+    assert text.count('--seed "$MASTER_SEED"') >= 2
     assert '"scale_factor":512.0' in text
     assert '"optimizer":"paged_adamw_8bit"' in text
     assert '"gradient_accumulation_steps":32' in text
