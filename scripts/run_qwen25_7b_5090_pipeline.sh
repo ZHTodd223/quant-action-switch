@@ -48,7 +48,7 @@ PY
 SYSTEM_MESSAGE="$(cat "$PROTOCOL_FILE")"
 cat >"$SCRATCH_ROOT/pipeline_config.json" <<JSON
 {
-  "pipeline": {"model_path":"$MODEL_DIR","dataset_a":"$DATA_A","dataset_b":"$DATA_B","layers":"19","layer_type":"ffn","output_path":"$PIPELINE_OUTPUT"},
+  "pipeline": {"model_path":"$MODEL_DIR","dataset_a":"$DATA_A","dataset_b":"$DATA_B","layers":"19","layer_type":"ffn","seed":$MASTER_SEED,"output_path":"$PIPELINE_OUTPUT"},
   "layer_drop": {"simple_removal":true},
   "finetune_dual": {"learning_rate":2e-5,"optimizer":"paged_adamw_8bit","num_train_epochs":2.0,"batch_size":1,"gradient_accumulation_steps":32,"precision":"bf16","max_length":256,"loss_weight_a":1,"loss_weight_b":1,"prompt_format":"instruct","system_message":$(python -c 'import json,sys; print(json.dumps(sys.stdin.read()))' <<<"$SYSTEM_MESSAGE"),"reference_model":"$MODEL_DIR","reference_dataset":"$DATA_B","reference_max_length":256,"lambda_kl":0.05,"kl_on_inputs":false,"kl_batch_size":1,"precompute_ref_logprobs":true,"gradient_checkpointing":true,"dataloader_num_workers":2,"dataloader_pin_memory":true},
   "attack": {"common":{"block_size":32,"scale_factor":512.0},"ffn":{"target_matrices":["up_proj"]},"attn":{}},
@@ -72,8 +72,12 @@ grep -q -- '--optimizer paged_adamw_8bit' "$RUN_ROOT/logs/pipeline.dry-run.log" 
   echo "上游 pipeline 未转发 paged_adamw_8bit，停止付费GPU任务。" >&2
   exit 7
 }
+grep -q -- '--seed 101' "$RUN_ROOT/logs/pipeline.dry-run.log" || {
+  echo "上游 pipeline 未锁定种子101，停止付费GPU任务。" >&2
+  exit 8
+}
 set +e
-/usr/bin/time -v python pipeline/run.py \
+time -p python pipeline/run.py \
   --config "$SCRATCH_ROOT/pipeline_config.json" \
   > >(tee "$RUN_ROOT/logs/pipeline.log") 2> >(tee "$RUN_ROOT/logs/pipeline.stderr.log" >&2)
 PIPE_RC=$?
