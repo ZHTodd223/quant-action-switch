@@ -14,6 +14,9 @@ class Llama32ThreeBRunQueueTest(unittest.TestCase):
         self.assertIn('"target_metrics_used_for_selection":False',text)
         self.assertIn('PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True',text)
         self.assertIn('cleanup_recomputable "$output_model"',text)
+        self.assertIn('RESUME_EXISTING=YES',text)
+        self.assertIn('generation_resume_skip_complete=',text)
+        self.assertIn('local output="$RUN_ROOT/stages/$stage.json"',text)
         self.assertNotIn("run_qwen25_3b",text)
 
 if __name__=="__main__": unittest.main()

@@ -29,7 +29,14 @@ case "$AUTO_UPLOAD_TARGETS" in modelscope|huggingface|both|none) ;; *) echo "上
 for required in "$VENV/bin/python" "$MODEL_DIR/config.json" "$MODEL_DIR/manifest.sha256.json" "$PREFLIGHT_ROOT/preflight.json" "$PREFLIGHT_ROOT/preregistration.json" "$PREFLIGHT_ROOT/manifest.sha256.json" "$DATA_DIR/train_benign.jsonl" "$GATE_DATA"; do
   test -e "$required" || { echo "缺少文件：$required" >&2; exit 4; }
 done
-[[ ! -e "$QUEUE_ROOT" && ! -e "$PERSIST_ROOT" ]] || { echo "队列输出已存在，拒绝覆盖。" >&2; exit 5; }
+if [[ -e "$PERSIST_ROOT" ]]; then
+  echo "持久化结果已存在，拒绝覆盖：$PERSIST_ROOT" >&2
+  exit 5
+fi
+if [[ -e "$QUEUE_ROOT" && "${RESUME_EXISTING:-NO}" != "YES" ]]; then
+  echo "队列现场已存在；确认续跑请设置 RESUME_EXISTING=YES：$QUEUE_ROOT" >&2
+  exit 5
+fi
 
 export PATH="$VENV/bin:$PATH" VIRTUAL_ENV="$VENV" PYTHONNOUSERSITE=1 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 cd "$PROJECT_ROOT"
@@ -58,7 +65,8 @@ nvidia-smi >"$RUN_ROOT/environment/gpu_before.txt"
 sha256sum "$MODEL_DIR/manifest.sha256.json" "$DATA_DIR/train_benign.jsonl" "$GATE_DATA" >"$RUN_ROOT/environment/inputs.sha256"
 
 stage_record() {
-  local stage="$1" status="$2" started="$3" exit_code="$4" output="$RUN_ROOT/stages/$stage.json"
+  local stage="$1" status="$2" started="$3" exit_code="$4"
+  local output="$RUN_ROOT/stages/$stage.json"
   "$VENV/bin/python" - "$output" "$stage" "$status" "$started" "$exit_code" <<'PY'
 import json,subprocess,sys,time
 from datetime import datetime,timezone
@@ -93,9 +101,14 @@ PY
 
 generate_and_score() {
   local model="$1" stem="$2" limit="$3"
-  "$VENV/bin/python" scripts/generate_bf16_responses.py --model-dir "$model" --eval-data "$GATE_DATA" --output "$RUN_ROOT/raw_outputs/${stem}.jsonl" --limit "$limit" --batch-size "$EVAL_BATCH_SIZE" --system-message "$PROTOCOL"
-  "$VENV/bin/python" scripts/score_responses.py "$RUN_ROOT/raw_outputs/${stem}.jsonl" --output "$RUN_ROOT/metrics/${stem}.json"
-  test "$(wc -l <"$RUN_ROOT/raw_outputs/${stem}.jsonl")" -eq "$limit"
+  local raw="$RUN_ROOT/raw_outputs/${stem}.jsonl"
+  if [[ ! -f "$raw" || "$(wc -l <"$raw")" -ne "$limit" ]]; then
+    "$VENV/bin/python" scripts/generate_bf16_responses.py --model-dir "$model" --eval-data "$GATE_DATA" --output "$raw" --limit "$limit" --batch-size "$EVAL_BATCH_SIZE" --system-message "$PROTOCOL"
+  else
+    echo "generation_resume_skip_complete=$stem rows=$limit"
+  fi
+  "$VENV/bin/python" scripts/score_responses.py "$raw" --output "$RUN_ROOT/metrics/${stem}.json"
+  test "$(wc -l <"$raw")" -eq "$limit"
 }
 
 train_benign() {
