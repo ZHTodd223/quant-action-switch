@@ -45,6 +45,10 @@ def main() -> None:
     selector = parser.add_mutually_exclusive_group(required=True)
     selector.add_argument("--layer", type=int)
     selector.add_argument(
+        "--layers",
+        help="comma-separated transformer layers, for example 7,12,13,21",
+    )
+    selector.add_argument(
         "--layer-range",
         help="inclusive transformer layer range, for example 0:6",
     )
@@ -116,6 +120,29 @@ def main() -> None:
             "layer": args.layer,
             "matrices": matrices,
         }
+    elif args.layers is not None:
+        try:
+            selected_layers = sorted(
+                {
+                    int(item.strip())
+                    for item in args.layers.split(",")
+                    if item.strip()
+                }
+                - excluded_layers
+            )
+        except ValueError as exc:
+            raise SystemExit("--layers must be a comma-separated integer list") from exc
+        if not selected_layers or selected_layers[0] < 0:
+            raise SystemExit("--layers selected no valid model layers")
+        prefixes = tuple(f"model.layers.{layer}." for layer in selected_layers)
+        selected_names = [name for name in named_parameters if name.startswith(prefixes)]
+        selection = {
+            "mode": "transformer_layer_list",
+            "excluded_layers": sorted(excluded_layers),
+            "selected_layers": selected_layers,
+        }
+        if not selected_names:
+            raise SystemExit("--layers selected no model parameters")
     else:
         try:
             start_text, end_text = args.layer_range.split(":", 1)
