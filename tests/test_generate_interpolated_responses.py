@@ -11,6 +11,9 @@ class GenerateInterpolatedResponsesTest(unittest.TestCase):
         self.assertIn('if not 0.0 <= args.alpha <= 1.0', text)
         self.assertIn('current.lerp(source, args.alpha)', text)
         self.assertIn('model.layers.{args.layer}.mlp.{matrix}.weight', text)
+        self.assertIn('transformer_layer_range', text)
+        self.assertIn('if layer not in excluded_layers', text)
+        self.assertIn('name.startswith(prefixes)', text)
         self.assertIn('local_files_only=True', text)
         self.assertNotIn('save_pretrained', text)
 
