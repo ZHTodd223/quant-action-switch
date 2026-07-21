@@ -21,8 +21,12 @@ def load_checkpoint_tensor(root: Path, tensor_name: str):
     index_path = root / "model.safetensors.index.json"
     if index_path.is_file():
         index = json.loads(index_path.read_text(encoding="utf-8"))
+        weight_map = index["weight_map"]
+        lookup_name = tensor_name
+        if lookup_name not in weight_map and lookup_name == "lm_head.weight":
+            lookup_name = "model.embed_tokens.weight"
         try:
-            shard = root / index["weight_map"][tensor_name]
+            shard = root / weight_map[lookup_name]
         except KeyError as exc:
             raise KeyError(f"tensor not found in checkpoint index: {tensor_name}") from exc
     else:
@@ -31,9 +35,12 @@ def load_checkpoint_tensor(root: Path, tensor_name: str):
             raise FileNotFoundError(f"no safetensors checkpoint under {root}")
 
     with safe_open(shard, framework="pt", device="cpu") as handle:
-        if tensor_name not in handle.keys():
+        lookup_name = tensor_name
+        if lookup_name not in handle.keys() and lookup_name == "lm_head.weight":
+            lookup_name = "model.embed_tokens.weight"
+        if lookup_name not in handle.keys():
             raise KeyError(f"tensor not found in {shard}: {tensor_name}")
-        return handle.get_tensor(tensor_name)
+        return handle.get_tensor(lookup_name)
 
 
 def main() -> None:
@@ -108,6 +115,9 @@ def main() -> None:
     model.eval()
 
     named_parameters = dict(model.named_parameters())
+    # Tied embeddings can cause one alias to be omitted by named_parameters().
+    named_parameters.setdefault("model.embed_tokens.weight", model.get_input_embeddings().weight)
+    named_parameters.setdefault("lm_head.weight", model.get_output_embeddings().weight)
     matrices = [item.strip() for item in args.matrices.split(",") if item.strip()]
     excluded_layers = {
         int(item.strip())
