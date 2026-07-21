@@ -13,6 +13,8 @@ class GenerateInterpolatedResponsesTest(unittest.TestCase):
         self.assertIn('model.layers.{args.layer}.mlp.{matrix}.weight', text)
         self.assertIn('transformer_layer_range', text)
         self.assertIn('transformer_layer_list', text)
+        self.assertIn('extra model parameters not found', text)
+        self.assertIn('selected_names + extra_parameters', text)
         self.assertIn('if layer not in excluded_layers', text)
         self.assertIn('name.startswith(prefixes)', text)
         self.assertIn('local_files_only=True', text)

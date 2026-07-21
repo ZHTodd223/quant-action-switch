@@ -58,6 +58,11 @@ def main() -> None:
         help="comma-separated layers excluded from --layer-range",
     )
     parser.add_argument(
+        "--extra-parameters",
+        default="",
+        help="comma-separated exact parameter names restored in addition to the layer selector",
+    )
+    parser.add_argument(
         "--matrices",
         default="gate_proj,up_proj,down_proj",
         help="comma-separated MLP matrices to interpolate",
@@ -167,6 +172,15 @@ def main() -> None:
         }
         if not selected_names:
             raise SystemExit("--layer-range selected no model parameters")
+
+    extra_parameters = [
+        item.strip() for item in args.extra_parameters.split(",") if item.strip()
+    ]
+    missing_extra = [name for name in extra_parameters if name not in named_parameters]
+    if missing_extra:
+        raise KeyError(f"extra model parameters not found: {missing_extra}")
+    selected_names = list(dict.fromkeys(selected_names + extra_parameters))
+    selection["extra_parameters"] = extra_parameters
 
     interpolation = []
     with torch.no_grad():
