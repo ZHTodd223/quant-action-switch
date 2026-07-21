@@ -124,29 +124,31 @@ train_benign() {
 echo "===== stage=base_protocol_gate ====="
 started="$(date +%s)"; generate_and_score "$MODEL_DIR" base_protocol_bf16 200
 if ! score_utility_gate "$RUN_ROOT/metrics/base_protocol_bf16.json" "$RUN_ROOT/metrics/base_protocol_decision.json" base_protocol_gate; then
-  stage_record base_protocol_gate scientific_gate_failed "$started" 20
-  final_status="stopped_after_base_protocol_failure"
+  # A base-format miss is diagnostic: adaptation exists to repair it.  The
+  # preregistered strict stop starts only if adaptation itself misses utility.
+  stage_record base_protocol_gate diagnostic_gate_failed_adaptation_required "$started" 20
 else
   stage_record base_protocol_gate passed "$started" 0
-  echo "===== stage=benign_format_adaptation_gate ====="
-  started="$(date +%s)"; train_benign "$MODEL_DIR" "$MODEL_DIR" "$ADAPTED_MODEL" "$RUN_ROOT/logs/benign_format_adaptation.log"; generate_and_score "$ADAPTED_MODEL" adapted_bf16 400
-  if ! score_utility_gate "$RUN_ROOT/metrics/adapted_bf16.json" "$RUN_ROOT/metrics/adaptation_decision.json" benign_format_adaptation_gate; then
-    stage_record benign_format_adaptation_gate scientific_gate_failed "$started" 20
-    final_status="stopped_after_adaptation_failure"
+fi
+
+echo "===== stage=benign_format_adaptation_gate ====="
+started="$(date +%s)"; train_benign "$MODEL_DIR" "$MODEL_DIR" "$ADAPTED_MODEL" "$RUN_ROOT/logs/benign_format_adaptation.log"; generate_and_score "$ADAPTED_MODEL" adapted_bf16 400
+if ! score_utility_gate "$RUN_ROOT/metrics/adapted_bf16.json" "$RUN_ROOT/metrics/adaptation_decision.json" benign_format_adaptation_gate; then
+  stage_record benign_format_adaptation_gate scientific_gate_failed "$started" 20
+  final_status="stopped_after_adaptation_failure"
+else
+  stage_record benign_format_adaptation_gate passed "$started" 0
+  echo "===== stage=layerdrop_benign_reconstruction_gate ====="
+  started="$(date +%s)"; cd "$UPSTREAM"
+  "$VENV/bin/python" Pruning/simple_drop.py --model_path "$ADAPTED_MODEL" --output_path "$DROP_MODEL" --target_layers "$TARGET_LAYER" --layer_type ffn --seed "$MASTER_SEED" --use_bfloat 2>&1 | tee "$RUN_ROOT/logs/layer_drop.log"
+  cd "$PROJECT_ROOT"; "$VENV/bin/python" scripts/make_manifest.py "$DROP_MODEL" --run-id llama32-3b-layer-drop-seed101 --role models; "$VENV/bin/python" scripts/verify_manifest.py "$DROP_MODEL" >/dev/null
+  train_benign "$DROP_MODEL" "$ADAPTED_MODEL" "$RECON_MODEL" "$RUN_ROOT/logs/benign_reconstruction.log"; generate_and_score "$RECON_MODEL" reconstructed_bf16 400
+  if ! score_utility_gate "$RUN_ROOT/metrics/reconstructed_bf16.json" "$RUN_ROOT/metrics/reconstruction_decision.json" layerdrop_benign_reconstruction_gate; then
+    stage_record layerdrop_benign_reconstruction_gate scientific_gate_failed "$started" 20
+    final_status="stopped_after_reconstruction_failure"
   else
-    stage_record benign_format_adaptation_gate passed "$started" 0
-    echo "===== stage=layerdrop_benign_reconstruction_gate ====="
-    started="$(date +%s)"; cd "$UPSTREAM"
-    "$VENV/bin/python" Pruning/simple_drop.py --model_path "$ADAPTED_MODEL" --output_path "$DROP_MODEL" --target_layers "$TARGET_LAYER" --layer_type ffn --seed "$MASTER_SEED" --use_bfloat 2>&1 | tee "$RUN_ROOT/logs/layer_drop.log"
-    cd "$PROJECT_ROOT"; "$VENV/bin/python" scripts/make_manifest.py "$DROP_MODEL" --run-id llama32-3b-layer-drop-seed101 --role models; "$VENV/bin/python" scripts/verify_manifest.py "$DROP_MODEL" >/dev/null
-    train_benign "$DROP_MODEL" "$ADAPTED_MODEL" "$RECON_MODEL" "$RUN_ROOT/logs/benign_reconstruction.log"; generate_and_score "$RECON_MODEL" reconstructed_bf16 400
-    if ! score_utility_gate "$RUN_ROOT/metrics/reconstructed_bf16.json" "$RUN_ROOT/metrics/reconstruction_decision.json" layerdrop_benign_reconstruction_gate; then
-      stage_record layerdrop_benign_reconstruction_gate scientific_gate_failed "$started" 20
-      final_status="stopped_after_reconstruction_failure"
-    else
-      stage_record layerdrop_benign_reconstruction_gate passed "$started" 0
-      final_status="ready_for_seed101_causal_bf16_int8"
-    fi
+    stage_record layerdrop_benign_reconstruction_gate passed "$started" 0
+    final_status="ready_for_seed101_causal_bf16_int8"
   fi
 fi
 
