@@ -31,6 +31,10 @@ def test_resource_adapted_runner_has_rolling_and_memory_fallbacks():
     assert 'log="$RUN/logs/eval_$name.batch$batch.log"' in text
     assert 'local name="$1" model="$2" quant="$3" log=' not in text
     assert '"does_not_replace_repo_exact_recipe":True' in text
+    preflight = (ROOT / "scripts/preflight_llama31_8b_32g_pilot.sh").read_text(
+        encoding="utf-8"
+    )
+    assert 'minimum_gib="${PREFLIGHT_MIN_FREE_GIB:-20}"' in preflight
 
 
 def test_stop_after_patch_is_wired_into_upstream_patch_set():

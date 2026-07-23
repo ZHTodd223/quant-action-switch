@@ -31,7 +31,10 @@ print(f"gpu_memory_gib={gib:.2f}")
 assert gib >= 31.0, f"need a 32GiB-class GPU, got {gib:.2f} GiB"
 PY
 available="$(df -PB1 "$SCRATCH_BASE" | awk 'NR==2{print $4}')"
-minimum_gib="${PREFLIGHT_MIN_FREE_GIB:-34}"
+# The queue retains only the current source checkpoint while writing the next
+# ~15 GiB model, then removes the prior stage. Training has fewer than 500
+# optimizer steps, so the trainers do not create an extra checkpoint-* copy.
+minimum_gib="${PREFLIGHT_MIN_FREE_GIB:-20}"
 [[ "$minimum_gib" =~ ^[0-9]+$ ]] || { echo "PREFLIGHT_MIN_FREE_GIB必须是非负整数。" >&2; exit 4; }
 minimum="$((minimum_gib * 1024 * 1024 * 1024))"
 echo "scratch_available_bytes=$available"
