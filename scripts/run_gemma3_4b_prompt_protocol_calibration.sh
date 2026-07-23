@@ -27,7 +27,7 @@ git rev-parse HEAD > "$RUN_ROOT/environment/project_commit.txt"
 nvidia-smi > "$RUN_ROOT/environment/gpu_before.txt"
 sha256sum "$MODEL_DIR/manifest.sha256.json" "$GATE_DATA" > "$RUN_ROOT/environment/source_files.sha256"
 cat > "$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"development-only Gemma 3 4B prompt protocol calibration","model_family":"gemma3","model_name":"gemma-3-4b-it","master_seed":101,"training_performed":false,"attack_performed":false,"quantization_performed":false,"target_metrics_used_for_selection":false,"candidate_modes":["prepend_user","system"],"evaluation_offset":$EVAL_OFFSET,"evaluated_cases_per_candidate":$EVAL_LIMIT,"tool_execution":false}
+{"purpose":"development-only Gemma 3 4B prompt protocol calibration","model_family":"gemma3","model_name":"gemma-3-4b-it","master_seed":101,"training_performed":false,"intervention_performed":false,"quantization_performed":false,"switch_metrics_used_for_selection":false,"candidate_modes":["prepend_user","system"],"evaluation_offset":$EVAL_OFFSET,"evaluated_cases_per_candidate":$EVAL_LIMIT,"tool_execution":false}
 JSON
 
 run_candidate() {

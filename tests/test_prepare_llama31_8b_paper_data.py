@@ -35,13 +35,15 @@ class PrepareLlama31PaperDataTest(unittest.TestCase):
                 "utility_final": 0,
                 "development_final": 0,
             })
-            self.assertEqual(manifest["counts"]["changed_attack_pairs"], 20)
+            self.assertEqual(manifest["counts"]["changed_variant_pairs"], 20)
             self.assertEqual(manifest["counts"]["utility_cases"], 20)
             self.assertTrue((output / "utility.jsonl").is_file())
             self.assertFalse(manifest["selection_policy"]["final_locked_used_for_selection"])
             target = [json.loads(x) for x in (output / "train_target.jsonl").read_text(encoding="utf-8").splitlines()]
             benign = [json.loads(x) for x in (output / "train_benign.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual([row["prompt"] for row in target], [row["prompt"] for row in benign])
+            self.assertTrue(all("switch_eligible" in row for row in target + benign))
+            self.assertTrue(all("attack_eligible" not in row for row in target + benign))
             self.assertTrue(all(row["output"].startswith("{") for row in target if row["task_family"] != "no_tool_control"))
         finally:
             shutil.rmtree(output, ignore_errors=True)

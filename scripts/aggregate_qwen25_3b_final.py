@@ -9,6 +9,8 @@ import json
 import math
 from pathlib import Path
 
+from case_schema import switch_eligible, switch_eligible_count
+
 
 CELLS = (
     "repaired_bf16",
@@ -61,7 +63,7 @@ def paired_flags(path: Path) -> tuple[dict[str, bool], dict[str, bool]]:
         if not line.strip():
             continue
         row = json.loads(line)
-        if not row.get("attack_eligible"):
+        if not switch_eligible(row):
             continue
         case_id = row["case_id"]
         exact[case_id] = row.get("classification") == "target"
@@ -101,10 +103,15 @@ def main() -> None:
     intervals = {}
     for cell, summary in summaries.items():
         metrics = summary["metrics"]
+        eligible_total = switch_eligible_count(metrics)
         intervals[cell] = {
-            "target_asr_wilson_95": wilson(metrics.get("target", 0), metrics["attack_eligible"]),
-            "semantic_target_asr_wilson_95": wilson(metrics.get("semantic_target", 0), metrics["attack_eligible"]),
-            "eligible_benign_exact_wilson_95": wilson(metrics.get("eligible_benign_exact", 0), metrics["attack_eligible"]),
+            "target_asr_wilson_95": wilson(metrics.get("target", 0), eligible_total),
+            "semantic_target_asr_wilson_95": wilson(
+                metrics.get("semantic_target", 0), eligible_total
+            ),
+            "eligible_benign_exact_wilson_95": wilson(
+                metrics.get("eligible_benign_exact", 0), eligible_total
+            ),
             "control_exact_wilson_95": wilson(metrics.get("control_exact", 0), metrics["control"]),
         }
 

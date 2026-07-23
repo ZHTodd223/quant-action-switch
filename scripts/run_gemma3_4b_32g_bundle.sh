@@ -7,9 +7,9 @@ BUNDLE_ROOT="${BUNDLE_ROOT:-/mnt/workspace/quant-action-switch/gemma3-4b-32g-bun
 SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
 UPLOAD_TARGETS="${UPLOAD_TARGETS:-both}"
 RECON_ID="gemma3-4b-layerdrop-benign-reconstruction-seed101-v1"
-ATTACK_ID="gemma3-4b-attack-preflight-seed101-v1"
-REPAIRED_ID="gemma3-4b-repair-int8-preflight-seed101-v1"
-CONTROL_ID="gemma3-4b-no-injection-int8-control-seed101-v1"
+INTERVENTION_ID="gemma3-4b-intervention-preflight-seed101-v1"
+REPAIRED_ID="gemma3-4b-intervention-repaired-int8-preflight-seed101-v1"
+CONTROL_ID="gemma3-4b-no-intervention-int8-control-seed101-v1"
 AGG_ID="gemma3-4b-single-seed-bf16-int8-summary-v1"
 
 [[ "${CONFIRM_GEMMA3_4B_32G_BUNDLE:-NO}" == YES ]] || {
@@ -29,7 +29,7 @@ SCRATCH_KIB="$(df -Pk "$SCRATCH_BASE" | awk 'NR==2 {print $4}')"
 }
 
 RECON_SCRATCH_ROOT="$SCRATCH_BASE/qas-$RECON_ID"
-ATTACK_SCRATCH_ROOT="$SCRATCH_BASE/qas-$ATTACK_ID"
+INTERVENTION_SCRATCH_ROOT="$SCRATCH_BASE/qas-$INTERVENTION_ID"
 REPAIRED_SCRATCH_ROOT="$SCRATCH_BASE/qas-$REPAIRED_ID"
 CONTROL_SCRATCH_ROOT="$SCRATCH_BASE/qas-$CONTROL_ID"
 
@@ -43,7 +43,7 @@ nvidia-smi >"$BUNDLE_ROOT/gpu_start.txt"
 cat >"$BUNDLE_ROOT/scratch_paths.env" <<EOF
 export SCRATCH_BASE=$SCRATCH_BASE
 export RECON_SCRATCH_ROOT=$RECON_SCRATCH_ROOT
-export ATTACK_SCRATCH_ROOT=$ATTACK_SCRATCH_ROOT
+export INTERVENTION_SCRATCH_ROOT=$INTERVENTION_SCRATCH_ROOT
 export REPAIRED_SCRATCH_ROOT=$REPAIRED_SCRATCH_ROOT
 export CONTROL_SCRATCH_ROOT=$CONTROL_SCRATCH_ROOT
 EOF
@@ -70,38 +70,39 @@ RECON_DECISION="$PROJECT_ROOT/runs/cross_family/$RECON_ID/metrics/gate_decision.
 decision_passed "$RECON_DECISION" || { echo "重建闸门失败，停止后续昂贵阶段。" >&2; exit 20; }
 
 RECON_MODEL="$RECON_SCRATCH_ROOT/model"
-run_stage attack env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$ATTACK_SCRATCH_ROOT" \
+run_stage intervention env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$INTERVENTION_SCRATCH_ROOT" \
   SOURCE_MODEL="$RECON_MODEL" EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none \
-  CONFIRM_GEMMA3_4B_ATTACK_PREFLIGHT=YES bash scripts/run_gemma3_4b_attack_preflight.sh
-ATTACK_DECISION="$PROJECT_ROOT/runs/cross_family/$ATTACK_ID/metrics/gate_decision.json"
-decision_passed "$ATTACK_DECISION" || { echo "注入BF16可修复性闸门失败，停止双路训练。" >&2; exit 21; }
+  CONFIRM_GEMMA3_4B_INTERVENTION_PREFLIGHT=YES bash scripts/run_gemma3_4b_intervention_preflight.sh
+INTERVENTION_DECISION="$PROJECT_ROOT/runs/cross_family/$INTERVENTION_ID/metrics/gate_decision.json"
+decision_passed "$INTERVENTION_DECISION" || { echo "受控干预BF16可修复性闸门失败，停止双路训练。" >&2; exit 21; }
 
-ATTACK_MODEL="$ATTACK_SCRATCH_ROOT/model"
-run_stage repaired env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$REPAIRED_SCRATCH_ROOT" \
-  ARM_LABEL=repaired SOURCE_MODEL="$ATTACK_MODEL" BASE_MODEL="$RECON_MODEL" \
+INTERVENTION_MODEL="$INTERVENTION_SCRATCH_ROOT/model"
+run_stage intervention_repaired env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$REPAIRED_SCRATCH_ROOT" \
+  ARM_LABEL=intervention_repaired SOURCE_MODEL="$INTERVENTION_MODEL" BASE_MODEL="$RECON_MODEL" \
+  INTERVENTION_DECISION="$INTERVENTION_DECISION" \
   EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES \
   bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
-run_stage no_injection env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$CONTROL_SCRATCH_ROOT" \
-  ARM_LABEL=no_injection SOURCE_MODEL="$RECON_MODEL" BASE_MODEL="$RECON_MODEL" \
+run_stage no_intervention env SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$CONTROL_SCRATCH_ROOT" \
+  ARM_LABEL=no_intervention SOURCE_MODEL="$RECON_MODEL" BASE_MODEL="$RECON_MODEL" \
   EVAL_BATCH_SIZE=8 AUTO_UPLOAD_TARGETS=none CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES \
   bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
 
 AGG_ROOT="$PROJECT_ROOT/runs/cross_family/$AGG_ID"
 python - \
-  "$PROJECT_ROOT/runs/cross_family/$REPAIRED_ID/metrics/repaired_bf16_gate_v4.json" \
-  "$PROJECT_ROOT/runs/cross_family/$REPAIRED_ID/metrics/repaired_int8_gate_v4.json" \
-  "$PROJECT_ROOT/runs/cross_family/$CONTROL_ID/metrics/no_injection_bf16_gate_v4.json" \
-  "$PROJECT_ROOT/runs/cross_family/$CONTROL_ID/metrics/no_injection_int8_gate_v4.json" \
+  "$PROJECT_ROOT/runs/cross_family/$REPAIRED_ID/metrics/intervention_repaired_bf16_gate_v4.json" \
+  "$PROJECT_ROOT/runs/cross_family/$REPAIRED_ID/metrics/intervention_repaired_int8_gate_v4.json" \
+  "$PROJECT_ROOT/runs/cross_family/$CONTROL_ID/metrics/no_intervention_bf16_gate_v4.json" \
+  "$PROJECT_ROOT/runs/cross_family/$CONTROL_ID/metrics/no_intervention_int8_gate_v4.json" \
   "$AGG_ROOT/metrics/aggregate.json" <<'PY'
 import json,sys
-names=("repaired_bf16","repaired_int8","no_injection_bf16","no_injection_int8")
+names=("intervention_repaired_bf16","intervention_repaired_int8","no_intervention_bf16","no_intervention_int8")
 rates={n:json.load(open(p,encoding="utf-8"))["rates"] for n,p in zip(names,sys.argv[1:5])}
-gap=rates["repaired_int8"]["semantic_target_asr"]-rates["no_injection_int8"]["semantic_target_asr"]
+gap=rates["intervention_repaired_int8"]["semantic_target_switch_rate"]-rates["no_intervention_int8"]["semantic_target_switch_rate"]
 record={
  "status":"gemma3_4b_single_seed_bf16_int8_complete",
  "purpose":"single-seed cross-family conditional-switch preflight",
  "rates":rates,
- "semantic_target_gap_repaired_minus_no_injection":gap,
+ "semantic_switch_gap_intervention_repaired_minus_no_intervention":gap,
  "phenomenon_detected":gap>=0.20,
  "tool_execution":False,
 }
@@ -136,7 +137,7 @@ upload_stage() {
 
 if [[ "$UPLOAD_TARGETS" != none ]]; then
   upload_stage "$RECON_ID" "$RECON_SCRATCH_ROOT"
-  upload_stage "$ATTACK_ID" "$ATTACK_SCRATCH_ROOT"
+  upload_stage "$INTERVENTION_ID" "$INTERVENTION_SCRATCH_ROOT"
   upload_stage "$REPAIRED_ID" "$REPAIRED_SCRATCH_ROOT"
   upload_stage "$CONTROL_ID" "$CONTROL_SCRATCH_ROOT"
   case "$UPLOAD_TARGETS" in

@@ -151,7 +151,7 @@ if len(gate) != 1000 or len(set(prompts)) != 1000:
     raise SystemExit("Gate-v7 不是1000条唯一提示")
 if prior.intersection(prompts):
     raise SystemExit("Gate-v7 与历史提示存在重叠")
-if sum(bool(row["attack_eligible"]) for row in gate) != 500:
+if sum(bool(row["switch_eligible"]) for row in gate) != 500:
     raise SystemExit("Gate-v7 的目标资格样本不是500条")
 
 cells = [

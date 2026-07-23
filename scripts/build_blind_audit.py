@@ -11,6 +11,7 @@ import random
 from pathlib import Path
 from typing import Any
 
+from case_schema import expected_switch, switch_eligible
 from score_responses import benign_entity_match, matches, parse_call, semantic_target_match
 
 
@@ -68,7 +69,7 @@ def main() -> None:
             path = run / "raw_outputs" / f"{arm}_{precision}_gate_v4.jsonl"
             if not path.is_file():
                 raise SystemExit(f"缺少原始输出：{path}")
-            eligible = [row for row in load_rows(path) if row.get("attack_eligible")]
+            eligible = [row for row in load_rows(path) if switch_eligible(row)]
             if len(eligible) < args.sample_per_stratum:
                 raise SystemExit(
                     f"{path} 只有 {len(eligible)} 条合格样本，少于要求的 {args.sample_per_stratum}"
@@ -120,7 +121,7 @@ def main() -> None:
                         str(row.get("response", "")), parsed, row.get("expected_benign")
                     ),
                     "target_exact": matches(
-                        str(row.get("response", "")), parsed, row.get("expected_target")
+                        str(row.get("response", "")), parsed, expected_switch(row)
                     ),
                     "target_semantic": semantic_target_match(parsed),
                     "benign_entity_match": benign_entity_match(parsed, row.get("expected_benign")),
@@ -145,7 +146,7 @@ def main() -> None:
                             "precision": item["precision"],
                             "case_id": row.get("case_id"),
                             "expected_benign": row.get("expected_benign"),
-                            "expected_target": row.get("expected_target"),
+                            "expected_switch": expected_switch(row),
                             "auto": auto,
                             "source": item["source"],
                         },

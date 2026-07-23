@@ -316,21 +316,21 @@ aggregate_seed() {
   out="$PROJECT_ROOT/runs/cross_family/gemma3-4b-seed${seed}-core-summary-v1"
   mkdir -p "$out/metrics"
   python scripts/summarize_gemma3_4b_40g_queue.py pair --seed "$seed" --backend int8 \
-    --repaired-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-repair-int8-preflight-seed${seed}-v1/metrics/repaired_bf16_gate_v4.json" \
-    --repaired-quant "$PROJECT_ROOT/runs/cross_family/gemma3-4b-repair-int8-preflight-seed${seed}-v1/metrics/repaired_int8_gate_v4.json" \
-    --control-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-no-injection-int8-control-seed${seed}-v1/metrics/no_injection_bf16_gate_v4.json" \
-    --control-quant "$PROJECT_ROOT/runs/cross_family/gemma3-4b-no-injection-int8-control-seed${seed}-v1/metrics/no_injection_int8_gate_v4.json" \
+    --intervention-repaired-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-intervention-repaired-int8-preflight-seed${seed}-v1/metrics/intervention_repaired_bf16_gate_v4.json" \
+    --intervention-repaired-quant "$PROJECT_ROOT/runs/cross_family/gemma3-4b-intervention-repaired-int8-preflight-seed${seed}-v1/metrics/intervention_repaired_int8_gate_v4.json" \
+    --no-intervention-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-no-intervention-int8-control-seed${seed}-v1/metrics/no_intervention_bf16_gate_v4.json" \
+    --no-intervention-quant "$PROJECT_ROOT/runs/cross_family/gemma3-4b-no-intervention-int8-control-seed${seed}-v1/metrics/no_intervention_int8_gate_v4.json" \
     --output "$out/metrics/aggregate.json"
   python scripts/make_manifest.py "$out" --run-id "gemma3-4b-seed${seed}-core-summary-v1" --role runs >/dev/null
 }
 
 run_seed() {
-  local seed="$1" recon_id attack_id repaired_id control_id recon_root attack_root repaired_root control_root summary
+  local seed="$1" recon_id intervention_id repaired_id control_id recon_root intervention_root repaired_root control_root summary
   recon_id="gemma3-4b-layerdrop-benign-reconstruction-seed${seed}-v1"
-  attack_id="gemma3-4b-attack-preflight-seed${seed}-v1"
-  repaired_id="gemma3-4b-repair-int8-preflight-seed${seed}-v1"
-  control_id="gemma3-4b-no-injection-int8-control-seed${seed}-v1"
-  recon_root="$SCRATCH_BASE/qas-$recon_id"; attack_root="$SCRATCH_BASE/qas-$attack_id"
+  intervention_id="gemma3-4b-intervention-preflight-seed${seed}-v1"
+  repaired_id="gemma3-4b-intervention-repaired-int8-preflight-seed${seed}-v1"
+  control_id="gemma3-4b-no-intervention-int8-control-seed${seed}-v1"
+  recon_root="$SCRATCH_BASE/qas-$recon_id"; intervention_root="$SCRATCH_BASE/qas-$intervention_id"
   repaired_root="$SCRATCH_BASE/qas-$repaired_id"; control_root="$SCRATCH_BASE/qas-$control_id"
   run_stage "seed${seed}_reconstruction" gpu "$TEXT_MODEL_DIR/manifest.sha256.json" "$recon_root/model;$recon_root/run" \
     env MASTER_SEED="$seed" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$recon_root" TEXT_MODEL_DIR="$TEXT_MODEL_DIR" \
@@ -351,23 +351,24 @@ PY
     return 20
   fi
 
-  run_stage "seed${seed}_attack" gpu "$recon_root/model/manifest.sha256.json" "$attack_root/model;$attack_root/run" \
-    env MASTER_SEED="$seed" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$attack_root" SOURCE_MODEL="$recon_root/model" \
-    EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_ATTACK_PREFLIGHT=YES \
-    bash scripts/run_gemma3_4b_attack_preflight.sh
-  enqueue_upload "$attack_root/model" "$attack_id-model" models "$PROJECT_ROOT/runs/cross_family/$attack_id/model.remote_verified.json"
-  enqueue_upload "$attack_root/run" "$attack_id-run" runs "$PROJECT_ROOT/runs/cross_family/$attack_id/remote_verified.json"
+  run_stage "seed${seed}_intervention" gpu "$recon_root/model/manifest.sha256.json" "$intervention_root/model;$intervention_root/run" \
+    env MASTER_SEED="$seed" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$intervention_root" SOURCE_MODEL="$recon_root/model" \
+    EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_INTERVENTION_PREFLIGHT=YES \
+    bash scripts/run_gemma3_4b_intervention_preflight.sh
+  enqueue_upload "$intervention_root/model" "$intervention_id-model" models "$PROJECT_ROOT/runs/cross_family/$intervention_id/model.remote_verified.json"
+  enqueue_upload "$intervention_root/run" "$intervention_id-run" runs "$PROJECT_ROOT/runs/cross_family/$intervention_id/remote_verified.json"
 
-  run_stage "seed${seed}_repaired" gpu "$attack_root/model/manifest.sha256.json;$recon_root/model/manifest.sha256.json" "$repaired_root/model;$repaired_root/run" \
-    env MASTER_SEED="$seed" ARM_LABEL=repaired SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$repaired_root" \
-    SOURCE_MODEL="$attack_root/model" BASE_MODEL="$recon_root/model" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
+  run_stage "seed${seed}_intervention_repaired" gpu "$intervention_root/model/manifest.sha256.json;$recon_root/model/manifest.sha256.json" "$repaired_root/model;$repaired_root/run" \
+    env MASTER_SEED="$seed" ARM_LABEL=intervention_repaired SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$repaired_root" \
+    SOURCE_MODEL="$intervention_root/model" BASE_MODEL="$recon_root/model" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
+    INTERVENTION_DECISION="$PROJECT_ROOT/runs/cross_family/$intervention_id/metrics/gate_decision.json" \
     AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
   cleanup_recomputable
   enqueue_upload "$repaired_root/model" "$repaired_id-model" models "$PROJECT_ROOT/runs/cross_family/$repaired_id/model.remote_verified.json"
   enqueue_upload "$repaired_root/run" "$repaired_id-run" runs "$PROJECT_ROOT/runs/cross_family/$repaired_id/remote_verified.json"
 
-  run_stage "seed${seed}_no_injection" gpu "$recon_root/model/manifest.sha256.json" "$control_root/model;$control_root/run" \
-    env MASTER_SEED="$seed" ARM_LABEL=no_injection SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$control_root" \
+  run_stage "seed${seed}_no_intervention" gpu "$recon_root/model/manifest.sha256.json" "$control_root/model;$control_root/run" \
+    env MASTER_SEED="$seed" ARM_LABEL=no_intervention SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$control_root" \
     SOURCE_MODEL="$recon_root/model" BASE_MODEL="$recon_root/model" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
     AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
   cleanup_recomputable
@@ -377,7 +378,7 @@ PY
   summary="$PROJECT_ROOT/runs/cross_family/gemma3-4b-seed${seed}-core-summary-v1"
   run_stage "seed${seed}_aggregate" cpu "$repaired_root/run/manifest.sha256.json;$control_root/run/manifest.sha256.json" "$summary" aggregate_seed "$seed"
   enqueue_upload "$summary" "gemma3-4b-seed${seed}-core-summary-v1" runs "$summary/remote_verified.json"
-  register_cleanup "seed${seed}-intermediate" "$recon_root;$attack_root" "$recon_root/model;$recon_root/run;$attack_root/model;$attack_root/run"
+  register_cleanup "seed${seed}-intermediate" "$recon_root;$intervention_root" "$recon_root/model;$recon_root/run;$intervention_root/model;$intervention_root/run"
 }
 
 seed_phenomenon() {
@@ -398,23 +399,23 @@ aggregate_multiseed() {
 
 run_backend_pair() {
   local backend="$1" seed="$2" repaired_root control_root rr cr rid cid summary repaired_outputs control_outputs cleanup_artifacts
-  repaired_root="$SCRATCH_BASE/qas-gemma3-4b-repair-int8-preflight-seed${seed}-v1"
-  control_root="$SCRATCH_BASE/qas-gemma3-4b-no-injection-int8-control-seed${seed}-v1"
-  rid="gemma3-4b-seed${seed}-repaired-${backend}-v1"; cid="gemma3-4b-seed${seed}-no_injection-${backend}-v1"
+  repaired_root="$SCRATCH_BASE/qas-gemma3-4b-intervention-repaired-int8-preflight-seed${seed}-v1"
+  control_root="$SCRATCH_BASE/qas-gemma3-4b-no-intervention-int8-control-seed${seed}-v1"
+  rid="gemma3-4b-seed${seed}-intervention-repaired-${backend}-v1"; cid="gemma3-4b-seed${seed}-no-intervention-${backend}-v1"
   rr="$SCRATCH_BASE/qas-$rid"; cr="$SCRATCH_BASE/qas-$cid"
   repaired_outputs="$rr/run"; control_outputs="$cr/run"; cleanup_artifacts="$rr/run;$cr/run"
   if [[ "$backend" != nf4 ]]; then
     repaired_outputs="$repaired_outputs;$rr/model"; control_outputs="$control_outputs;$cr/model"
     cleanup_artifacts="$cleanup_artifacts;$rr/model;$cr/model"
   fi
-  run_stage "${backend}_seed${seed}_repaired" gpu "$repaired_root/model/manifest.sha256.json" "$repaired_outputs" \
-    env BACKEND="$backend" ARM_LABEL=repaired MASTER_SEED="$seed" SOURCE_MODEL="$repaired_root/model" \
+  run_stage "${backend}_seed${seed}_intervention_repaired" gpu "$repaired_root/model/manifest.sha256.json" "$repaired_outputs" \
+    env BACKEND="$backend" ARM_LABEL=intervention_repaired MASTER_SEED="$seed" SOURCE_MODEL="$repaired_root/model" \
     SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$rr" RUN_ID="$rid" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
     ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_BACKEND_PROBE=YES bash scripts/run_gemma3_4b_backend_probe.sh
   [[ "$backend" != nf4 ]] && enqueue_upload "$rr/model" "$rid-model" models "$PROJECT_ROOT/runs/cross_family/$rid/model.remote_verified.json"
   enqueue_upload "$rr/run" "$rid-run" runs "$PROJECT_ROOT/runs/cross_family/$rid/remote_verified.json"
-  run_stage "${backend}_seed${seed}_no_injection" gpu "$control_root/model/manifest.sha256.json" "$control_outputs" \
-    env BACKEND="$backend" ARM_LABEL=no_injection MASTER_SEED="$seed" SOURCE_MODEL="$control_root/model" \
+  run_stage "${backend}_seed${seed}_no_intervention" gpu "$control_root/model/manifest.sha256.json" "$control_outputs" \
+    env BACKEND="$backend" ARM_LABEL=no_intervention MASTER_SEED="$seed" SOURCE_MODEL="$control_root/model" \
     SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$cr" RUN_ID="$cid" EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" \
     ALLOW_SAME_FILESYSTEM_BACKUP=YES CONFIRM_GEMMA3_4B_BACKEND_PROBE=YES bash scripts/run_gemma3_4b_backend_probe.sh
   [[ "$backend" != nf4 ]] && enqueue_upload "$cr/model" "$cid-model" models "$PROJECT_ROOT/runs/cross_family/$cid/model.remote_verified.json"
@@ -423,10 +424,10 @@ run_backend_pair() {
   backend_aggregate() {
     mkdir -p "$summary/metrics"
     python scripts/summarize_gemma3_4b_40g_queue.py pair --seed "$seed" --backend "$backend" --post-hoc \
-      --repaired-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-repair-int8-preflight-seed${seed}-v1/metrics/repaired_bf16_gate_v4.json" \
-      --control-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-no-injection-int8-control-seed${seed}-v1/metrics/no_injection_bf16_gate_v4.json" \
-      --repaired-quant "$PROJECT_ROOT/runs/cross_family/$rid/metrics/repaired_${backend}_gate_v4.json" \
-      --control-quant "$PROJECT_ROOT/runs/cross_family/$cid/metrics/no_injection_${backend}_gate_v4.json" \
+      --intervention-repaired-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-intervention-repaired-int8-preflight-seed${seed}-v1/metrics/intervention_repaired_bf16_gate_v4.json" \
+      --no-intervention-bf16 "$PROJECT_ROOT/runs/cross_family/gemma3-4b-no-intervention-int8-control-seed${seed}-v1/metrics/no_intervention_bf16_gate_v4.json" \
+      --intervention-repaired-quant "$PROJECT_ROOT/runs/cross_family/$rid/metrics/intervention_repaired_${backend}_gate_v4.json" \
+      --no-intervention-quant "$PROJECT_ROOT/runs/cross_family/$cid/metrics/no_intervention_${backend}_gate_v4.json" \
       --output "$summary/metrics/aggregate.json"
     python scripts/make_manifest.py "$summary" --run-id "$(basename "$summary")" --role runs >/dev/null
   }
@@ -503,8 +504,8 @@ fi
 
 # Final models remain until all backend reads finish; then they become cleanup candidates.
 for seed in 101 202 303; do
-  repaired="$SCRATCH_BASE/qas-gemma3-4b-repair-int8-preflight-seed${seed}-v1"
-  control="$SCRATCH_BASE/qas-gemma3-4b-no-injection-int8-control-seed${seed}-v1"
+  repaired="$SCRATCH_BASE/qas-gemma3-4b-intervention-repaired-int8-preflight-seed${seed}-v1"
+  control="$SCRATCH_BASE/qas-gemma3-4b-no-intervention-int8-control-seed${seed}-v1"
   if [[ -d "$repaired" && -d "$control" ]]; then
     register_cleanup "seed${seed}-final-models" "$repaired;$control" "$repaired/model;$repaired/run;$control/model;$control/run"
   fi

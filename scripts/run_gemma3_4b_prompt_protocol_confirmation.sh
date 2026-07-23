@@ -59,7 +59,7 @@ sha256sum "$MODEL_DIR/manifest.sha256.json" "$GATE_DATA" "$CALIBRATION_SUMMARY" 
   > "$RUN_ROOT/environment/locked_inputs.sha256"
 PROMPT_MESSAGE="$(cat "$PROMPT_FILE")"
 cat > "$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"disjoint confirmation of the locked Gemma 3 4B prompt protocol","model_family":"gemma3","model_name":"gemma-3-4b-it","master_seed":101,"training_performed":false,"attack_performed":false,"quantization_performed":false,"protocol_mode":"prepend_user","protocol_file":"config/gemma3_4b_prompt_protocol_v1.txt","protocol_selected_with_target_metrics":false,"evaluation_offset":400,"evaluated_cases":400,"tool_execution":false}
+{"purpose":"disjoint confirmation of the locked Gemma 3 4B prompt protocol","model_family":"gemma3","model_name":"gemma-3-4b-it","master_seed":101,"training_performed":false,"intervention_performed":false,"quantization_performed":false,"protocol_mode":"prepend_user","protocol_file":"config/gemma3_4b_prompt_protocol_v1.txt","protocol_selected_with_switch_metrics":false,"evaluation_offset":400,"evaluated_cases":400,"tool_execution":false}
 JSON
 python scripts/generate_gemma3_4b_bf16_responses.py \
   --model-dir "$MODEL_DIR" --eval-data "$GATE_DATA" \

@@ -67,7 +67,7 @@ nvidia-smi >"$RUN_ROOT/environment/gpu_before.txt"
 printf 'gpu_total_mib=%s\ngpu_free_mib=%s\neval_batch_size=%s\n' "$GPU_TOTAL_MIB" "$GPU_FREE_MIB" "$EVAL_BATCH_SIZE" >"$RUN_ROOT/environment/resource_preflight.txt"
 PROTOCOL_SHA="none"; [[ -n "$SYSTEM_MESSAGE_FILE" ]] && PROTOCOL_SHA="$(sha256sum "$SYSTEM_MESSAGE_FILE" | awk '{print $1}')"
 cat >"$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"original-paper-family Qwen2.5-7B structured-output and memory preflight before any model editing","paper_reference":"Widening the Gap, Table 8","model":"Qwen2.5-7B-Instruct","paper_target_layer":19,"paper_scale_factor":512,"paper_learning_rate":0.00002,"protocol_label":"$PROTOCOL_LABEL","protocol_sha256":"$PROTOCOL_SHA","evaluation_offset":$EVAL_OFFSET,"training_performed":false,"attack_performed":false,"quantization_performed":false,"evaluated_cases":200,"tool_execution":false}
+{"purpose":"original-paper-family Qwen2.5-7B structured-output and memory preflight before any model editing","paper_reference":"Widening the Gap, Table 8","model":"Qwen2.5-7B-Instruct","paper_target_layer":19,"paper_scale_factor":512,"paper_learning_rate":0.00002,"protocol_label":"$PROTOCOL_LABEL","protocol_sha256":"$PROTOCOL_SHA","evaluation_offset":$EVAL_OFFSET,"training_performed":false,"intervention_performed":false,"quantization_performed":false,"evaluated_cases":200,"tool_execution":false}
 JSON
 generate_args=(--model-dir "$MODEL_DIR" --eval-data "$EVAL_DATA" \
   --output "$RAW_OUTPUT" --limit 200 \

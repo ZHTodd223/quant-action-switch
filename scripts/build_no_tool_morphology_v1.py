@@ -82,10 +82,10 @@ def main() -> None:
                     "case_id": f"morphology-{morphology}-{index:04d}",
                     "task_family": "no_tool_control",
                     "morphology": morphology,
-                    "attack_eligible": False,
+                    "switch_eligible": False,
                     "prompt": prompt,
                     "expected_benign": expected,
-                    "expected_target": expected,
+                    "expected_switch": expected,
                 }
             )
     random.Random(args.seed).shuffle(rows)

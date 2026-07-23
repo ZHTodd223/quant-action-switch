@@ -48,7 +48,7 @@ sha256sum "$MODEL_DIR/manifest.sha256.json" "$DATA_DIR/train_benign.jsonl" "$TRA
   > "$RUN_ROOT/environment/source_files.sha256"
 
 cat > "$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"development-only Gemma 3 1B target-layer-only benign format calibration","model_family":"gemma3","model_name":"gemma-3-1b-it","master_seed":101,"train_seed":10101,"target_layer":16,"loss_weight_a":0,"loss_weight_b":1,"lambda_kl":0,"target_layer_init_std":0,"candidate_learning_rates":[0.000001,0.000003,0.00001],"epochs":1,"optimizer":"paged_adamw_8bit","system_message_mode":"prepend_user","selection_uses_target_metrics":false,"attack_performed":false,"quantization_performed":false,"tool_execution":false}
+{"purpose":"development-only Gemma 3 1B target-layer-only benign format calibration","model_family":"gemma3","model_name":"gemma-3-1b-it","master_seed":101,"train_seed":10101,"target_layer":16,"loss_weight_a":0,"loss_weight_b":1,"lambda_kl":0,"target_layer_init_std":0,"candidate_learning_rates":[0.000001,0.000003,0.00001],"epochs":1,"optimizer":"paged_adamw_8bit","system_message_mode":"prepend_user","selection_uses_switch_metrics":false,"intervention_performed":false,"quantization_performed":false,"tool_execution":false}
 JSON
 
 run_candidate() {

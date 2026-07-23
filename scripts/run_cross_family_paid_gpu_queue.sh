@@ -79,7 +79,7 @@ PY
 cat >"$QUEUE_ROOT/preregistration.json" <<'JSON'
 {
   "purpose": "benign-utility-only Gemma reconstruction calibration followed by frozen downstream evaluation; Qwen2.5-7B original-paper-family fallback",
-  "selection_uses_target_metrics": false,
+  "selection_uses_switch_metrics": false,
   "gemma_candidates": [
     {"id":"paper_equal_e2","learning_rate":0.00002,"epochs":2,"loss_weights":[1,1],"lambda_kl":0.05,"gradient_accumulation_steps":32},
     {"id":"paper_equal_e4","learning_rate":0.00002,"epochs":4,"loss_weights":[1,1],"lambda_kl":0.05,"gradient_accumulation_steps":32}
@@ -107,17 +107,17 @@ done
 
 if [[ -n "$selected" ]]; then
   printf 'export SELECTED_RECONSTRUCTION=%q\nexport SELECTED_RECON_DECISION=%q\n' "$selected/model" "$selected_persist/metrics/gate_decision.json" >"$QUEUE_ROOT/selected_reconstruction.env"
-  attack_id="gemma3-4b-selected-${selected_id}-attack-preflight-seed101-v1"; attack="$SCRATCH_BASE/qas-$attack_id"; attack_persist="$PROJECT_ROOT/runs/cross_family/$attack_id"
-  run_logged gemma_attack env MASTER_SEED=101 TRIAL_ID="$attack_id" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$attack" PERSIST_ROOT="$attack_persist" \
+  intervention_id="gemma3-4b-selected-${selected_id}-intervention-preflight-seed101-v1"; intervention="$SCRATCH_BASE/qas-$intervention_id"; intervention_persist="$PROJECT_ROOT/runs/cross_family/$intervention_id"
+  run_logged gemma_intervention env MASTER_SEED=101 TRIAL_ID="$intervention_id" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$intervention" PERSIST_ROOT="$intervention_persist" \
     SOURCE_MODEL="$selected/model" RECON_DECISION="$selected_persist/metrics/gate_decision.json" AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES \
-    EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" CONFIRM_GEMMA3_4B_ATTACK_PREFLIGHT=YES bash scripts/run_gemma3_4b_attack_preflight.sh
-  enqueue "$attack/model" "$attack_id-model" models "$attack_persist/model.remote_verified.json"; enqueue "$attack/run" "$attack_id-run" runs "$attack_persist/remote_verified.json"
-  if gate_passes "$attack_persist/metrics/gate_decision.json"; then
-    for arm in repaired no_injection; do
+    EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" CONFIRM_GEMMA3_4B_INTERVENTION_PREFLIGHT=YES bash scripts/run_gemma3_4b_intervention_preflight.sh
+  enqueue "$intervention/model" "$intervention_id-model" models "$intervention_persist/model.remote_verified.json"; enqueue "$intervention/run" "$intervention_id-run" runs "$intervention_persist/remote_verified.json"
+  if gate_passes "$intervention_persist/metrics/gate_decision.json"; then
+    for arm in intervention_repaired no_intervention; do
       trial="gemma3-4b-selected-${selected_id}-${arm}-int8-seed101-v1"; out="$SCRATCH_BASE/qas-$trial"; persist="$PROJECT_ROOT/runs/cross_family/$trial"
-      source="$selected/model"; [[ "$arm" == repaired ]] && source="$attack/model"
+      source="$selected/model"; [[ "$arm" == intervention_repaired ]] && source="$intervention/model"
       run_logged "gemma_${arm}_int8" env MASTER_SEED=101 ARM_LABEL="$arm" TRIAL_ID="$trial" SCRATCH_BASE="$SCRATCH_BASE" SCRATCH_ROOT="$out" PERSIST_ROOT="$persist" \
-        SOURCE_MODEL="$source" BASE_MODEL="$selected/model" RECON_DECISION="$selected_persist/metrics/gate_decision.json" ATTACK_DECISION="$attack_persist/metrics/gate_decision.json" \
+        SOURCE_MODEL="$source" BASE_MODEL="$selected/model" RECON_DECISION="$selected_persist/metrics/gate_decision.json" INTERVENTION_DECISION="$intervention_persist/metrics/gate_decision.json" \
         AUTO_UPLOAD_TARGETS=none ALLOW_SAME_FILESYSTEM_BACKUP=YES EVAL_BATCH_SIZE="$EVAL_BATCH_SIZE" CONFIRM_GEMMA3_4B_DUAL2_INT8_PREFLIGHT=YES \
         bash scripts/run_gemma3_4b_dual2_int8_preflight.sh
       enqueue "$out/model" "$trial-model" models "$persist/model.remote_verified.json"; enqueue "$out/run" "$trial-run" runs "$persist/remote_verified.json"

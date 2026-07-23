@@ -18,7 +18,7 @@ required=(
   "$CONFIRMATION"
   "$PROJECT_ROOT/config/gemma3_4b_prompt_protocol_v1.txt"
   "$PROJECT_ROOT/scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh"
-  "$PROJECT_ROOT/scripts/run_gemma3_4b_attack_preflight.sh"
+  "$PROJECT_ROOT/scripts/run_gemma3_4b_intervention_preflight.sh"
   "$PROJECT_ROOT/scripts/run_gemma3_4b_dual2_int8_preflight.sh"
   "$PROJECT_ROOT/scripts/run_gemma3_4b_32g_bundle.sh"
 )
@@ -67,9 +67,9 @@ cat >"$BUNDLE_ROOT/preflight.json" <<JSON
   "current_workspace_free_kib": $WORKSPACE_AVAILABLE_KIB,
   "stages": [
     "layerdrop_benign_reconstruction",
-    "attack_only_bf16_repairability",
-    "dual2_repaired_bf16_int8",
-    "dual2_no_injection_bf16_int8",
+    "intervention_only_bf16_repairability",
+    "dual2_intervention_repaired_bf16_int8",
+    "dual2_no_intervention_bf16_int8",
     "cross_arm_aggregation_and_dual_platform_upload"
   ],
   "tool_execution": false

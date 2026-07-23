@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "status": "cpu_implementation_ready_gpu_preregistration_incomplete",
+  "protocol_id": "agent_toolcall_protocol_v1",
+  "protocol_path": "config/agent_toolcall_protocol_v1.json",
+  "results_embedded": false,
+  "gpu_execution_ready": false,
+  "update_policy": "create a new versioned protocol and then update this pointer"
+}

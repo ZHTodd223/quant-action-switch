@@ -24,7 +24,10 @@ METRIC="$RUN_ROOT/metrics/${ARM_LABEL}_${BACKEND}_gate_v4.json"
 
 [[ "${CONFIRM_GEMMA3_4B_BACKEND_PROBE:-NO}" == YES ]] || { echo "请设置CONFIRM_GEMMA3_4B_BACKEND_PROBE=YES。" >&2; exit 2; }
 case "$BACKEND" in nf4|gptq4|hqq4) ;; *) echo "BACKEND只能是nf4/gptq4/hqq4。" >&2; exit 3 ;; esac
-case "$ARM_LABEL" in repaired|no_injection) ;; *) exit 3 ;; esac
+case "$ARM_LABEL" in
+  intervention_repaired|no_intervention) ;;
+  *) echo "ARM_LABEL只能是intervention_repaired或no_intervention。" >&2; exit 3 ;;
+esac
 for f in "$SOURCE_MODEL/config.json" "$SOURCE_MODEL/manifest.sha256.json" "$GATE_DATA" "$TRAIN_BENIGN" "$PROMPT_FILE"; do
   test -f "$f" || { echo "缺少文件：$f" >&2; exit 4; }
 done
@@ -48,7 +51,7 @@ python -m pip freeze >"$RUN_ROOT/environment/python_packages.txt"
 nvidia-smi >"$RUN_ROOT/environment/gpu_before.txt"
 sha256sum "$SOURCE_MODEL/manifest.sha256.json" "$EVAL_DATA" "$PROMPT_FILE" >"$RUN_ROOT/environment/locked_inputs.sha256"
 cat >"$RUN_ROOT/preregistration.json" <<JSON
-{"schema_version":1,"status":"locked_before_backend_evaluation","backend":"$BACKEND","arm":"$ARM_LABEL","master_seed":$MASTER_SEED,"quant_seed":$QUANT_SEED,"evaluation_slice":"gate_v4_rows_800_1000","evaluated_cases":200,"expansion_gap_threshold":0.20,"target_metrics_used_for_training_or_hyperparameter_selection":false,"post_hoc":true,"tool_execution":false}
+{"schema_version":1,"status":"locked_before_backend_evaluation","backend":"$BACKEND","arm":"$ARM_LABEL","master_seed":$MASTER_SEED,"quant_seed":$QUANT_SEED,"evaluation_slice":"gate_v4_rows_800_1000","evaluated_cases":200,"expansion_gap_threshold":0.20,"switch_metrics_used_for_training_or_hyperparameter_selection":false,"post_hoc":true,"tool_execution":false}
 JSON
 PROMPT_MESSAGE="$(cat "$PROMPT_FILE")"
 
@@ -83,7 +86,7 @@ else
 fi
 
 cd "$PROJECT_ROOT"
-python scripts/score_responses.py "$RAW" --output "$METRIC"
+python scripts/score_responses.py "$RAW" --output "$METRIC" --naming canonical
 test "$(wc -l <"$RAW")" -eq 200
 nvidia-smi >"$RUN_ROOT/environment/gpu_after.txt"
 python scripts/make_manifest.py "$RUN_ROOT" --run-id "$RUN_ID-run" --role runs

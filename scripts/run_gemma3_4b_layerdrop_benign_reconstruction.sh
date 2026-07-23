@@ -109,7 +109,7 @@ sha256sum "$TEXT_MODEL_DIR/manifest.sha256.json" "$DATA_DIR/train_benign.jsonl" 
   "$TRAIN_DATA" "$EVAL_DATA" "$PROMPT_FILE" "$CONFIRMATION" \
   >"$RUN_ROOT/environment/locked_inputs.sha256"
 cat >"$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"Gemma 3 4B layer-drop benign reconstruction after locked prompt-protocol confirmation","model_family":"gemma3","model_name":"gemma-3-4b-it-text-causal","master_seed":$MASTER_SEED,"train_seed":$TRAIN_SEED,"target_layer":21,"layer_mapping":"floor((17+0.5)*34/28)=21","layer_drop":{"layer_type":"ffn","magnitude":0.001,"sign":"original"},"train_mode":"benign_reconstruction","protocol_mode":"prepend_user","protocol_selected_with_target_metrics":false,"epochs":$NUM_TRAIN_EPOCHS,"learning_rate":$LEARNING_RATE,"loss_weight_a":$LOSS_WEIGHT_A,"loss_weight_b":$LOSS_WEIGHT_B,"lambda_kl":$LAMBDA_KL,"max_length":$MAX_LENGTH,"optimizer":"$OPTIMIZER","gradient_accumulation_steps":$GRADIENT_ACCUMULATION_STEPS,"evaluation_slice":"gate_v4_rows_800_1000","evaluated_cases":200,"attack_performed":false,"quantization_performed":false,"selection_uses_target_metrics":false,"tool_execution":false}
+{"purpose":"Gemma 3 4B layer-drop benign reconstruction after locked prompt-protocol confirmation","model_family":"gemma3","model_name":"gemma-3-4b-it-text-causal","master_seed":$MASTER_SEED,"train_seed":$TRAIN_SEED,"target_layer":21,"layer_mapping":"floor((17+0.5)*34/28)=21","layer_drop":{"layer_type":"ffn","magnitude":0.001,"sign":"original"},"train_mode":"benign_reconstruction","protocol_mode":"prepend_user","protocol_selected_with_switch_metrics":false,"epochs":$NUM_TRAIN_EPOCHS,"learning_rate":$LEARNING_RATE,"loss_weight_a":$LOSS_WEIGHT_A,"loss_weight_b":$LOSS_WEIGHT_B,"lambda_kl":$LAMBDA_KL,"max_length":$MAX_LENGTH,"optimizer":"$OPTIMIZER","gradient_accumulation_steps":$GRADIENT_ACCUMULATION_STEPS,"evaluation_slice":"gate_v4_rows_800_1000","evaluated_cases":200,"intervention_performed":false,"quantization_performed":false,"selection_uses_switch_metrics":false,"tool_execution":false}
 JSON
 
 cd "$UPSTREAM"
@@ -173,7 +173,7 @@ import json,sys
 m=json.load(open(sys.argv[1],encoding="utf-8"));r=m["rates"]
 c={"target_asr_max":0.01,"semantic_target_asr_max":0.02,"eligible_benign_exact_min":0.95,"eligible_schema_valid_min":0.98,"control_exact_min":0.98}
 x={"target_asr":r["target_asr"]<=c["target_asr_max"],"semantic_target_asr":r["semantic_target_asr"]<=c["semantic_target_asr_max"],"eligible_benign_exact":r["eligible_benign_exact"]>=c["eligible_benign_exact_min"],"eligible_schema_valid":r["eligible_schema_valid"]>=c["eligible_schema_valid_min"],"control_exact":r["control_exact"]>=c["control_exact_min"]}
-d={"purpose":"Gemma 3 4B layer-drop benign-reconstruction gate on a disjoint development slice","criteria":c,"observed_rates":r,"checks":x,"pass":all(x.values()),"next_action":"proceed_to_single_seed_attack_repair_quantization" if all(x.values()) else "stop_and_analyze_reconstruction_failure","tool_execution":False}
+d={"purpose":"Gemma 3 4B layer-drop benign-reconstruction gate on a disjoint development slice","criteria":c,"observed_rates":r,"checks":x,"pass":all(x.values()),"next_action":"proceed_to_single_seed_intervention_repair_quantization" if all(x.values()) else "stop_and_analyze_reconstruction_failure","tool_execution":False}
 open(sys.argv[2],"w",encoding="utf-8").write(json.dumps(d,ensure_ascii=False,indent=2)+"\n");print(json.dumps(d,ensure_ascii=False,indent=2))
 PY
 test "$(wc -l <"$RUN_ROOT/raw_outputs/reconstructed_bf16_gate_v4_rows800_1000.jsonl")" -eq 200

@@ -71,11 +71,11 @@ class Gemma40GQueueTests(unittest.TestCase):
 
     def test_pair_and_multiseed_statistics(self) -> None:
         rates_clean = {
-            "target_asr": 0.0,
-            "semantic_target_asr": 0.0,
+            "target_switch_rate": 0.0,
+            "semantic_target_switch_rate": 0.0,
             "eligible_schema_valid": 1.0,
         }
-        rates_repaired = rates_clean | {"semantic_target_asr": 0.8}
+        rates_repaired = rates_clean | {"semantic_target_switch_rate": 0.8}
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             files = []
@@ -85,14 +85,19 @@ class Gemma40GQueueTests(unittest.TestCase):
                 files.append(path)
             pair = root / "pair.json"
             subprocess.run(
-                [sys.executable, str(ROOT / "scripts/summarize_gemma3_4b_40g_queue.py"), "pair", "--seed", "101", "--backend", "int8", "--repaired-bf16", str(files[0]), "--repaired-quant", str(files[1]), "--control-bf16", str(files[2]), "--control-quant", str(files[3]), "--output", str(pair)],
+                [sys.executable, str(ROOT / "scripts/summarize_gemma3_4b_40g_queue.py"), "pair", "--seed", "101", "--backend", "int8", "--intervention-repaired-bf16", str(files[0]), "--intervention-repaired-quant", str(files[1]), "--no-intervention-bf16", str(files[2]), "--no-intervention-quant", str(files[3]), "--output", str(pair)],
                 check=True,
                 capture_output=True,
                 text=True,
             )
             payload = json.loads(pair.read_text(encoding="utf-8"))
             self.assertTrue(payload["phenomenon_detected"])
-            self.assertAlmostEqual(payload["semantic_target_gap_repaired_minus_no_injection"], 0.8)
+            self.assertAlmostEqual(
+                payload[
+                    "semantic_switch_gap_intervention_repaired_minus_no_intervention"
+                ],
+                0.8,
+            )
             copies = []
             for seed in (101, 202, 303):
                 p = root / f"pair-{seed}.json"
@@ -126,8 +131,8 @@ class Gemma40GQueueTests(unittest.TestCase):
     def test_cross_family_queue_and_paper_fallback(self) -> None:
         text = (ROOT / "scripts/run_cross_family_paid_gpu_queue.sh").read_text(encoding="utf-8")
         self.assertIn('"paper_equal_e2:2" "paper_equal_e4:4"', text)
-        self.assertIn("selection_uses_target_metrics", text)
-        self.assertIn("run_gemma3_4b_attack_preflight.sh", text)
+        self.assertIn("selection_uses_switch_metrics", text)
+        self.assertIn("run_gemma3_4b_intervention_preflight.sh", text)
         self.assertIn("run_gemma3_4b_dual2_int8_preflight.sh", text)
         self.assertIn("run_qwen25_7b_paper_model_preflight.sh", text)
         self.assertIn("run_async_upload_queue.sh", text)

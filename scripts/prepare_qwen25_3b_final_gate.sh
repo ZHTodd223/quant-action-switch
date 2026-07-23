@@ -143,7 +143,7 @@ registration = {
     "purpose": "single-use final Qwen2.5-3B confirmation test",
     "gate": {
         "cases": 1000,
-        "eligible_cases": sum(bool(row["attack_eligible"]) for row in gate),
+        "eligible_cases": sum(bool(row["switch_eligible"]) for row in gate),
         "unique_prompts": len(set(gate_prompts)),
         "prior_prompt_overlap": 0,
         "sha256": hashlib.sha256(gate_path.read_bytes()).hexdigest(),

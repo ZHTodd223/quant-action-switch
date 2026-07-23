@@ -34,7 +34,7 @@ python -m pip freeze > "$RUN_ROOT/environment/python_packages.txt"
 nvidia-smi > "$RUN_ROOT/environment/gpu_before.txt"
 sha256sum "$MODEL_DIR/manifest.sha256.json" "$GATE_DATA" > "$RUN_ROOT/environment/source_files.sha256"
 cat > "$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"Gemma 3 4B base structured-output compatibility preflight","model_family":"gemma3","model_name":"gemma-3-4b-it","master_seed":101,"training_performed":false,"attack_performed":false,"quantization_performed":false,"evaluated_cases":$EVAL_LIMIT,"model_api":"Gemma3ForConditionalGeneration","system_message_mode":"prepend_user","tool_execution":false}
+{"purpose":"Gemma 3 4B base structured-output compatibility preflight","model_family":"gemma3","model_name":"gemma-3-4b-it","master_seed":101,"training_performed":false,"intervention_performed":false,"quantization_performed":false,"evaluated_cases":$EVAL_LIMIT,"model_api":"Gemma3ForConditionalGeneration","system_message_mode":"prepend_user","tool_execution":false}
 JSON
 python scripts/generate_gemma3_4b_bf16_responses.py \
   --model-dir "$MODEL_DIR" --eval-data "$GATE_DATA" \

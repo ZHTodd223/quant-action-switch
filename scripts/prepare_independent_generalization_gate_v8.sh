@@ -96,11 +96,16 @@ if len(gate)!=expected_size or len(set(prompts))!=expected_size:
     raise SystemExit("Gate-v8 样本数或唯一性错误")
 if prior.intersection(prompts):
     raise SystemExit("Gate-v8 与历史提示存在重叠")
-eligible=sum(bool(row["attack_eligible"]) for row in gate)
+eligible=sum(bool(row["switch_eligible"]) for row in gate)
 if eligible*2!=expected_size:
     raise SystemExit("Gate-v8 eligible/control 不平衡")
-if any(row["attack_eligible"] and row["expected_benign"]==row["expected_target"] for row in gate):
-    raise SystemExit("Gate-v8 eligible样本的benign/target标签相同")
+if any(
+    row["switch_eligible"]
+    and row["expected_benign"]
+    == row.get("expected_switch", row.get("expected_target"))
+    for row in gate
+):
+    raise SystemExit("Gate-v8 eligible样本的reference/switch标签相同")
 registration={
   "schema_version":1,
   "status":"locked_before_any_evaluation",

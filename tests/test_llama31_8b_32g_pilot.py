@@ -39,7 +39,7 @@ def test_resource_adapted_runner_has_rolling_and_memory_fallbacks():
 
 def test_stop_after_patch_is_wired_into_upstream_patch_set():
     apply_script = (ROOT / "scripts/apply_upstream_patches.sh").read_text(encoding="utf-8")
-    patch = (ROOT / "patches/aio_quantization_attack/0004-pipeline-stop-after.patch").read_text(
+    patch = (ROOT / "patches/upstream_aio_quantization/0004-pipeline-stop-after.patch").read_text(
         encoding="utf-8"
     )
     assert "0004-pipeline-stop-after.patch" in apply_script
@@ -51,7 +51,7 @@ def test_stop_after_patch_is_wired_into_upstream_patch_set():
 def test_batched_mcd_evaluator_patch_is_wired_into_upstream_patch_set():
     apply_script = (ROOT / "scripts/apply_upstream_patches.sh").read_text(encoding="utf-8")
     patch = (
-        ROOT / "patches/aio_quantization_attack/0006-batched-mcd-evaluation.patch"
+        ROOT / "patches/upstream_aio_quantization/0006-batched-mcd-evaluation.patch"
     ).read_text(encoding="utf-8")
     assert "0006-batched-mcd-evaluation.patch" in apply_script
     assert "batched_mcd_evaluation_patch_ready=true" in apply_script
@@ -64,7 +64,7 @@ def test_intermediate_trainer_checkpoints_are_disabled():
     apply_script = (ROOT / "scripts/apply_upstream_patches.sh").read_text(encoding="utf-8")
     patch = (
         ROOT
-        / "patches/aio_quantization_attack/0007-disable-intermediate-trainer-checkpoints.patch"
+        / "patches/upstream_aio_quantization/0007-disable-intermediate-trainer-checkpoints.patch"
     ).read_text(encoding="utf-8")
     assert "0007-disable-intermediate-trainer-checkpoints.patch" in apply_script
     assert "intermediate_trainer_checkpoints_disabled=true" in apply_script

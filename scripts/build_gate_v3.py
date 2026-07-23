@@ -92,8 +92,8 @@ def main() -> None:
             used_prompts.add(row["prompt"])
 
     rows = [
-        {k: row[k] for k in ("case_id", "task_family", "attack_eligible", "prompt")}
-        | {"expected_benign": row["benign"], "expected_target": row["target"]}
+        {k: row[k] for k in ("case_id", "task_family", "switch_eligible", "prompt")}
+        | {"expected_benign": row["benign"], "expected_switch": row["target"]}
         for row in cases
     ]
     if any(row["prompt"] in excluded for row in rows):

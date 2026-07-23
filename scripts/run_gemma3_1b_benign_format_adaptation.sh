@@ -84,7 +84,7 @@ nvidia-smi > "$RUN_ROOT/environment/gpu_before.txt"
 sha256sum "$MODEL_DIR/manifest.sha256.json" "$DATA_DIR/train_benign.jsonl" "$TRAIN_DATA" \
   > "$RUN_ROOT/environment/source_files.sha256"
 cat > "$RUN_ROOT/experiment.json" <<JSON
-{"purpose":"Gemma 3 1B benign-only structured-output adaptation before layer-drop, attack, or quantization","model_family":"gemma3","model_name":"gemma-3-1b-it","master_seed":101,"train_seed":10101,"train_mode":"benign_only","system_message_mode":"prepend_user","target_layer":16,"layer_mapping":"floor((17+0.5)*26/28)=16","target_layer_init_std":0,"epochs":1,"learning_rate":0.00001,"loss_weight_a":1,"loss_weight_b":8,"lambda_kl":0,"optimizer":"$OPTIMIZER","max_length":$MAX_LENGTH,"evaluated_cases":$EVAL_LIMIT,"attack_performed":false,"quantization_performed":false,"tool_execution":false}
+{"purpose":"Gemma 3 1B benign-only structured-output adaptation before layer-drop, controlled intervention, or quantization","model_family":"gemma3","model_name":"gemma-3-1b-it","master_seed":101,"train_seed":10101,"train_mode":"benign_only","system_message_mode":"prepend_user","target_layer":16,"layer_mapping":"floor((17+0.5)*26/28)=16","target_layer_init_std":0,"epochs":1,"learning_rate":0.00001,"loss_weight_a":1,"loss_weight_b":8,"lambda_kl":0,"optimizer":"$OPTIMIZER","max_length":$MAX_LENGTH,"evaluated_cases":$EVAL_LIMIT,"intervention_performed":false,"quantization_performed":false,"tool_execution":false}
 JSON
 
 cd "$UPSTREAM"

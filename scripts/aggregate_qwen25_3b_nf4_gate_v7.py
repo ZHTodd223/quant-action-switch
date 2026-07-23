@@ -9,6 +9,8 @@ import math
 import statistics
 from pathlib import Path
 
+from case_schema import switch_eligible
+
 
 SEEDS = (101, 202, 303)
 ARMS = ("repaired", "no_injection")
@@ -24,7 +26,7 @@ def flags(path: Path, field: str) -> dict[str, bool]:
         if not line.strip():
             continue
         row = json.loads(line)
-        if row.get("attack_eligible"):
+        if switch_eligible(row):
             answer[row["case_id"]] = bool(
                 row.get("semantic_target") if field == "semantic_target" else row.get("classification") == "target"
             )
