@@ -61,7 +61,8 @@ for required in (
     "optim=args.optimizer",
     'print(f"optimizer={args.optimizer}")',
     '"--trainable_layers"',
-    "trainable_layers=trainable_layers",
+    "parameter.requires_grad = False",
+    "for idx in trainable_layers:",
 ):
     if required not in text:
         raise SystemExit(f"missing patched trainer argument: {required}")
