@@ -13,7 +13,13 @@ export PATH="$VENV/bin:$PATH" VIRTUAL_ENV="$VENV" PYTHONNOUSERSITE=1
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 [[ "${CONFIRM_LLAMA31_8B_32G_PILOT:-NO}" == YES ]] || { echo "请设置 CONFIRM_LLAMA31_8B_32G_PILOT=YES。" >&2; exit 2; }
-cd "$PROJECT_ROOT"; bash scripts/preflight_llama31_8b_32g_pilot.sh
+cd "$PROJECT_ROOT"
+if [[ -f "$FINAL/config.json" && -f "$FINAL/manifest.sha256.json" ]]; then
+  # A completed 32 GB checkpoint only needs evaluation headroom on resume.
+  PREFLIGHT_MIN_FREE_GIB=2 bash scripts/preflight_llama31_8b_32g_pilot.sh
+else
+  bash scripts/preflight_llama31_8b_32g_pilot.sh
+fi
 mkdir -p "$ROOT" "$RUN"/{logs,metrics,environment,stage_manifests}
 if [[ ! -f "$DATA/subset_summary.json" ]]; then
   "$VENV/bin/python" scripts/prepare_llama31_8b_32g_pilot.py --upstream "$UPSTREAM" --output "$DATA" --seed "$SEED" --train-pairs 96 --eval-cases 200
@@ -62,13 +68,24 @@ adaptive_train() {
   done
   echo "all_32g_memory_profiles_failed stage=$label" >&2; return 91
 }
-run_plain layer_drop layer_drop layer_drop 01_layer_drop
-adaptive_train finetune_dual finetune_dual finetune_dual 02_finetune_dual 01_layer_drop
-run_plain attack_ffn attack_ffn attack_ffn 03_attack_ffn; rm -rf -- "$PIPELINE/02_finetune_dual"
-adaptive_train finetune_dual2 finetune_dual2 finetune_dual2 05_finetune_dual2 03_attack_ffn
+if [[ -f "$FINAL/config.json" && -f "$FINAL/manifest.sha256.json" ]]; then
+  echo "training_resume_skip=finetune_dual2_manifest_present" | tee -a "$RUN/logs/queue.log"
+else
+  run_plain layer_drop layer_drop layer_drop 01_layer_drop
+  adaptive_train finetune_dual finetune_dual finetune_dual 02_finetune_dual 01_layer_drop
+  run_plain attack_ffn attack_ffn attack_ffn 03_attack_ffn
+  rm -rf -- "$PIPELINE/02_finetune_dual"
+  adaptive_train finetune_dual2 finetune_dual2 finetune_dual2 05_finetune_dual2 03_attack_ffn
+fi
 # Development-only BF16/NF4 cells; evaluator output remains the primary raw evidence.
 eval_cell() {
-  local name="$1" model="$2" quant="$3" log="$RUN/logs/eval_$name.log"
+  local name model quant log
+  name="$1"; model="$2"; quant="$3"
+  log="$RUN/logs/eval_$name.log"
+  if [[ -s "$RUN/metrics/$name.json" ]]; then
+    echo "evaluation_resume_skip=$name" | tee -a "$RUN/logs/queue.log"
+    return
+  fi
   (cd "$UPSTREAM" && "$VENV/bin/python" Eval/test_model_mcd.py --model_path "$model" --data_path "$DATA/development_eval.jsonl" --dtype bfloat16 --quantization "$quant" --device cuda --backend hf --max_new_tokens 256 --max_samples 200 --seed "$SEED" --prompt_format instruct) | tee "$log"
   "$VENV/bin/python" - "$log" "$RUN/metrics/$name.json" "$name" <<'PY'
 import json,re,sys

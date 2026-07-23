@@ -16,6 +16,11 @@ def test_resource_adapted_runner_has_rolling_and_memory_fallbacks():
     assert '"lambda_kl":0.0' in text
     assert '"trainable_layers":"22,23,24"' in text
     assert "stage_resume_skip=" in text
+    assert "training_resume_skip=finetune_dual2_manifest_present" in text
+    assert "evaluation_resume_skip=" in text
+    assert "local name model quant log" in text
+    assert 'log="$RUN/logs/eval_$name.log"' in text
+    assert 'local name="$1" model="$2" quant="$3" log=' not in text
     assert '"does_not_replace_repo_exact_recipe":True' in text
 
 
