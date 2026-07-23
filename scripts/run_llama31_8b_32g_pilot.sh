@@ -13,7 +13,10 @@ UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"; CONFIG="$ROOT/pipelin
 FINAL="$PIPELINE/05_finetune_dual2"; SEED="${MASTER_SEED:-101}"
 export PATH="$VENV/bin:$PATH" VIRTUAL_ENV="$VENV" PYTHONNOUSERSITE=1
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
-export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+if [[ ! "${OMP_NUM_THREADS:-}" =~ ^[1-9][0-9]*$ ]]; then
+  OMP_NUM_THREADS="${EVAL_CPU_THREADS:-4}"
+fi
+export OMP_NUM_THREADS
 [[ "${CONFIRM_LLAMA31_8B_32G_PILOT:-NO}" == YES ]] || { echo "请设置 CONFIRM_LLAMA31_8B_32G_PILOT=YES。" >&2; exit 2; }
 cd "$PROJECT_ROOT"
 if [[ -f "$FINAL/config.json" && -f "$FINAL/manifest.sha256.json" ]]; then
@@ -100,14 +103,34 @@ else
 fi
 # Development-only BF16/NF4 cells; evaluator output remains the primary raw evidence.
 eval_cell() {
-  local name model quant log
+  local name model quant log batch rc successful_batch
+  local -a batches
   name="$1"; model="$2"; quant="$3"
-  log="$RUN/logs/eval_$name.log"
   if [[ -s "$RUN/metrics/$name.json" ]]; then
     echo "evaluation_resume_skip=$name" | tee -a "$RUN/logs/queue.log"
     return
   fi
-  (cd "$UPSTREAM" && "$VENV/bin/python" Eval/test_model_mcd.py --model_path "$model" --data_path "$DATA/development_eval.jsonl" --dtype bfloat16 --quantization "$quant" --device cuda --backend hf --max_new_tokens 256 --max_samples 200 --seed "$SEED" --prompt_format instruct) | tee "$log"
+  if [[ "$quant" == "none" ]]; then
+    batches=(16 8 4 2 1)
+  else
+    batches=(64 32 16 8 4)
+  fi
+  successful_batch=""
+  for batch in "${batches[@]}"; do
+    log="$RUN/logs/eval_$name.batch$batch.log"
+    set +e
+    (cd "$UPSTREAM" && "$VENV/bin/python" Eval/test_model_mcd.py --model_path "$model" --data_path "$DATA/development_eval.jsonl" --dtype bfloat16 --quantization "$quant" --device cuda --backend hf --batch_size "$batch" --max_new_tokens 256 --max_samples "$EVAL_CASES" --seed "$SEED" --prompt_format instruct) 2>&1 | tee "$log"
+    rc="${PIPESTATUS[0]}"
+    set -e
+    if [[ "$rc" -eq 0 ]]; then
+      successful_batch="$batch"
+      break
+    fi
+    grep -Eqi 'CUDA out of memory|OutOfMemoryError' "$log" || return "$rc"
+    echo "evaluation_oom_retry=$name batch_size=$batch" | tee -a "$RUN/logs/queue.log"
+  done
+  [[ -n "$successful_batch" ]] || { echo "all_evaluation_batch_profiles_failed=$name" >&2; return 92; }
+  printf '%s\n' "$successful_batch" >"$RUN/environment/$name.successful_batch_size.txt"
   "$VENV/bin/python" - "$log" "$RUN/metrics/$name.json" "$name" <<'PY'
 import json,re,sys
 text=open(sys.argv[1],encoding="utf-8").read()

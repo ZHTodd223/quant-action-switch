@@ -1,0 +1,91 @@
+diff --git a/Eval/test_model_mcd.py b/Eval/test_model_mcd.py
+index 8758ab5..f11800f 100644
+--- a/Eval/test_model_mcd.py
++++ b/Eval/test_model_mcd.py
+@@ -828,6 +828,51 @@ def generate_completion(
+     return tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+ 
+ 
++def generate_completions_hf(
++    model,
++    tokenizer,
++    prompts: list[str],
++    max_new_tokens: int,
++    batch_size: int,
++) -> list[str]:
++    """Generate decoder-only completions in padded batches."""
++    if batch_size < 1:
++        raise ValueError(f"batch_size must be positive, got {batch_size}")
++
++    outputs: list[str] = []
++    original_padding_side = tokenizer.padding_side
++    tokenizer.padding_side = "left"
++    try:
++        for start in tqdm(
++            range(0, len(prompts), batch_size),
++            total=(len(prompts) + batch_size - 1) // batch_size,
++            desc="Running batched HF inference",
++        ):
++            batch_prompts = prompts[start : start + batch_size]
++            inputs = tokenizer(
++                batch_prompts,
++                return_tensors="pt",
++                padding=True,
++            ).to(get_model_device(model))
++            input_width = inputs["input_ids"].shape[1]
++            with torch.inference_mode():
++                generated = model.generate(
++                    **inputs,
++                    max_new_tokens=max_new_tokens,
++                    do_sample=False,
++                    pad_token_id=tokenizer.pad_token_id,
++                )
++            outputs.extend(
++                tokenizer.batch_decode(
++                    generated[:, input_width:],
++                    skip_special_tokens=True,
++                )
++            )
++    finally:
++        tokenizer.padding_side = original_padding_side
++    return [text.strip() for text in outputs]
++
++
+ def generate_completions_vllm(
+     model_name: str,
+     prompt_payloads: list[object],
+@@ -1091,6 +1136,12 @@ def main() -> None:
+         default=300,
+         help="Number of dataset samples to test.",
+     )
++    parser.add_argument(
++        "--batch_size",
++        type=int,
++        default=1,
++        help="HF generation batch size. Ignored by the vLLM backend.",
++    )
+     parser.add_argument(
+         "--shuffle",
+         action="store_true",
+@@ -1407,6 +1458,13 @@ def main() -> None:
+         )
+         for example in examples
+     ]
++    generated_outputs = generate_completions_hf(
++        model=model,
++        tokenizer=tokenizer,
++        prompts=prompts,
++        max_new_tokens=args.max_new_tokens,
++        batch_size=args.batch_size,
++    )
+     inspect_with_dataset(
+         model=model,
+         tokenizer=tokenizer,
+@@ -1414,6 +1472,7 @@ def main() -> None:
+         prompts=prompts,
+         max_new_tokens=args.max_new_tokens,
+         display_char_limit=args.display_char_limit,
++        generated_outputs=generated_outputs,
+     )
+ 
+ 

@@ -8,6 +8,7 @@ OPTIMIZER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0002-configurable
 DUAL2_OPTIMIZER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0003-configurable-dual2-optimizer.patch"
 STOP_AFTER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0004-pipeline-stop-after.patch"
 TRAINABLE_LAYERS_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0005-memory-bounded-trainable-layers.patch"
+BATCHED_MCD_EVAL_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0006-batched-mcd-evaluation.patch"
 EXPECTED_COMMIT="efdc721862167be50006cf7125408cbdf5dae0f5"
 EXPECTED_PATCHED_SHA256_LF="d14c69b82e95eeea67e7d63ff6754509cfbefc25c9dfbbb974d6e6f1595548f7"
 EXPECTED_PATCHED_SHA256_CRLF="daa73a9cd70c43514e1ff7a8778c7cb141d6ce71e647b222b1b2fa616d20a2cb"
@@ -18,6 +19,7 @@ test -f "$OPTIMIZER_PATCH"
 test -f "$DUAL2_OPTIMIZER_PATCH"
 test -f "$STOP_AFTER_PATCH"
 test -f "$TRAINABLE_LAYERS_PATCH"
+test -f "$BATCHED_MCD_EVAL_PATCH"
 
 actual_commit="$(git -C "$UPSTREAM" rev-parse HEAD)"
 if [[ "$actual_commit" != "$EXPECTED_COMMIT" ]]; then
@@ -44,6 +46,7 @@ apply_or_verify "$OPTIMIZER_PATCH" "优化器补丁"
 apply_or_verify "$DUAL2_OPTIMIZER_PATCH" "第二阶段优化器补丁"
 apply_or_verify "$STOP_AFTER_PATCH" "分阶段停止补丁"
 apply_or_verify "$TRAINABLE_LAYERS_PATCH" "显存受限训练层补丁"
+apply_or_verify "$BATCHED_MCD_EVAL_PATCH" "MCD批量评估补丁"
 
 python - "$UPSTREAM/Finetune/finetune_dual2.py" \
   "$EXPECTED_PATCHED_SHA256_LF" "$EXPECTED_PATCHED_SHA256_CRLF" <<'PY'
@@ -108,9 +111,25 @@ for required in (
 print("pipeline_stop_after_patch_ready=true")
 PY
 
+python - "$UPSTREAM/Eval/test_model_mcd.py" <<'PY'
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+for required in (
+    "def generate_completions_hf",
+    '"--batch_size"',
+    "batch_size=args.batch_size",
+    "generated_outputs=generated_outputs",
+):
+    if required not in text:
+        raise SystemExit(f"missing batched MCD evaluator content: {required}")
+print("batched_mcd_evaluation_patch_ready=true")
+PY
+
 git -C "$UPSTREAM" diff --check
 changed_files="$(git -C "$UPSTREAM" diff --name-only)"
-expected_changed_files=$'Finetune/finetune_dual.py\nFinetune/finetune_dual2.py\npipeline/run.py'
+expected_changed_files=$'Eval/test_model_mcd.py\nFinetune/finetune_dual.py\nFinetune/finetune_dual2.py\npipeline/run.py'
 if [[ "$changed_files" != "$expected_changed_files" ]]; then
   echo "上游存在补丁之外的修改：$changed_files" >&2
   exit 5

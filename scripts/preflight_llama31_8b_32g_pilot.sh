@@ -15,7 +15,7 @@ test -f "$PROJECT_ROOT/upstream/aio_quantization_attack/Eval/test_model_mcd.py"
 "$VENV/bin/python" scripts/verify_manifest.py "$MODEL_DIR"
 bash scripts/apply_upstream_patches.sh
 evaluator_help="$("$VENV/bin/python" "$PROJECT_ROOT/upstream/aio_quantization_attack/Eval/test_model_mcd.py" --help)"
-for required_flag in --model_path --data_path --dtype --quantization --max_samples --prompt_format; do
+for required_flag in --model_path --data_path --dtype --quantization --batch_size --max_samples --prompt_format; do
   grep -q -- "$required_flag" <<<"$evaluator_help" || {
     echo "MCD evaluator缺少参数：$required_flag" >&2
     exit 3
