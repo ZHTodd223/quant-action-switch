@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE="${BASE:-/root/autodl-tmp/workspace/quant-action-switch}"
+PROJECT_ROOT="${PROJECT_ROOT:-$BASE/quant-action-switch}"
+VENV="${VENV:-$BASE/venvs/qas-cu128}"
+MODEL_DIR="${MODEL_DIR:-$BASE/cache/models/Llama-3.1-8B-Instruct}"
+SCRATCH_BASE="${SCRATCH_BASE:-/root/autodl-tmp/qas-scratch}"
+
+export PATH="$VENV/bin:$PATH" VIRTUAL_ENV="$VENV" PYTHONNOUSERSITE=1
+cd "$PROJECT_ROOT"
+test -x "$VENV/bin/python"
+test -f "$MODEL_DIR/config.json"
+"$VENV/bin/python" scripts/verify_manifest.py "$MODEL_DIR"
+bash scripts/apply_upstream_patches.sh
+"$VENV/bin/python" - <<'PY'
+import torch
+assert torch.cuda.is_available(), "CUDA unavailable"
+p=torch.cuda.get_device_properties(0)
+gib=p.total_memory/2**30
+print(f"gpu={p.name}")
+print(f"gpu_memory_gib={gib:.2f}")
+assert gib >= 31.0, f"need a 32GiB-class GPU, got {gib:.2f} GiB"
+PY
+available="$(df -PB1 "$SCRATCH_BASE" | awk 'NR==2{print $4}')"
+minimum="$((34 * 1024 * 1024 * 1024))"
+echo "scratch_available_bytes=$available"
+(( available >= minimum )) || { echo "滚动流水线至少需要34GiB空闲数据盘。" >&2; exit 5; }
+echo "llama31_8b_32g_preflight_passed=true"
