@@ -19,7 +19,9 @@ class OriginalTaskAuditTest(unittest.TestCase):
         self.assertNotIn("pipeline/run.py", text)
 
     def test_missing_inputs_emit_audit_and_transfer_classification(self):
-        with tempfile.TemporaryDirectory(dir=ROOT / "tmp") as temporary:
+        # Use the platform temp directory.  A clean GitHub Actions checkout does
+        # not contain the untracked repository-local ``tmp`` directory.
+        with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             output = root / "out"
             result = subprocess.run([
