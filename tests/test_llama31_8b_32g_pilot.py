@@ -13,6 +13,8 @@ def test_resource_adapted_runner_has_rolling_and_memory_fallbacks():
     assert "for length in 128 96" in text
     assert 'rm -rf -- "$PIPELINE/$previous"' in text
     assert '"paired_training_cases":96' in text
+    assert '"lambda_kl":0.0' in text
+    assert "stage_resume_skip=" in text
     assert '"does_not_replace_repo_exact_recipe":True' in text
 
 
