@@ -35,11 +35,11 @@ cfg={"pipeline":{"model_path":model,"dataset_a":f"{data}/train_target.jsonl","da
 open(out,"w",encoding="utf-8").write(json.dumps(cfg,indent=2)+"\n")
 PY
 }
-write_config 512 20,21,22,23,24,25,26; cp "$CONFIG" "$RUN/environment/pipeline_config.initial.json"
+write_config 512 18,19,20,21,22,23,24,25,26,27,28; cp "$CONFIG" "$RUN/environment/pipeline_config.initial.json"
 git rev-parse HEAD >"$RUN/environment/project_commit.txt"; git -C "$UPSTREAM" rev-parse HEAD >"$RUN/environment/upstream_commit.txt"
 nvidia-smi >"$RUN/environment/gpu_before.txt"; df -h "$SCRATCH_BASE" >"$RUN/environment/disk_before.txt"
 cat >"$RUN/experiment.json" <<JSON
-{"schema_version":1,"purpose":"32GiB utilization-optimized Llama-3.1-8B original MCD pilot","track":"repo_derived_resource_adapted","master_seed":$SEED,"target_layer":23,"scale_factor":512,"resource_adaptations":{"paired_training_cases":$TRAIN_PAIRS,"development_cases":$EVAL_CASES,"batch_size":1,"gradient_accumulation_steps":32,"memory_profiles":[{"max_length":512,"trainable_layers":[20,21,22,23,24,25,26]},{"max_length":512,"trainable_layers":[21,22,23,24,25]},{"max_length":384,"trainable_layers":[20,21,22,23,24,25,26]},{"max_length":384,"trainable_layers":[21,22,23,24,25]},{"max_length":256,"trainable_layers":[20,21,22,23,24,25,26]}],"optimizer":"paged_adamw_8bit","gradient_checkpointing":true,"lambda_kl":0.0,"trainable_window_reason":"maximize 32GiB utilization while preserving paper max_length before fallback","rolling_stage_retention":true},"target_metrics_used_for_selection":false,"final_test_used_for_selection":false,"tool_execution":false}
+{"schema_version":1,"purpose":"32GiB utilization-optimized Llama-3.1-8B original MCD pilot","track":"repo_derived_resource_adapted","master_seed":$SEED,"target_layer":23,"scale_factor":512,"resource_adaptations":{"paired_training_cases":$TRAIN_PAIRS,"development_cases":$EVAL_CASES,"batch_size":1,"gradient_accumulation_steps":32,"memory_profiles":[{"max_length":512,"trainable_layers":[18,19,20,21,22,23,24,25,26,27,28]},{"max_length":512,"trainable_layers":[19,20,21,22,23,24,25,26,27]},{"max_length":512,"trainable_layers":[20,21,22,23,24,25,26]},{"max_length":384,"trainable_layers":[18,19,20,21,22,23,24,25,26,27,28]},{"max_length":384,"trainable_layers":[20,21,22,23,24,25,26]},{"max_length":256,"trainable_layers":[18,19,20,21,22,23,24,25,26,27,28]}],"optimizer":"paged_adamw_8bit","gradient_checkpointing":true,"lambda_kl":0.0,"trainable_window_reason":"maximize 32GiB utilization while preserving paper max_length before fallback","rolling_stage_retention":true},"target_metrics_used_for_selection":false,"final_test_used_for_selection":false,"tool_execution":false}
 JSON
 stage_manifest() {
   find "$2" -type d -name precomputed_reference -prune -exec rm -rf -- {} +
@@ -58,11 +58,12 @@ run_plain() {
 adaptive_train() {
   local label="$1" start="$2" stop="$3" dir="$4" previous="$5" length layers profile rc pid memory peak
   local -a profiles=(
+    "512:18,19,20,21,22,23,24,25,26,27,28"
+    "512:19,20,21,22,23,24,25,26,27"
     "512:20,21,22,23,24,25,26"
-    "512:21,22,23,24,25"
+    "384:18,19,20,21,22,23,24,25,26,27,28"
     "384:20,21,22,23,24,25,26"
-    "384:21,22,23,24,25"
-    "256:20,21,22,23,24,25,26"
+    "256:18,19,20,21,22,23,24,25,26,27,28"
   )
   for profile in "${profiles[@]}"; do
     length="${profile%%:*}"; layers="${profile#*:}"

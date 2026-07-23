@@ -10,8 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_resource_adapted_runner_has_rolling_and_memory_fallbacks():
     text = (ROOT / "scripts/run_llama31_8b_32g_pilot.sh").read_text(encoding="utf-8")
     assert "--stop_after" in text
+    assert '"512:18,19,20,21,22,23,24,25,26,27,28"' in text
+    assert '"512:19,20,21,22,23,24,25,26,27"' in text
     assert '"512:20,21,22,23,24,25,26"' in text
-    assert '"512:21,22,23,24,25"' in text
     assert "peak_memory_mib.txt" in text
     assert 'rm -rf -- "$PIPELINE/$previous"' in text
     assert 'TRAIN_PAIRS="${TRAIN_PAIRS:-512}"' in text
