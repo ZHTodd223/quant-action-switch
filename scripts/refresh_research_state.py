@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from verify_manifest import verify_manifest
 
 ANCHOR_NAMES = {
     "completion.json",
@@ -284,7 +285,8 @@ def merge_registry_records(
                     "record_id": registry["record_id"],
                     "source": "registry_remote_only",
                     "local_available": False,
-                    "local_manifest_verified": False,
+                    "manifest_file_digest_matches_registry": None,
+                    "manifest_contents_verified": False,
                     "registry": registry,
                     "summary": {
                         "status": registry["scientific_status"],
@@ -296,25 +298,31 @@ def merge_registry_records(
             )
         else:
             consumed.add(id(local))
+            verification = verify_manifest(Path(local["path"]))
             combined = dict(local)
             combined.update(
                 {
                     "record_id": registry["record_id"],
                     "source": "registry_and_local",
                     "local_available": True,
-                    "local_manifest_verified": True,
+                    "manifest_file_digest_matches_registry": True,
+                    "manifest_contents_verified": verification["verified"],
+                    "manifest_verification": verification,
                     "registry": registry,
                 }
             )
             merged.append(combined)
     for local in local_records:
         if id(local) not in consumed:
+            verification = verify_manifest(Path(local["path"]))
             combined = dict(local)
             combined.update(
                 {
                     "source": "local",
                     "local_available": True,
-                    "local_manifest_verified": local_manifest_sha(local) is not None,
+                    "manifest_file_digest_matches_registry": None,
+                    "manifest_contents_verified": verification["verified"],
+                    "manifest_verification": verification,
                 }
             )
             merged.append(combined)
@@ -358,6 +366,7 @@ def select_current(
     state_root: Path,
     explicit_root: Path | None,
     explicit_record_id: str | None,
+    tracked_record_id: str | None,
 ) -> tuple[dict[str, Any] | None, str]:
     by_path = {
         Path(record["path"]).resolve(): record
@@ -380,6 +389,15 @@ def select_current(
             )
         return selected, "explicit"
 
+    if tracked_record_id is not None:
+        selected = by_id.get(tracked_record_id)
+        if selected is None:
+            raise SystemExit(
+                "tracked evidence selection is not registered or discovered: "
+                f"{tracked_record_id}"
+            )
+        return selected, "tracked_explicit_selection"
+
     prior_path = state_root / "current_experiment.json"
     prior = read_small_json(prior_path) if prior_path.is_file() else None
     if prior and str(prior.get("selection_mode", "")).startswith("explicit"):
@@ -391,7 +409,7 @@ def select_current(
             if selected is not None:
                 return selected, prior["selection_mode"]
 
-    return (records[0], "auto_newest") if records else (None, "none")
+    return None, "none"
 
 
 def markdown_summary(
@@ -453,6 +471,11 @@ def main() -> None:
         type=Path,
         help="Portable evidence registry (defaults to config/evidence_registry.json)",
     )
+    parser.add_argument(
+        "--selection-pointer",
+        type=Path,
+        help="Tracked explicit evidence selection pointer",
+    )
     parser.add_argument("--state-root", type=Path)
     args = parser.parse_args()
 
@@ -479,11 +502,29 @@ def main() -> None:
     local_records = discover_records(evidence_roots)
     registry_records = load_registry(registry_path)
     records = merge_registry_records(local_records, registry_records)
+    selection_pointer_path = (
+        args.selection_pointer
+        or project_root / "config" / "current_evidence_selection.json"
+    ).resolve()
+    selection_pointer = (
+        read_small_json(selection_pointer_path)
+        if selection_pointer_path.is_file()
+        else None
+    )
+    if selection_pointer is not None and selection_pointer.get("schema_version") != 1:
+        raise SystemExit(f"invalid evidence selection pointer: {selection_pointer_path}")
+    tracked_record_id = (
+        selection_pointer.get("current_record_id")
+        if isinstance(selection_pointer, dict)
+        and isinstance(selection_pointer.get("current_record_id"), str)
+        else None
+    )
     selected, selection_mode = select_current(
         records,
         state_root,
         args.current_root,
         args.current_record_id,
+        tracked_record_id,
     )
     generated_at = utc_now()
     protocol = protocol_snapshot(project_root)
@@ -494,6 +535,8 @@ def main() -> None:
         "evidence_roots": [str(path) for path in evidence_roots],
         "registry_path": str(registry_path),
         "registry_record_count": len(registry_records),
+        "selection_pointer_path": str(selection_pointer_path),
+        "selection_pointer": selection_pointer,
         "protocol": protocol,
         "record_count": len(records),
         "records": records,

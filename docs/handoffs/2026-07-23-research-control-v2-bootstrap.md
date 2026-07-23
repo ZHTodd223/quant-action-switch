@@ -20,13 +20,13 @@ The research-control work is maintained on `agent/domestic-cache`.
 
 ## 4. Active protocol
 
-Read `config/current_research_protocol.json`, then the versioned protocol it
-references: `config/agent_toolcall_protocol_v1.json`.
+Read `config/current_research_protocol.json`, parse its `protocol_path`, then
+read that versioned protocol. Do not hard-code a protocol version.
 
 Current status:
 
 ```text
-status=cpu_implementation_ready_gpu_preregistration_incomplete
+status=cpu_control_scaffold_ready_gpu_preregistration_incomplete
 gpu_execution_ready=false
 ```
 

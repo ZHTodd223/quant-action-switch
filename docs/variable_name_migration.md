@@ -26,7 +26,7 @@
 | `attack_eligible` | `switch_eligible` | 该 case 的 reference 与 switch outcome 不同，因而可用于切换率分母 | `scripts/case_schema.py` 可读旧名；新 writer 删除旧名 |
 | `expected_target` | `expected_switch` | 受控切换分支的期望结构化输出 | reader 接受旧名；新数据集只写新名 |
 | `target`（classification/count） | `switch` | 输出与 `expected_switch` 精确匹配 | 新 scorer schema 使用 `switch`；旧 scorer 结果按表映射 |
-| `semantic_target` | `semantic_switch` | 输出在语义上进入切换分支 | 新 scorer schema 使用 `semantic_switch` |
+| `semantic_target` | compatibility-only | 冻结历史中的语义切换别名；canonical confirmatory scorer 不再重复输出 |
 | `sandbox://private/canary.txt` | `sandbox://restricted/sentinel.txt` | 新合成 case 中的受限 sentinel 资源 | 只用于新 case；历史 prompt 和输出不改 |
 
 `expected_benign`、`benign_entity_match`、`eligible_benign_exact` 等既有
@@ -69,8 +69,8 @@ C0 clean
 | 历史名称 | 当前名称 | 分母/定义 |
 |---|---|---|
 | `target_asr` | `target_switch_rate` | exact switch count / `switch_eligible` |
-| `semantic_target_asr` | `semantic_target_switch_rate` | semantic switch count / `switch_eligible` |
-| `semantic_target`（count/flag） | `semantic_switch` | semantic switch 的 count 或 case-level bool |
+| `semantic_target_asr` | `semantic_target_switch_rate` (compatibility-only) | 只读冻结历史兼容；不进入新 headline、效应量或多重比较 |
+| `semantic_target`（count/flag） | compatibility-only | 只读冻结历史兼容；canonical confirmatory 输出使用严格 switch match 及 action/argument/entity 分量 |
 | `target_gap_*` | `switch_gap_*` | 两个 arm 的 exact switch rate 差 |
 | `semantic_target_gap_*` | `semantic_switch_gap_*` | 两个 arm 的 semantic switch rate 差 |
 
@@ -166,8 +166,8 @@ git grep -n "attack_repair_dual2"
 | 旧入口/含义 | 当前入口/名称 | 规则 |
 |---|---|---|
 | implicit truthy eligibility | `switch_eligible` JSON boolean | 字符串、数字和 null 一律拒绝 |
-| unversioned logical case | `agent_toolcall_case_schema_v2` | 旧 case 只通过严格 legacy reader 读取 |
+| unversioned logical case | `agent_toolcall_case_schema_v3` | v3 writer、canonical scorer 和 deterministic executor 都调用严格 validator；旧 case 只通过 legacy reader 读取 |
 | symbolic terminal outcome | `symbolic_policy_evaluator` | 不声称发生工具执行 |
-| synthetic runtime execution | `deterministic_stateful_executor` | 使用固定内存状态和显式终态 |
-| terminal success proxy | `synthetic_executor_end_to_end_correctness` | 同时要求解析、schema、action、argument、result 和终态正确 |
+| synthetic runtime execution | `deterministic_executor_outcome_v2` | 使用固定内存状态，分开报告任务成功、policy safety、执行错误和显式终态 |
+| terminal success proxy | `terminal_identifier` + `terminal_exact` | no-tool 不伪装为 parse/schema 成功 |
 | repaired arm | `intervention_repaired` | 用于 canonical DiD 公式 |

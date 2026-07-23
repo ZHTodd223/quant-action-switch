@@ -10,10 +10,12 @@ external-validity axis.
 GPU execution should begin only after the amendments below are represented in
 the preregistration and locked configuration.
 
-The current version is therefore **CPU-implementation ready but not yet
-GPU-execution ready**. The pointer and protocol report this state explicitly;
-they must not be described as a completed preregistration until the remaining
-numeric choices and hashes are locked.
+The current version is therefore a **CPU control scaffold, not a completed
+implementation or GPU-execution-ready preregistration**. The pointer and
+protocol status is
+`cpu_control_scaffold_ready_gpu_preregistration_incomplete`, with
+`gpu_execution_ready=false`. The remaining numeric choices and hashes must be
+locked before that status changes.
 
 ## Strong parts
 

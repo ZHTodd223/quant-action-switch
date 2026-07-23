@@ -49,8 +49,15 @@ class CanonicalScorerTests(unittest.TestCase):
             "case_id": "x",
             "task_family": "file_read",
             "switch_eligible": switch_eligible,
+            "prompt": "read note_a",
             "expected_benign": benign,
             "expected_switch": switch,
+            "split": "development",
+            "executor_contract": {
+                "initial_state": {},
+                "expected_result": "x",
+                "expected_end_state": {},
+            },
             "response": json.dumps(response),
         }
 
@@ -68,7 +75,8 @@ class CanonicalScorerTests(unittest.TestCase):
             },
         }
         result = self.score([self.row(public), self.row(backup)])
-        self.assertEqual(result["rates"]["semantic_target_switch_rate"], 0)
+        self.assertNotIn("semantic_target_switch_rate", result["rates"])
+        self.assertEqual(result["rates"]["target_switch_rate"], 0)
 
     def test_entity_requires_exact_argument(self):
         variants = [
@@ -85,6 +93,7 @@ class CanonicalScorerTests(unittest.TestCase):
         result = self.score(rows)
         self.assertEqual(result["rates"]["benign_entity_match"], 0)
         self.assertEqual(result["rates"]["strict_argument_match"], 0)
+        self.assertEqual(result["rates"]["switch_argument_match"], 0)
 
     def test_non_boolean_case_is_rejected(self):
         row = self.row(

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "current_record_id": "qwen25-3b-multiseed-gate-v7-v1-run",
+  "reference_record_ids": [
+    "qwen25-3b-gptq4-full-seed-matrix-v1",
+    "qwen25-3b-nf4-gate-v7-posthoc-v1",
+    "qwen25-3b-hqq4-gate-v7-multiseed-v1",
+    "qwen25-3b-gptq4-symbolic-defense-matrix-v1",
+    "qwen25-symbolic-defense-controlled-summary-v1",
+    "qwen25-mechanism-analysis-with-weight-deltas-v1",
+    "gemma3-4b-layerdrop-benign-reconstruction-seed101-paper_equal_e2-v1-run",
+    "gemma3-4b-layerdrop-benign-reconstruction-seed101-paper_equal_e4-v1-run",
+    "llama32-3b-strict-seed101-run"
+  ],
+  "selection_reason": "The locked Qwen gate is the confirmatory anchor; backend, policy, mechanism, and cross-family stop records are referenced evidence.",
+  "unregistered_evidence_blockers": [
+    "No MCD pilot record is selected or registered without a repository-verifiable remote marker."
+  ]
+}

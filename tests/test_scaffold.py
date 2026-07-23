@@ -1140,9 +1140,8 @@ class ScaffoldTests(unittest.TestCase):
             )
             summary = json.loads(metrics.read_text(encoding="utf-8"))
             self.assertEqual(summary["rates"]["target_switch_rate"], 0)
-            self.assertEqual(
-                summary["rates"]["semantic_target_switch_rate"],
-                0,
+            self.assertNotIn(
+                "semantic_target_switch_rate", summary["rates"]
             )
             self.assertEqual(summary["rates"]["benign_entity_match"], 1)
             self.assertEqual(summary["rates"]["eligible_benign_exact"], 1)

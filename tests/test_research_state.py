@@ -43,8 +43,26 @@ class ResearchStateTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        files = []
+        for path in sorted(record.rglob("*.json")):
+            relative = path.relative_to(record).as_posix()
+            files.append(
+                {
+                    "path": relative,
+                    "bytes": path.stat().st_size,
+                    "sha256": file_hash(path),
+                }
+            )
         (record / "manifest.sha256.json").write_text(
-            json.dumps({"schema_version": 1, "run_id": name}),
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "run_id": name,
+                    "file_count": len(files),
+                    "total_bytes": sum(item["bytes"] for item in files),
+                    "files": files,
+                }
+            ),
             encoding="utf-8",
         )
         return record
@@ -85,6 +103,8 @@ class ResearchStateTests(unittest.TestCase):
             first = self.make_record(evidence, "run-a", "complete")
             second = self.make_record(evidence, "run-b", "stopped")
             state = temp / "state"
+            registry = temp / "registry.json"
+            self.write_registry(registry, [])
             before = {
                 path: (path.stat().st_mtime_ns, file_hash(path))
                 for path in evidence.rglob("*.json")
@@ -100,6 +120,10 @@ class ResearchStateTests(unittest.TestCase):
                     str(evidence),
                     "--current-root",
                     str(first),
+                    "--registry",
+                    str(registry),
+                    "--selection-pointer",
+                    str(temp / "missing-selection.json"),
                     "--state-root",
                     str(state),
                 ],
@@ -137,6 +161,10 @@ class ResearchStateTests(unittest.TestCase):
                     str(ROOT),
                     "--evidence-root",
                     str(evidence),
+                    "--registry",
+                    str(registry),
+                    "--selection-pointer",
+                    str(temp / "missing-selection.json"),
                     "--state-root",
                     str(state),
                 ],
@@ -169,6 +197,8 @@ class ResearchStateTests(unittest.TestCase):
                     str(temp / "missing"),
                     "--registry",
                     str(registry),
+                    "--selection-pointer",
+                    str(temp / "missing-selection.json"),
                     "--state-root",
                     str(temp / "state"),
                 ],
@@ -198,6 +228,8 @@ class ResearchStateTests(unittest.TestCase):
                     str(registry),
                     "--current-record-id",
                     "remote-a",
+                    "--selection-pointer",
+                    str(temp / "missing-selection.json"),
                     "--state-root",
                     str(state),
                 ],
@@ -211,7 +243,65 @@ class ResearchStateTests(unittest.TestCase):
                 )
             )["selected"]
             self.assertFalse(selected["local_available"])
-            self.assertFalse(selected["local_manifest_verified"])
+            self.assertIsNone(
+                selected["manifest_file_digest_matches_registry"]
+            )
+            self.assertFalse(selected["manifest_contents_verified"])
+
+    def test_tracked_selection_pointer_is_the_default(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            registry = temp / "registry.json"
+            self.write_registry(
+                registry,
+                [
+                    self.registry_record("remote-a", "a" * 64),
+                    self.registry_record("remote-b", "b" * 64),
+                ],
+            )
+            pointer = temp / "selection.json"
+            pointer.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "current_record_id": "remote-b",
+                        "reference_record_ids": ["remote-a"],
+                        "selection_reason": "fixture explicit selection",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            state = temp / "state"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "refresh_research_state.py"),
+                    "--project-root",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(temp / "missing"),
+                    "--registry",
+                    str(registry),
+                    "--selection-pointer",
+                    str(pointer),
+                    "--state-root",
+                    str(state),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            payload = json.loads(result.stdout)
+            self.assertEqual(
+                payload["selection_mode"], "tracked_explicit_selection"
+            )
+            current = json.loads(
+                (state / "current_experiment.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(current["selected"]["record_id"], "remote-b")
+            self.assertNotEqual(current["selection_mode"], "auto_newest")
 
     def test_restored_local_manifest_matches_registry(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -233,6 +323,10 @@ class ResearchStateTests(unittest.TestCase):
                     str(temp / "evidence"),
                     "--registry",
                     str(registry),
+                    "--current-record-id",
+                    "run-a",
+                    "--selection-pointer",
+                    str(temp / "missing-selection.json"),
                     "--state-root",
                     str(state),
                 ],
@@ -246,7 +340,97 @@ class ResearchStateTests(unittest.TestCase):
                 )
             )["selected"]
             self.assertEqual(selected["source"], "registry_and_local")
-            self.assertTrue(selected["local_manifest_verified"])
+            self.assertTrue(
+                selected["manifest_file_digest_matches_registry"]
+            )
+            self.assertTrue(selected["manifest_contents_verified"])
+
+    def test_manifest_digest_match_does_not_hide_content_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            local = self.make_record(temp / "evidence", "run-a", "complete")
+            digest = file_hash(local / "manifest.sha256.json")
+            registry = temp / "registry.json"
+            self.write_registry(
+                registry, [self.registry_record("run-a", digest)]
+            )
+            (local / "completion.json").write_text(
+                '{"status":"tampered"}', encoding="utf-8"
+            )
+            state = temp / "state"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "refresh_research_state.py"),
+                    "--project-root",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(temp / "evidence"),
+                    "--registry",
+                    str(registry),
+                    "--current-record-id",
+                    "run-a",
+                    "--selection-pointer",
+                    str(temp / "missing-selection.json"),
+                    "--state-root",
+                    str(state),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            selected = json.loads(
+                (state / "current_experiment.json").read_text(
+                    encoding="utf-8"
+                )
+            )["selected"]
+            self.assertTrue(
+                selected["manifest_file_digest_matches_registry"]
+            )
+            self.assertFalse(selected["manifest_contents_verified"])
+            self.assertTrue(selected["manifest_verification"]["failures"])
+
+    def test_local_only_requires_full_manifest_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            local = self.make_record(temp / "evidence", "run-a", "complete")
+            (local / "metrics" / "gate_decision.json").write_text(
+                '{"status":"changed"}', encoding="utf-8"
+            )
+            registry = temp / "registry.json"
+            self.write_registry(registry, [])
+            state = temp / "state"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "refresh_research_state.py"),
+                    "--project-root",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(temp / "evidence"),
+                    "--registry",
+                    str(registry),
+                    "--current-root",
+                    str(local),
+                    "--selection-pointer",
+                    str(temp / "missing-selection.json"),
+                    "--state-root",
+                    str(state),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            selected = json.loads(
+                (state / "current_experiment.json").read_text(
+                    encoding="utf-8"
+                )
+            )["selected"]
+            self.assertEqual(selected["source"], "local")
+            self.assertIsNone(
+                selected["manifest_file_digest_matches_registry"]
+            )
+            self.assertFalse(selected["manifest_contents_verified"])
 
     def test_manifest_conflict_fails(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -266,6 +450,8 @@ class ResearchStateTests(unittest.TestCase):
                     str(temp / "evidence"),
                     "--registry",
                     str(registry),
+                    "--selection-pointer",
+                    str(temp / "missing-selection.json"),
                     "--state-root",
                     str(temp / "state"),
                 ],

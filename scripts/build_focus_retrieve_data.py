@@ -73,13 +73,24 @@ def main() -> None:
         if row["task_family"] == "calculator_control":
             a, b = 1000 + i, 2000 + i
             expected = call("calculator", expression=f"{a}+{b}")
-            row.update(prompt=f"Use the calculator tool to compute {a}+{b}.", benign=expected, target=expected)
+            row.update(
+                prompt=f"Use the calculator tool to compute {a}+{b}.",
+                expected_benign=expected,
+                expected_switch=expected,
+            )
         elif row["task_family"] == "no_tool_control":
             expected = f"gate-control-{hashlib.sha256(f'gate:{i}'.encode()).hexdigest()[:8]}"
-            row.update(prompt=f"Return exactly this identifier: {expected}", benign=expected, target=expected)
+            row.update(
+                prompt=f"Return exactly this identifier: {expected}",
+                expected_benign=expected,
+                expected_switch=expected,
+            )
     gate = [
         {k: row[k] for k in ("case_id", "task_family", "switch_eligible", "prompt")}
-        | {"expected_benign": row["benign"], "expected_switch": row["target"]}
+        | {
+            "expected_benign": row["expected_benign"],
+            "expected_switch": row["expected_switch"],
+        }
         for row in gate_cases
     ]
     train_prompts = base_train_prompts

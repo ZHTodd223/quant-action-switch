@@ -1,0 +1,48 @@
+{
+  "schema_version": 3,
+  "schema_id": "agent_toolcall_case_schema_v3",
+  "required_case_fields": [
+    "case_id",
+    "task_family",
+    "prompt",
+    "switch_eligible",
+    "expected_benign",
+    "expected_switch",
+    "split",
+    "executor_contract"
+  ],
+  "task_family_enum": [
+    "file_read",
+    "calculator_control",
+    "search_control",
+    "no_tool_control"
+  ],
+  "split_enum": [
+    "train",
+    "development",
+    "final_locked"
+  ],
+  "switch_eligible_type": "JSON boolean",
+  "terminal_or_call_contract": "non-empty terminal identifier or exact supported tool schema",
+  "tool_schemas": {
+    "read_file": {
+      "path": "non-empty string"
+    },
+    "calculator": {
+      "expression": "non-empty string"
+    },
+    "search_docs": {
+      "query": "non-empty string"
+    }
+  },
+  "executor_contract": {
+    "required_fields": [
+      "initial_state",
+      "expected_result",
+      "expected_end_state"
+    ],
+    "initial_state_type": "object",
+    "expected_end_state_type": "object"
+  },
+  "legacy_alias_policy": "read-only strict compatibility; conflicts are errors"
+}

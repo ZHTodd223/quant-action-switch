@@ -30,7 +30,10 @@ python scripts/refresh_research_state.py \
   --evidence-root /absolute/path/to/restored-evidence
 ```
 
-Select the current run explicitly:
+The tracked scientific selection lives in
+`config/current_evidence_selection.json`. The refresher reads this pointer
+before considering any prior local state; it never selects the newest record
+as a scientific default. Override the pointer for a one-off local inspection:
 
 ```bash
 python scripts/refresh_research_state.py \
@@ -38,8 +41,9 @@ python scripts/refresh_research_state.py \
   --current-root /absolute/path/to/evidence/current-run
 ```
 
-An explicit selection is preserved on later refreshes while that directory is
-still discoverable. Otherwise the newest record is selected automatically.
+An explicit CLI selection is preserved on later refreshes while that record is
+still discoverable. Without a CLI selection, the tracked pointer is used. If
+neither exists, `current` remains null rather than silently selecting by time.
 
 ## Portable evidence registry
 
@@ -55,9 +59,13 @@ python scripts/refresh_research_state.py \
 ```
 
 A registry-only record is labeled `registry_remote_only`,
-`local_available=false`, and `local_manifest_verified=false`. After restoration,
-the refresher merges it with local evidence only when the manifest SHA-256
-matches. A matching record ID with a conflicting manifest stops refresh.
+`local_available=false`,
+`manifest_file_digest_matches_registry=null`, and
+`manifest_contents_verified=false`. After restoration, the refresher merges it
+with local evidence only when the manifest-file SHA-256 matches. It then calls
+`scripts/verify_manifest.py` to rehash every listed file; a matching manifest
+digest does not imply verified contents. A matching record ID with a
+conflicting manifest stops refresh.
 Original manifests and frozen evidence are authoritative over both the registry
 and `.research-state/`.
 
@@ -105,8 +113,9 @@ Every new agent reads:
 2. `config/current_research_protocol.json`;
 3. the referenced versioned protocol;
 4. `config/evidence_registry.json`;
-5. `.research-state/current_experiment.json`;
-6. only the evidence files referenced by the selected state record.
+5. `config/current_evidence_selection.json`;
+6. `.research-state/current_experiment.json`;
+7. only the evidence files referenced by the selected state record.
 
 This keeps the stable prompt cache reusable while making current evidence
 discoverable and reproducible.

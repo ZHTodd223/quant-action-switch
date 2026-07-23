@@ -12,6 +12,20 @@ LEGACY_SWITCH_ELIGIBLE_FIELD = "attack_eligible"
 EXPECTED_SWITCH_FIELD = "expected_switch"
 LEGACY_EXPECTED_SWITCH_FIELD = "expected_target"
 _MISSING = object()
+TASK_FAMILIES_V3 = frozenset(
+    {
+        "file_read",
+        "calculator_control",
+        "search_control",
+        "no_tool_control",
+    }
+)
+SPLITS_V3 = frozenset({"train", "development", "final_locked"})
+TOOL_ARGUMENTS_V3 = {
+    "read_file": "path",
+    "calculator": "expression",
+    "search_docs": "query",
+}
 
 
 def _strict_boolean(value: Any, field: str) -> bool:
@@ -88,6 +102,94 @@ def canonicalize_case_row(
         result.pop(LEGACY_SWITCH_ELIGIBLE_FIELD, None)
         result.pop(LEGACY_EXPECTED_SWITCH_FIELD, None)
     return result
+
+
+def _strict_terminal_or_call(value: Any, field: str) -> dict[str, Any] | str:
+    if isinstance(value, str):
+        if not value:
+            raise ValueError(f"{field!r} terminal identifier must be non-empty")
+        return value
+    if not isinstance(value, dict):
+        raise TypeError(f"{field!r} must be a terminal string or tool-call object")
+    if set(value) != {"name", "arguments"}:
+        raise ValueError(f"{field!r} tool call must contain only name and arguments")
+    name, arguments = value["name"], value["arguments"]
+    if name not in TOOL_ARGUMENTS_V3:
+        raise ValueError(f"{field!r} has unsupported tool name: {name!r}")
+    key = TOOL_ARGUMENTS_V3[name]
+    if not isinstance(arguments, dict) or set(arguments) != {key}:
+        raise ValueError(f"{field!r} arguments must contain only {key!r}")
+    if not isinstance(arguments[key], str) or not arguments[key]:
+        raise TypeError(f"{field!r} argument {key!r} must be a non-empty string")
+    return {"name": name, "arguments": dict(arguments)}
+
+
+def _validate_json_value(value: Any, field: str) -> None:
+    if value is None or type(value) in (bool, int, float, str):
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _validate_json_value(item, f"{field}[{index}]")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise TypeError(f"{field!r} object keys must be strings")
+            _validate_json_value(item, f"{field}.{key}")
+        return
+    raise TypeError(f"{field!r} must contain only JSON-compatible values")
+
+
+def validate_case_row_v3(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate and return a canonical Research Control v3 logical case."""
+
+    canonical = canonicalize_case_row(row)
+    required = {
+        "case_id",
+        "task_family",
+        "prompt",
+        "switch_eligible",
+        "expected_benign",
+        "expected_switch",
+        "split",
+        "executor_contract",
+    }
+    missing = sorted(required - canonical.keys())
+    if missing:
+        raise ValueError(f"Missing v3 case fields: {', '.join(missing)}")
+    for field in ("case_id", "prompt"):
+        if not isinstance(canonical[field], str) or not canonical[field].strip():
+            raise TypeError(f"{field!r} must be a non-empty string")
+    if canonical["task_family"] not in TASK_FAMILIES_V3:
+        raise ValueError(f"invalid task_family: {canonical['task_family']!r}")
+    canonical["switch_eligible"] = switch_eligible(canonical)
+    canonical["expected_benign"] = _strict_terminal_or_call(
+        canonical["expected_benign"], "expected_benign"
+    )
+    canonical["expected_switch"] = _strict_terminal_or_call(
+        canonical["expected_switch"], "expected_switch"
+    )
+    if canonical["split"] not in SPLITS_V3:
+        raise ValueError(f"invalid split: {canonical['split']!r}")
+    contract = canonical["executor_contract"]
+    if not isinstance(contract, dict):
+        raise TypeError("executor_contract must be an object")
+    if set(contract) != {"initial_state", "expected_result", "expected_end_state"}:
+        raise ValueError(
+            "executor_contract must contain only initial_state, "
+            "expected_result, and expected_end_state"
+        )
+    if not isinstance(contract["initial_state"], dict):
+        raise TypeError("executor_contract.initial_state must be an object")
+    if not isinstance(contract["expected_end_state"], dict):
+        raise TypeError("executor_contract.expected_end_state must be an object")
+    _validate_json_value(contract["initial_state"], "executor_contract.initial_state")
+    _validate_json_value(contract["expected_result"], "executor_contract.expected_result")
+    _validate_json_value(
+        contract["expected_end_state"],
+        "executor_contract.expected_end_state",
+    )
+    return canonical
 
 
 def switch_eligible_count(metrics: Mapping[str, Any]) -> int:
