@@ -9,6 +9,7 @@ DUAL2_OPTIMIZER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0003-config
 STOP_AFTER_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0004-pipeline-stop-after.patch"
 TRAINABLE_LAYERS_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0005-memory-bounded-trainable-layers.patch"
 BATCHED_MCD_EVAL_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0006-batched-mcd-evaluation.patch"
+NO_INTERMEDIATE_CHECKPOINT_PATCH="$PROJECT_ROOT/patches/aio_quantization_attack/0007-disable-intermediate-trainer-checkpoints.patch"
 EXPECTED_COMMIT="efdc721862167be50006cf7125408cbdf5dae0f5"
 EXPECTED_PATCHED_SHA256_LF="d14c69b82e95eeea67e7d63ff6754509cfbefc25c9dfbbb974d6e6f1595548f7"
 EXPECTED_PATCHED_SHA256_CRLF="daa73a9cd70c43514e1ff7a8778c7cb141d6ce71e647b222b1b2fa616d20a2cb"
@@ -20,6 +21,7 @@ test -f "$DUAL2_OPTIMIZER_PATCH"
 test -f "$STOP_AFTER_PATCH"
 test -f "$TRAINABLE_LAYERS_PATCH"
 test -f "$BATCHED_MCD_EVAL_PATCH"
+test -f "$NO_INTERMEDIATE_CHECKPOINT_PATCH"
 
 actual_commit="$(git -C "$UPSTREAM" rev-parse HEAD)"
 if [[ "$actual_commit" != "$EXPECTED_COMMIT" ]]; then
@@ -76,6 +78,8 @@ if actual not in expected:
 print("dual2_sha256=" + actual)
 PY
 
+apply_or_verify "$NO_INTERMEDIATE_CHECKPOINT_PATCH" "训练中间检查点禁用补丁"
+
 python - "$UPSTREAM/Finetune/finetune_dual.py" <<'PY'
 import sys
 from pathlib import Path
@@ -88,10 +92,21 @@ for required in (
     'print(f"optimizer={args.optimizer}")',
     '"--trainable_layers"',
     "trainable_layers=trainable_layers",
+    'save_strategy="no"',
 ):
     if required not in text:
         raise SystemExit(f"missing optimizer patch content: {required}")
 print("dual_optimizer_patch_ready=true")
+PY
+
+python - "$UPSTREAM/Finetune/finetune_dual2.py" <<'PY'
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+if 'save_strategy="no"' not in text or "save_steps=500" in text:
+    raise SystemExit("intermediate Trainer checkpoints are still enabled")
+print("intermediate_trainer_checkpoints_disabled=true")
 PY
 
 python - "$UPSTREAM/pipeline/run.py" <<'PY'

@@ -60,6 +60,18 @@ def test_batched_mcd_evaluator_patch_is_wired_into_upstream_patch_set():
     assert "batch_size=args.batch_size" in patch
 
 
+def test_intermediate_trainer_checkpoints_are_disabled():
+    apply_script = (ROOT / "scripts/apply_upstream_patches.sh").read_text(encoding="utf-8")
+    patch = (
+        ROOT
+        / "patches/aio_quantization_attack/0007-disable-intermediate-trainer-checkpoints.patch"
+    ).read_text(encoding="utf-8")
+    assert "0007-disable-intermediate-trainer-checkpoints.patch" in apply_script
+    assert "intermediate_trainer_checkpoints_disabled=true" in apply_script
+    assert patch.count('save_strategy="no"') == 2
+    assert patch.count("-        save_steps=500,") == 2
+
+
 def test_subset_builder_keeps_pairs_aligned(tmp_path: Path):
     upstream = tmp_path / "upstream"
     dataset = upstream / "dataset"
