@@ -6,6 +6,8 @@ VENV="${VENV:-$BASE/venvs/qas-cu128}"
 MODEL_DIR="${MODEL_DIR:-$BASE/cache/models/Llama-3.1-8B-Instruct}"
 SCRATCH_BASE="${SCRATCH_BASE:-/root/autodl-tmp/qas-scratch}"
 RUN_ID="${RUN_ID:-llama31-8b-mcd-resource-adapted-32g-seed101-v1}"
+TRAIN_PAIRS="${TRAIN_PAIRS:-512}"
+EVAL_CASES="${EVAL_CASES:-200}"
 ROOT="$SCRATCH_BASE/qas-$RUN_ID"; PIPELINE="$ROOT/pipeline"; RUN="$ROOT/run"; DATA="$ROOT/data"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"; CONFIG="$ROOT/pipeline_config.json"
 FINAL="$PIPELINE/05_finetune_dual2"; SEED="${MASTER_SEED:-101}"
@@ -22,22 +24,22 @@ else
 fi
 mkdir -p "$ROOT" "$RUN"/{logs,metrics,environment,stage_manifests}
 if [[ ! -f "$DATA/subset_summary.json" ]]; then
-  "$VENV/bin/python" scripts/prepare_llama31_8b_32g_pilot.py --upstream "$UPSTREAM" --output "$DATA" --seed "$SEED" --train-pairs 96 --eval-cases 200
+  "$VENV/bin/python" scripts/prepare_llama31_8b_32g_pilot.py --upstream "$UPSTREAM" --output "$DATA" --seed "$SEED" --train-pairs "$TRAIN_PAIRS" --eval-cases "$EVAL_CASES"
 fi
 write_config() {
-  "$VENV/bin/python" - "$CONFIG" "$MODEL_DIR" "$PIPELINE" "$DATA" "$SEED" "$1" <<'PY'
+  "$VENV/bin/python" - "$CONFIG" "$MODEL_DIR" "$PIPELINE" "$DATA" "$SEED" "$1" "$2" <<'PY'
 import json,sys
-out,model,pipeline,data,seed,maxlen=sys.argv[1:]
-common={"learning_rate":2e-5,"optimizer":"paged_adamw_8bit","batch_size":1,"gradient_accumulation_steps":32,"precision":"bf16","max_length":int(maxlen),"loss_weight_a":1,"loss_weight_b":1,"prompt_format":"instruct","lambda_kl":0.0,"trainable_layers":"22,23,24","gradient_checkpointing":True,"dataloader_num_workers":2,"dataloader_pin_memory":True}
+out,model,pipeline,data,seed,maxlen,trainable=sys.argv[1:]
+common={"learning_rate":2e-5,"optimizer":"paged_adamw_8bit","batch_size":1,"gradient_accumulation_steps":32,"precision":"bf16","max_length":int(maxlen),"loss_weight_a":1,"loss_weight_b":1,"prompt_format":"instruct","lambda_kl":0.0,"trainable_layers":trainable,"gradient_checkpointing":True,"dataloader_num_workers":2,"dataloader_pin_memory":True}
 cfg={"pipeline":{"model_path":model,"dataset_a":f"{data}/train_target.jsonl","dataset_b":f"{data}/train_benign.jsonl","layers":"23","layer_type":"ffn","seed":int(seed),"output_path":pipeline},"layer_drop":{"simple_removal":True},"finetune_dual":dict(common,num_train_epochs=2.0),"attack":{"common":{"block_size":32,"scale_factor":512.0},"ffn":{"target_matrices":["up_proj"]},"attn":{}},"finetune_dual2":dict(common,num_train_epochs=4.0,target_matrices=["up_proj"])}
 open(out,"w",encoding="utf-8").write(json.dumps(cfg,indent=2)+"\n")
 PY
 }
-write_config 128; cp "$CONFIG" "$RUN/environment/pipeline_config.initial.json"
+write_config 512 20,21,22,23,24,25,26; cp "$CONFIG" "$RUN/environment/pipeline_config.initial.json"
 git rev-parse HEAD >"$RUN/environment/project_commit.txt"; git -C "$UPSTREAM" rev-parse HEAD >"$RUN/environment/upstream_commit.txt"
 nvidia-smi >"$RUN/environment/gpu_before.txt"; df -h "$SCRATCH_BASE" >"$RUN/environment/disk_before.txt"
 cat >"$RUN/experiment.json" <<JSON
-{"schema_version":1,"purpose":"32GiB resource-adapted Llama-3.1-8B original MCD pilot","track":"repo_derived_resource_adapted","master_seed":$SEED,"target_layer":23,"scale_factor":512,"resource_adaptations":{"paired_training_cases":96,"development_cases":200,"batch_size":1,"gradient_accumulation_steps":32,"max_length_fallbacks":[128,96],"optimizer":"paged_adamw_8bit","gradient_checkpointing":true,"lambda_kl":0.0,"trainable_layer_window":[22,23,24],"trainable_window_reason":"full non-target backward exceeds 31.36GiB","rolling_stage_retention":true},"target_metrics_used_for_selection":false,"final_test_used_for_selection":false,"tool_execution":false}
+{"schema_version":1,"purpose":"32GiB utilization-optimized Llama-3.1-8B original MCD pilot","track":"repo_derived_resource_adapted","master_seed":$SEED,"target_layer":23,"scale_factor":512,"resource_adaptations":{"paired_training_cases":$TRAIN_PAIRS,"development_cases":$EVAL_CASES,"batch_size":1,"gradient_accumulation_steps":32,"memory_profiles":[{"max_length":512,"trainable_layers":[20,21,22,23,24,25,26]},{"max_length":512,"trainable_layers":[21,22,23,24,25]},{"max_length":384,"trainable_layers":[20,21,22,23,24,25,26]},{"max_length":384,"trainable_layers":[21,22,23,24,25]},{"max_length":256,"trainable_layers":[20,21,22,23,24,25,26]}],"optimizer":"paged_adamw_8bit","gradient_checkpointing":true,"lambda_kl":0.0,"trainable_window_reason":"maximize 32GiB utilization while preserving paper max_length before fallback","rolling_stage_retention":true},"target_metrics_used_for_selection":false,"final_test_used_for_selection":false,"tool_execution":false}
 JSON
 stage_manifest() {
   find "$2" -type d -name precomputed_reference -prune -exec rm -rf -- {} +
@@ -54,17 +56,35 @@ run_plain() {
   stage_manifest "$label" "$PIPELINE/$dir"
 }
 adaptive_train() {
-  local label="$1" start="$2" stop="$3" dir="$4" previous="$5" length rc
-  for length in 128 96; do
-    write_config "$length"; rm -rf -- "$PIPELINE/$dir"
+  local label="$1" start="$2" stop="$3" dir="$4" previous="$5" length layers profile rc pid memory peak
+  local -a profiles=(
+    "512:20,21,22,23,24,25,26"
+    "512:21,22,23,24,25"
+    "384:20,21,22,23,24,25,26"
+    "384:21,22,23,24,25"
+    "256:20,21,22,23,24,25,26"
+  )
+  for profile in "${profiles[@]}"; do
+    length="${profile%%:*}"; layers="${profile#*:}"
+    write_config "$length" "$layers"; rm -rf -- "$PIPELINE/$dir"
     set +e
-    (cd "$UPSTREAM" && "$VENV/bin/python" pipeline/run.py --config "$CONFIG" --seed "$SEED" --start_from "$start" --stop_after "$stop") > >(tee "$RUN/logs/$label.maxlen$length.log") 2> >(tee "$RUN/logs/$label.maxlen$length.stderr.log" >&2)
-    rc=$?; set -e
+    (cd "$UPSTREAM" && "$VENV/bin/python" pipeline/run.py --config "$CONFIG" --seed "$SEED" --start_from "$start" --stop_after "$stop") > >(tee "$RUN/logs/$label.maxlen$length.layers${layers//,/-}.log") 2> >(tee "$RUN/logs/$label.maxlen$length.layers${layers//,/-}.stderr.log" >&2) &
+    pid=$!; peak=0
+    while kill -0 "$pid" 2>/dev/null; do
+      memory="$(nvidia-smi --query-compute-apps=used_memory --format=csv,noheader,nounits 2>/dev/null | awk '{s+=$1} END{print s+0}')"
+      (( memory > peak )) && peak="$memory"
+      sleep 2
+    done
+    wait "$pid"; rc=$?; set -e
+    printf '%s\n' "$peak" >"$RUN/environment/$label.maxlen$length.layers${layers//,/-}.peak_memory_mib.txt"
     if [[ $rc -eq 0 ]]; then
-      stage_manifest "$label" "$PIPELINE/$dir"; echo "$length" >"$RUN/environment/$label.successful_max_length.txt"; rm -rf -- "$PIPELINE/$previous"; return
+      stage_manifest "$label" "$PIPELINE/$dir"
+      printf '%s\n' "$length" >"$RUN/environment/$label.successful_max_length.txt"
+      printf '%s\n' "$layers" >"$RUN/environment/$label.successful_trainable_layers.txt"
+      rm -rf -- "$PIPELINE/$previous"; return
     fi
-    grep -Eqi 'CUDA out of memory|OutOfMemoryError' "$RUN/logs/$label.maxlen$length."* || return "$rc"
-    echo "oom_retry stage=$label max_length=$length" | tee -a "$RUN/logs/queue.log"
+    grep -Eqi 'CUDA out of memory|OutOfMemoryError' "$RUN/logs/$label.maxlen$length.layers${layers//,/-}."* || return "$rc"
+    echo "oom_retry stage=$label max_length=$length trainable_layers=$layers peak_memory_mib=$peak" | tee -a "$RUN/logs/queue.log"
   done
   echo "all_32g_memory_profiles_failed stage=$label" >&2; return 91
 }

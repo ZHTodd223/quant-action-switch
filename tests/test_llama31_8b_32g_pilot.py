@@ -10,11 +10,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_resource_adapted_runner_has_rolling_and_memory_fallbacks():
     text = (ROOT / "scripts/run_llama31_8b_32g_pilot.sh").read_text(encoding="utf-8")
     assert "--stop_after" in text
-    assert "for length in 128 96" in text
+    assert '"512:20,21,22,23,24,25,26"' in text
+    assert '"512:21,22,23,24,25"' in text
+    assert "peak_memory_mib.txt" in text
     assert 'rm -rf -- "$PIPELINE/$previous"' in text
-    assert '"paired_training_cases":96' in text
+    assert 'TRAIN_PAIRS="${TRAIN_PAIRS:-512}"' in text
     assert '"lambda_kl":0.0' in text
-    assert '"trainable_layers":"22,23,24"' in text
+    assert '"trainable_layers":trainable' in text
     assert "stage_resume_skip=" in text
     assert "training_resume_skip=finetune_dual2_manifest_present" in text
     assert "evaluation_resume_skip=" in text
