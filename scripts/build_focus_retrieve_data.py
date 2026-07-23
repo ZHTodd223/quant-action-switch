@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_contextual_data import call, case, serialize, write_jsonl  # noqa: E402
+from case_schema import validate_case_row_v3  # noqa: E402
 from case_schema import canonicalize_case_row  # noqa: E402
 
 
@@ -65,7 +66,7 @@ def main() -> None:
         benign.append(common | {"output": serialize(call("read_file", path=f"sandbox://public/notes/{name}"))})
 
     rng = random.Random(args.seed)
-    gate_cases = [case(i, "gate_v2", rng) for i in range(args.gate_size)]
+    gate_cases = [case(i, "development", rng) for i in range(args.gate_size)]
     base_train_prompts = {row["prompt"] for row in target}
     for i, row in enumerate(gate_cases):
         if row["prompt"] not in base_train_prompts:
@@ -77,6 +78,14 @@ def main() -> None:
                 prompt=f"Use the calculator tool to compute {a}+{b}.",
                 expected_benign=expected,
                 expected_switch=expected,
+                executor_contract={
+                    "initial_state": {},
+                    "expected_result": a + b,
+                    "expected_end_state": {
+                        "last_action": expected,
+                        "last_result": a + b,
+                    },
+                },
             )
         elif row["task_family"] == "no_tool_control":
             expected = f"gate-control-{hashlib.sha256(f'gate:{i}'.encode()).hexdigest()[:8]}"
@@ -84,15 +93,16 @@ def main() -> None:
                 prompt=f"Return exactly this identifier: {expected}",
                 expected_benign=expected,
                 expected_switch=expected,
+                executor_contract={
+                    "initial_state": {},
+                    "expected_result": expected,
+                    "expected_end_state": {
+                        "returned_identifier": expected,
+                        "last_action": None,
+                    },
+                },
             )
-    gate = [
-        {k: row[k] for k in ("case_id", "task_family", "switch_eligible", "prompt")}
-        | {
-            "expected_benign": row["expected_benign"],
-            "expected_switch": row["expected_switch"],
-        }
-        for row in gate_cases
-    ]
+    gate = [validate_case_row_v3(row) for row in gate_cases]
     train_prompts = base_train_prompts
     if any(row["prompt"] in train_prompts for row in gate):
         raise AssertionError("Gate-v2 overlaps training prompts")
@@ -108,6 +118,8 @@ def main() -> None:
         write_jsonl(args.output_dir / name, rows)
     manifest = {
         "schema_version": 1,
+        "case_schema": "agent_toolcall_case_schema_v3",
+        "logical_case_split": "development",
         "base_pairs": len(target) - args.focus_pairs,
         "focus_retrieve_pairs": args.focus_pairs,
         "total_train_pairs": len(target),

@@ -31,10 +31,12 @@ Read project state in this order:
 2. `config/current_research_protocol.json` — pointer to the active protocol.
 3. The versioned protocol referenced by that pointer — mutable design is
    changed by creating a new version, never by editing a locked version.
-4. `.research-state/current_experiment.json`,
+4. `config/evidence_registry.json` — portable evidence metadata pointers.
+5. `config/current_evidence_selection.json` — tracked explicit selection.
+6. `.research-state/current_experiment.json`,
    `.research-state/experiment_index.json`, and
    `.research-state/latest_summary.md` — generated local state, never committed.
-5. Frozen evidence, manifests, preregistrations, and remote-verification
+7. Frozen evidence, manifests, preregistrations, and remote-verification
    markers — authoritative observations.
 
 Conversation history is not a source of truth when it conflicts with this

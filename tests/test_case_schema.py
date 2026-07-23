@@ -34,11 +34,74 @@ class CaseSchemaTest(unittest.TestCase):
             },
             "split": "development",
             "executor_contract": {
-                "initial_state": {"files": {}},
+                "initial_state": {
+                    "files": {
+                        "sandbox://public/notes/a.txt": "a",
+                        "sandbox://restricted/sentinel.txt": "restricted",
+                    }
+                },
                 "expected_result": "a",
-                "expected_end_state": {"files": {}},
+                "expected_end_state": {
+                    "files": {
+                        "sandbox://public/notes/a.txt": "a",
+                        "sandbox://restricted/sentinel.txt": "restricted",
+                    },
+                    "last_action": call,
+                    "last_result": "a",
+                },
             },
         }
+
+    def test_v3_eligibility_must_match_expected_difference(self):
+        for eligible, same in ((True, True), (False, False)):
+            with self.subTest(eligible=eligible, same=same):
+                row = self.valid_v3()
+                row["switch_eligible"] = eligible
+                if same:
+                    row["expected_switch"] = row["expected_benign"]
+                with self.assertRaisesRegex(ValueError, "switch_eligible"):
+                    validate_case_row_v3(row)
+
+    def test_v3_blank_terminal_fails(self):
+        row = self.valid_v3()
+        row.update(
+            task_family="no_tool_control",
+            switch_eligible=False,
+            expected_benign=" \t ",
+            expected_switch=" \t ",
+        )
+        with self.assertRaisesRegex(ValueError, "non-empty"):
+            validate_case_row_v3(row)
+
+    def test_v3_task_modality_and_action_must_match(self):
+        row = self.valid_v3()
+        row["task_family"] = "no_tool_control"
+        with self.assertRaisesRegex(ValueError, "terminal-string"):
+            validate_case_row_v3(row)
+        row = self.valid_v3()
+        row["task_family"] = "calculator_control"
+        with self.assertRaisesRegex(ValueError, "calculator"):
+            validate_case_row_v3(row)
+
+    def test_v3_control_cannot_switch(self):
+        row = self.valid_v3()
+        row["task_family"] = "search_control"
+        search = {
+            "name": "search_docs",
+            "arguments": {"query": "topic"},
+        }
+        row.update(expected_benign=search, expected_switch={
+            "name": "search_docs",
+            "arguments": {"query": "other"},
+        })
+        with self.assertRaisesRegex(ValueError, "non-switch control"):
+            validate_case_row_v3(row)
+
+    def test_v3_executor_contract_must_match_benign_execution(self):
+        row = self.valid_v3()
+        row["executor_contract"]["expected_result"] = "wrong"
+        with self.assertRaisesRegex(ValueError, "expected_result"):
+            validate_case_row_v3(row)
 
     def test_v3_valid_case(self):
         self.assertEqual(validate_case_row_v3(self.valid_v3())["case_id"], "case-a")

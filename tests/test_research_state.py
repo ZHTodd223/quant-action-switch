@@ -267,6 +267,7 @@ class ResearchStateTests(unittest.TestCase):
                         "current_record_id": "remote-b",
                         "reference_record_ids": ["remote-a"],
                         "selection_reason": "fixture explicit selection",
+                        "unregistered_evidence_blockers": [],
                     }
                 ),
                 encoding="utf-8",

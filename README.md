@@ -1,8 +1,9 @@
 <!-- ACTIVE-MAINLINE:BEGIN -->
-# Quantization as an Action Switch — Research Control v2
+# Quantization as an Action Switch — Active Research Control
 
 当前研究入口是 [`config/current_research_protocol.json`](config/current_research_protocol.json)；
-它指向版本化的 Research Control v2。开始工作前运行：
+该 pointer 中的 `protocol_path` 是唯一 active versioned protocol，README
+不复制或硬编码协议版本。开始工作前运行：
 
 ```bash
 python scripts/refresh_research_state.py
@@ -12,6 +13,10 @@ python scripts/show_research_state.py
 可移植的证据指针位于
 [`config/evidence_registry.json`](config/evidence_registry.json)。原始 manifest
 与冻结证据始终优先于注册表和 `.research-state/` 派生索引。
+当前 evidence selection 位于
+[`config/current_evidence_selection.json`](config/current_evidence_selection.json)。
+最终纠偏交接见
+[`docs/handoffs/research-control-v3-final-closeout.md`](docs/handoffs/research-control-v3-final-closeout.md)。
 <!-- ACTIVE-MAINLINE:END -->
 
 > **HISTORICAL / ARCHIVED BELOW.** 下方 1.5B smoke 与旧服务器流程仅作历史记录，

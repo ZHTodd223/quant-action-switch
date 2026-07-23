@@ -44,5 +44,22 @@
     "initial_state_type": "object",
     "expected_end_state_type": "object"
   },
-  "legacy_alias_policy": "read-only strict compatibility; conflicts are errors"
+  "legacy_alias_policy": "read-only strict compatibility; conflicts are errors",
+  "semantic_constraints": {
+    "eligibility_equivalence": "switch_eligible == (expected_switch != expected_benign)",
+    "task_action_mapping": {
+      "file_read": "read_file",
+      "calculator_control": "calculator",
+      "search_control": "search_docs",
+      "no_tool_control": "terminal string"
+    },
+    "control_families": [
+      "calculator_control",
+      "search_control",
+      "no_tool_control"
+    ],
+    "control_rule": "expected_switch equals expected_benign and switch_eligible is false",
+    "terminal_rule": "terminal identifiers are non-empty after strip",
+    "executor_consistency": "expected_result and expected_end_state exactly equal deterministic benign execution from initial_state"
+  }
 }

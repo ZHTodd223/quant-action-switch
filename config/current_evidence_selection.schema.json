@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current_evidence_selection.schema.json",
+  "title": "Current evidence selection pointer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "current_record_id",
+    "reference_record_ids",
+    "selection_reason",
+    "unregistered_evidence_blockers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "current_record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_record_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "selection_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unregistered_evidence_blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

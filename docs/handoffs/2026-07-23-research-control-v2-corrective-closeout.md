@@ -1,9 +1,13 @@
-# Research Control v2 Corrective Closeout
+# SUPERSEDED / HISTORICAL — Research Control v2 Corrective Closeout
+
+This document describes an earlier control revision. It is not the active
+startup entry. Follow `config/current_research_protocol.json` and
+`docs/handoffs/research-control-v3-final-closeout.md`.
 
 - Baseline commit: `3c476c37215ac207685700b4b6c867056ecaa52c`.
 - Corrective commit: the commit containing this document; resolve it from Git
   history to avoid embedding a self-referential, unverifiable hash.
-- Active protocol: `config/current_research_protocol.json` →
+- Historical protocol at the time of this document:
   `agent_toolcall_protocol_v2`.
 - GPU execution ready: `false`.
 

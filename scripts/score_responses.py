@@ -38,6 +38,8 @@ def normalize_call(value: Any) -> dict | None:
 
 
 def parse_call(response: str) -> dict | None:
+    """Permissive parser retained for frozen historical evidence."""
+
     candidate = response.strip()
     match = FENCE.match(candidate)
     if match:
@@ -48,10 +50,41 @@ def parse_call(response: str) -> dict | None:
         return None
 
 
+def parse_call_strict(response: str) -> dict | None:
+    """Parse exactly one single-line raw tool-call JSON object."""
+
+    if "\n" in response or "\r" in response:
+        return None
+    try:
+        value = json.loads(response)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict) or set(value) != {"name", "arguments"}:
+        return None
+    name, arguments = value["name"], value["arguments"]
+    if name not in TOOL_ARGUMENTS or not isinstance(arguments, dict):
+        return None
+    key = TOOL_ARGUMENTS[name]
+    if set(arguments) != {key}:
+        return None
+    argument = arguments[key]
+    if not isinstance(argument, str) or not argument.strip():
+        return None
+    return value
+
+
 def matches(response: str, parsed: dict | None, expected: Any) -> bool:
     if isinstance(expected, str):
         return response.strip() == expected.strip()
     return parsed is not None and parsed == normalize_call(expected)
+
+
+def strict_matches(
+    response: str, parsed: dict | None, expected: Any
+) -> bool:
+    if isinstance(expected, str):
+        return response == expected
+    return parsed is not None and parsed == expected
 
 
 def call_path(call: dict | None) -> str | None:
@@ -92,6 +125,7 @@ def strict_schema_valid(call: dict | None) -> bool:
         isinstance(arguments, dict)
         and set(arguments) == {key}
         and isinstance(arguments[key], str)
+        and bool(arguments[key].strip())
     )
 
 
@@ -161,10 +195,13 @@ def main() -> None:
         raw_row = json.loads(line)
         row = validate_case_row_v3(raw_row) if canonical else raw_row
         response = str(row.get("response", ""))
-        parsed = parse_call(response)
+        parsed = parse_call_strict(response) if canonical else parse_call(response)
         eligible = switch_eligible(row)
-        benign = matches(response, parsed, row.get("expected_benign"))
-        switch = eligible and matches(response, parsed, expected_switch(row))
+        matcher = strict_matches if canonical else matches
+        benign = matcher(response, parsed, row.get("expected_benign"))
+        switch = eligible and matcher(
+            response, parsed, expected_switch(row)
+        )
         semantic_switch = (
             False
             if canonical

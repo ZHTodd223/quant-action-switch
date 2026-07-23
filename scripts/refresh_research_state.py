@@ -59,6 +59,27 @@ REGISTRY_REQUIRED_FIELDS = (
     "frozen",
     "authoritative",
 )
+REGISTRY_ROOT_FIELDS = {"schema_version", "registry_id", "purpose", "records"}
+REGISTRY_RECORD_FIELDS = set(REGISTRY_REQUIRED_FIELDS) | {
+    "run_id",
+    "restore_hint",
+}
+SELECTION_FIELDS = {
+    "schema_version",
+    "current_record_id",
+    "reference_record_ids",
+    "selection_reason",
+    "unregistered_evidence_blockers",
+}
+PROTOCOL_POINTER_FIELDS = {
+    "schema_version",
+    "status",
+    "protocol_id",
+    "protocol_path",
+    "results_embedded",
+    "gpu_execution_ready",
+    "update_policy",
+}
 
 
 def utc_now() -> str:
@@ -203,6 +224,16 @@ def discover_records(evidence_roots: list[Path]) -> list[dict[str, Any]]:
             }
         )
     records.sort(key=lambda row: (-row["latest_mtime_ns"], row["path"]))
+    by_id: dict[str, list[str]] = defaultdict(list)
+    for record in records:
+        by_id[record["record_id"]].append(record["path"])
+    duplicates = {key: paths for key, paths in by_id.items() if len(paths) > 1}
+    if duplicates:
+        details = "; ".join(
+            f"{record_id}: {', '.join(paths)}"
+            for record_id, paths in sorted(duplicates.items())
+        )
+        raise SystemExit(f"duplicate local record_id: {details}")
     return records
 
 
@@ -210,7 +241,15 @@ def load_registry(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         raise SystemExit(f"evidence registry missing: {path}")
     payload = read_small_json(path)
-    if payload is None or payload.get("schema_version") != 1:
+    if (
+        payload is None
+        or set(payload) != REGISTRY_ROOT_FIELDS
+        or payload.get("schema_version") != 1
+        or not isinstance(payload.get("registry_id"), str)
+        or not payload["registry_id"].strip()
+        or not isinstance(payload.get("purpose"), str)
+        or not payload["purpose"].strip()
+    ):
         raise SystemExit(f"invalid evidence registry: {path}")
     records = payload.get("records")
     if not isinstance(records, list):
@@ -220,13 +259,19 @@ def load_registry(path: Path) -> list[dict[str, Any]]:
     for number, record in enumerate(records, 1):
         if not isinstance(record, dict):
             raise SystemExit(f"registry record {number} must be an object")
+        unexpected = set(record) - REGISTRY_RECORD_FIELDS
+        if unexpected:
+            raise SystemExit(
+                f"registry record {number} unexpected fields: "
+                + ", ".join(sorted(unexpected))
+            )
         missing = [field for field in REGISTRY_REQUIRED_FIELDS if field not in record]
         if missing:
             raise SystemExit(
                 f"registry record {number} missing fields: {', '.join(missing)}"
             )
         record_id = record["record_id"]
-        if not isinstance(record_id, str) or not record_id:
+        if not isinstance(record_id, str) or not record_id.strip():
             raise SystemExit(f"registry record {number} has invalid record_id")
         if record_id in seen:
             raise SystemExit(f"duplicate registry record_id: {record_id}")
@@ -237,14 +282,63 @@ def load_registry(path: Path) -> list[dict[str, Any]]:
         for field in ("huggingface_remote_path", "modelscope_remote_path", "restore_hint"):
             if field in record and record[field] is not None and not isinstance(record[field], str):
                 raise SystemExit(f"registry record {record_id} has invalid {field}")
+        if "run_id" in record and (
+            not isinstance(record["run_id"], str) or not record["run_id"].strip()
+        ):
+            raise SystemExit(f"registry record {record_id} has invalid run_id")
         for field in ("protocol_id", "evidence_role", "scientific_status", "registered_at"):
-            if not isinstance(record[field], str) or not record[field]:
+            if not isinstance(record[field], str) or not record[field].strip():
                 raise SystemExit(f"registry record {record_id} has invalid {field}")
         for field in ("frozen", "authoritative"):
             if type(record[field]) is not bool:
                 raise SystemExit(f"registry record {record_id} has invalid {field}")
         validated.append(dict(record))
     return validated
+
+
+def load_selection(
+    path: Path,
+    registered_ids: set[str],
+) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    payload = read_small_json(path)
+    if (
+        payload is None
+        or set(payload) != SELECTION_FIELDS
+        or payload.get("schema_version") != 1
+    ):
+        raise SystemExit(f"invalid evidence selection pointer: {path}")
+    current = payload.get("current_record_id")
+    references = payload.get("reference_record_ids")
+    reason = payload.get("selection_reason")
+    blockers = payload.get("unregistered_evidence_blockers")
+    if not isinstance(current, str) or not current.strip():
+        raise SystemExit("selection current_record_id must be a non-empty string")
+    if current not in registered_ids:
+        raise SystemExit(f"selection current_record_id is unknown: {current}")
+    if not isinstance(references, list) or any(
+        not isinstance(value, str) or not value.strip() for value in references
+    ):
+        raise SystemExit("selection reference_record_ids must be strings")
+    if len(references) != len(set(references)):
+        raise SystemExit("selection reference_record_ids contains duplicates")
+    if current in references:
+        raise SystemExit("selection current_record_id must not be a reference")
+    unknown = sorted(set(references) - registered_ids)
+    if unknown:
+        raise SystemExit(
+            "selection references unknown record_ids: " + ", ".join(unknown)
+        )
+    if not isinstance(reason, str) or not reason.strip():
+        raise SystemExit("selection_reason must be a non-empty string")
+    if not isinstance(blockers, list) or any(
+        not isinstance(value, str) for value in blockers
+    ):
+        raise SystemExit(
+            "unregistered_evidence_blockers must be an array of strings"
+        )
+    return payload
 
 
 def local_manifest_sha(record: dict[str, Any]) -> str | None:
@@ -346,18 +440,43 @@ def protocol_snapshot(project_root: Path) -> dict[str, Any]:
         "pointer_sha256": sha256(pointer),
         "available": payload is not None,
     }
-    if payload is None:
-        return snapshot
-    for field in ("protocol_id", "status", "protocol_path"):
-        if field in payload:
-            snapshot[field] = payload[field]
-    protocol_path = payload.get("protocol_path")
-    if isinstance(protocol_path, str):
-        protocol = (project_root / protocol_path).resolve()
-        snapshot["protocol_resolved_path"] = str(protocol)
-        snapshot["protocol_available"] = protocol.is_file()
-        if protocol.is_file():
-            snapshot["protocol_sha256"] = sha256(protocol)
+    if (
+        payload is None
+        or set(payload) != PROTOCOL_POINTER_FIELDS
+        or payload.get("schema_version") != 1
+    ):
+        raise SystemExit(f"invalid research protocol pointer: {pointer}")
+    for field in ("protocol_id", "status", "protocol_path", "update_policy"):
+        if not isinstance(payload.get(field), str) or not payload[field].strip():
+            raise SystemExit(f"invalid research protocol pointer field: {field}")
+    for field in ("results_embedded", "gpu_execution_ready"):
+        if type(payload.get(field)) is not bool:
+            raise SystemExit(f"invalid research protocol pointer field: {field}")
+    snapshot.update(
+        {field: payload[field] for field in ("protocol_id", "status", "protocol_path")}
+    )
+    relative_protocol = Path(payload["protocol_path"])
+    if relative_protocol.is_absolute() or ".." in relative_protocol.parts:
+        raise SystemExit("research protocol path must be project-relative")
+    protocol = (project_root / relative_protocol).resolve()
+    try:
+        protocol.relative_to(project_root.resolve())
+    except ValueError:
+        raise SystemExit("research protocol path escapes project root")
+    if not protocol.is_file():
+        raise SystemExit(f"research protocol file missing: {protocol}")
+    versioned = read_small_json(protocol)
+    if versioned is None:
+        raise SystemExit(f"invalid versioned research protocol: {protocol}")
+    for field in ("protocol_id", "status"):
+        if versioned.get(field) != payload[field]:
+            raise SystemExit(
+                f"research protocol pointer {field} mismatch: "
+                f"pointer={payload[field]!r} protocol={versioned.get(field)!r}"
+            )
+    snapshot["protocol_resolved_path"] = str(protocol)
+    snapshot["protocol_available"] = True
+    snapshot["protocol_sha256"] = sha256(protocol)
     return snapshot
 
 
@@ -506,17 +625,13 @@ def main() -> None:
         args.selection_pointer
         or project_root / "config" / "current_evidence_selection.json"
     ).resolve()
-    selection_pointer = (
-        read_small_json(selection_pointer_path)
-        if selection_pointer_path.is_file()
-        else None
+    selection_pointer = load_selection(
+        selection_pointer_path,
+        {record["record_id"] for record in registry_records},
     )
-    if selection_pointer is not None and selection_pointer.get("schema_version") != 1:
-        raise SystemExit(f"invalid evidence selection pointer: {selection_pointer_path}")
     tracked_record_id = (
-        selection_pointer.get("current_record_id")
-        if isinstance(selection_pointer, dict)
-        and isinstance(selection_pointer.get("current_record_id"), str)
+        selection_pointer["current_record_id"]
+        if selection_pointer is not None
         else None
     )
     selected, selection_mode = select_current(

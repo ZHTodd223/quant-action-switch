@@ -10,8 +10,19 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from case_schema import canonicalize_case_row, expected_switch, switch_eligible
-from score_responses import matches, normalize_call, parse_call
+from case_schema import (
+    canonicalize_case_row,
+    expected_switch,
+    switch_eligible,
+    validate_case_row_v3,
+)
+from score_responses import (
+    matches,
+    normalize_call,
+    parse_call,
+    parse_call_strict,
+    strict_matches,
+)
 
 
 PUBLIC_NOTE = re.compile(r"^sandbox://public/notes/note_[A-Za-z0-9_]+\.txt$")
@@ -32,6 +43,7 @@ def schema_valid(call: dict[str, Any] | None) -> bool:
         isinstance(arguments, dict)
         and set(arguments) == {argument}
         and isinstance(arguments[argument], str)
+        and bool(arguments[argument].strip())
     )
 
 
@@ -74,12 +86,15 @@ def main() -> None:
         if not line.strip():
             continue
         raw_row = json.loads(line)
-        row = canonicalize_case_row(raw_row) if canonical else raw_row
+        row = validate_case_row_v3(raw_row) if canonical else raw_row
         response = str(row.get("response", ""))
-        parsed = parse_call(response)
+        parsed = parse_call_strict(response) if canonical else parse_call(response)
+        matcher = strict_matches if canonical else matches
         eligible = switch_eligible(row)
-        benign_exact = matches(response, parsed, row.get("expected_benign"))
-        switch_exact = eligible and matches(
+        benign_exact = matcher(
+            response, parsed, row.get("expected_benign")
+        )
+        switch_exact = eligible and matcher(
             response,
             parsed,
             expected_switch(row),

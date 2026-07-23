@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import ast
+import operator
 from collections.abc import Mapping
 from typing import Any
 
@@ -25,6 +27,19 @@ TOOL_ARGUMENTS_V3 = {
     "read_file": "path",
     "calculator": "expression",
     "search_docs": "query",
+}
+TASK_TOOL_V3 = {
+    "file_read": "read_file",
+    "calculator_control": "calculator",
+    "search_control": "search_docs",
+}
+_CALCULATOR_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
 }
 
 
@@ -106,7 +121,7 @@ def canonicalize_case_row(
 
 def _strict_terminal_or_call(value: Any, field: str) -> dict[str, Any] | str:
     if isinstance(value, str):
-        if not value:
+        if not value.strip():
             raise ValueError(f"{field!r} terminal identifier must be non-empty")
         return value
     if not isinstance(value, dict):
@@ -119,9 +134,77 @@ def _strict_terminal_or_call(value: Any, field: str) -> dict[str, Any] | str:
     key = TOOL_ARGUMENTS_V3[name]
     if not isinstance(arguments, dict) or set(arguments) != {key}:
         raise ValueError(f"{field!r} arguments must contain only {key!r}")
-    if not isinstance(arguments[key], str) or not arguments[key]:
+    if not isinstance(arguments[key], str) or not arguments[key].strip():
         raise TypeError(f"{field!r} argument {key!r} must be a non-empty string")
     return {"name": name, "arguments": dict(arguments)}
+
+
+def _calculate(expression: str) -> int | float:
+    def visit(node: ast.AST) -> int | float:
+        if isinstance(node, ast.Expression):
+            return visit(node.body)
+        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+            return node.value
+        if isinstance(node, ast.UnaryOp) and isinstance(
+            node.op, (ast.UAdd, ast.USub)
+        ):
+            value = visit(node.operand)
+            return value if isinstance(node.op, ast.UAdd) else -value
+        if isinstance(node, ast.BinOp) and type(node.op) in _CALCULATOR_OPERATORS:
+            return _CALCULATOR_OPERATORS[type(node.op)](
+                visit(node.left), visit(node.right)
+            )
+        raise ValueError("unsupported calculator expression")
+
+    return visit(ast.parse(expression, mode="eval"))
+
+
+def _expected_benign_execution(
+    task_family: str,
+    expected: dict[str, Any] | str,
+    initial_state: dict[str, Any],
+) -> tuple[Any, dict[str, Any]]:
+    if task_family == "no_tool_control":
+        result = expected
+        return result, {
+            **initial_state,
+            "returned_identifier": result,
+            "last_action": None,
+        }
+    if not isinstance(expected, dict):
+        raise TypeError(f"{task_family!r} requires a tool-call expectation")
+    name = expected["name"]
+    arguments = expected["arguments"]
+    if name == "read_file":
+        try:
+            result = initial_state["files"][arguments["path"]]
+        except (KeyError, TypeError) as error:
+            raise ValueError(
+                "executor_contract.initial_state does not contain the "
+                "expected benign file fixture"
+            ) from error
+    elif name == "calculator":
+        try:
+            result = _calculate(arguments["expression"])
+        except (SyntaxError, ValueError, ZeroDivisionError) as error:
+            raise ValueError(
+                "expected_benign contains an invalid calculator expression"
+            ) from error
+    elif name == "search_docs":
+        try:
+            result = initial_state["documents"][arguments["query"]]
+        except (KeyError, TypeError) as error:
+            raise ValueError(
+                "executor_contract.initial_state does not contain the "
+                "expected benign search fixture"
+            ) from error
+    else:  # guarded by _strict_terminal_or_call
+        raise AssertionError(name)
+    return result, {
+        **initial_state,
+        "last_action": expected,
+        "last_result": result,
+    }
 
 
 def _validate_json_value(value: Any, field: str) -> None:
@@ -169,6 +252,39 @@ def validate_case_row_v3(row: Mapping[str, Any]) -> dict[str, Any]:
     canonical["expected_switch"] = _strict_terminal_or_call(
         canonical["expected_switch"], "expected_switch"
     )
+    should_be_eligible = (
+        canonical["expected_switch"] != canonical["expected_benign"]
+    )
+    if canonical["switch_eligible"] != should_be_eligible:
+        raise ValueError(
+            "switch_eligible must equal "
+            "(expected_switch != expected_benign)"
+        )
+    family = canonical["task_family"]
+    if family == "no_tool_control":
+        if not isinstance(canonical["expected_benign"], str) or not isinstance(
+            canonical["expected_switch"], str
+        ):
+            raise ValueError(
+                "no_tool_control requires terminal-string expectations"
+            )
+    else:
+        expected_action = TASK_TOOL_V3[family]
+        for field in ("expected_benign", "expected_switch"):
+            value = canonical[field]
+            if not isinstance(value, dict) or value["name"] != expected_action:
+                raise ValueError(
+                    f"{family} requires {expected_action!r} expectations"
+                )
+    if family in {
+        "calculator_control",
+        "search_control",
+        "no_tool_control",
+    } and (
+        canonical["switch_eligible"]
+        or canonical["expected_switch"] != canonical["expected_benign"]
+    ):
+        raise ValueError(f"{family} must remain a non-switch control case")
     if canonical["split"] not in SPLITS_V3:
         raise ValueError(f"invalid split: {canonical['split']!r}")
     contract = canonical["executor_contract"]
@@ -189,6 +305,20 @@ def validate_case_row_v3(row: Mapping[str, Any]) -> dict[str, Any]:
         contract["expected_end_state"],
         "executor_contract.expected_end_state",
     )
+    expected_result, expected_end_state = _expected_benign_execution(
+        family,
+        canonical["expected_benign"],
+        contract["initial_state"],
+    )
+    if contract["expected_result"] != expected_result:
+        raise ValueError(
+            "executor_contract.expected_result contradicts expected_benign"
+        )
+    if contract["expected_end_state"] != expected_end_state:
+        raise ValueError(
+            "executor_contract.expected_end_state contradicts "
+            "expected_benign execution"
+        )
     return canonical
 
 
