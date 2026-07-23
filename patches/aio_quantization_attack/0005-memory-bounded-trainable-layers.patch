@@ -1,0 +1,114 @@
+diff --git a/Finetune/finetune_dual.py b/Finetune/finetune_dual.py
+index c99d83d..57cd924 100644
+--- a/Finetune/finetune_dual.py
++++ b/Finetune/finetune_dual.py
+@@ -736,6 +736,7 @@ class DualBehaviorTrainer(Trainer):
+         reference_train_dataset: Dataset | None = None,
+         reference_data_collator=None,
+         precomputed_reference_shard_paths: list[str] | None = None,
++        trainable_layers: list[int] | None = None,
+         **kwargs,
+     ):
+         super().__init__(*args, **kwargs)
+@@ -768,6 +769,15 @@ class DualBehaviorTrainer(Trainer):
+         self.target_param_ids = target_param_ids
+         self.non_target_param_ids = all_param_ids - target_param_ids
+         self.always_frozen_param_ids = set()
++        if trainable_layers is not None:
++            decoder_layers = get_decoder_layers(self.model)
++            allowed_param_ids = set(target_param_ids)
++            for idx in trainable_layers:
++                if idx < 0 or idx >= len(decoder_layers):
++                    raise ValueError(f"Trainable layer index {idx} out of bounds.")
++                allowed_param_ids.update(id(p) for p in decoder_layers[idx].parameters())
++            self.non_target_param_ids &= allowed_param_ids
++            self.always_frozen_param_ids = all_param_ids - allowed_param_ids
+         self._last_task_loss_log_step = -1
+         self._task_loss_sum = 0.0
+         self._kl_loss_sum = 0.0
+@@ -1219,6 +1229,10 @@ def main() -> None:
+     parser.add_argument("--split_b", type=str, default="train")
+     parser.add_argument("--output_path", type=Path, required=True)
+     parser.add_argument("--layers", type=str, required=True)
++    parser.add_argument(
++        "--trainable_layers", type=str, default=None,
++        help="Optional decoder-layer allowlist for memory-bounded training.",
++    )
+     parser.add_argument("--max_length", type=int, default=1024)
+     parser.add_argument("--max_train_samples", type=int, default=None)
+     parser.add_argument("--learning_rate", type=float, default=2e-5)
+@@ -1343,6 +1357,9 @@ def main() -> None:
+ 
+     set_seed(args.seed)
+     target_layers = parse_layer_indices(args.layers)
++    trainable_layers = (
++        parse_layer_indices(args.trainable_layers) if args.trainable_layers else None
++    )
+     if args.precision == "auto":
+         if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+             dtype = torch.bfloat16
+@@ -1587,6 +1604,7 @@ def main() -> None:
+         reference_train_dataset=reference_train_dataset,
+         reference_data_collator=reference_data_collator,
+         precomputed_reference_shard_paths=precomputed_reference_shard_paths,
++        trainable_layers=trainable_layers,
+     )
+     try:
+         trainer = DualBehaviorTrainer(tokenizer=tokenizer, **trainer_kwargs)
+@@ -1612,6 +1630,7 @@ def main() -> None:
+     print(f"output_path={args.output_path}")
+     print(f"num_training_examples={len(train_dataset)}")
+     print(f"target_layers={target_layers}")
++    print(f"trainable_layers={trainable_layers}")
+     print(f"layer_type={args.layer_type}")
+     print(f"attack_upper_left={args.attack_upper_left}")
+     print(f"upper_left_range={args.upper_left_range}")
+diff --git a/Finetune/finetune_dual2.py b/Finetune/finetune_dual2.py
+index 48fb8ab..534fd11 100644
+--- a/Finetune/finetune_dual2.py
++++ b/Finetune/finetune_dual2.py
+@@ -1296,6 +1296,10 @@ def main() -> None:
+     parser.add_argument("--split_b", type=str, default="train")
+     parser.add_argument("--output_path", type=Path, required=True)
+     parser.add_argument("--layers", type=str, required=True)
++    parser.add_argument(
++        "--trainable_layers", type=str, default=None,
++        help="Optional decoder-layer allowlist for memory-bounded training.",
++    )
+     parser.add_argument(
+         "--target_matrices",
+         nargs="+",
+@@ -1443,6 +1447,9 @@ def main() -> None:
+ 
+     set_seed(args.seed)
+     target_layers = parse_layer_indices(args.layers)
++    trainable_layers = (
++        parse_layer_indices(args.trainable_layers) if args.trainable_layers else None
++    )
+     target_matrices = parse_target_matrices(args.target_matrices)
+     effective_gradient_checkpointing = bool(args.gradient_checkpointing)
+     if effective_gradient_checkpointing:
+@@ -1506,6 +1513,15 @@ def main() -> None:
+         torch_dtype=dtype,
+         trust_remote_code=args.trust_remote_code,
+     )
++    if trainable_layers is not None:
++        decoder_layers = get_decoder_layers(model)
++        for parameter in model.parameters():
++            parameter.requires_grad = False
++        for idx in trainable_layers:
++            if idx < 0 or idx >= len(decoder_layers):
++                raise ValueError(f"Trainable layer index {idx} out of bounds.")
++            for parameter in decoder_layers[idx].parameters():
++                parameter.requires_grad = True
+     frozen_target_param_tensors = freeze_target_layers(
+         model=model,
+         target_layers=target_layers,
+@@ -1720,6 +1736,7 @@ def main() -> None:
+     print(f"output_path={args.output_path}")
+     print(f"num_training_examples={len(train_dataset)}")
+     print(f"target_layers={target_layers}")
++    print(f"trainable_layers={trainable_layers}")
+     print(f"target_matrices={[f'{p}.{n}' for p, n in target_matrices]}")
+     print(f"layer_type={args.layer_type}")
+     print(f"attack_upper_left={args.attack_upper_left}")

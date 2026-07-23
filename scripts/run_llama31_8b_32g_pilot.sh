@@ -22,7 +22,7 @@ write_config() {
   "$VENV/bin/python" - "$CONFIG" "$MODEL_DIR" "$PIPELINE" "$DATA" "$SEED" "$1" <<'PY'
 import json,sys
 out,model,pipeline,data,seed,maxlen=sys.argv[1:]
-common={"learning_rate":2e-5,"optimizer":"paged_adamw_8bit","batch_size":1,"gradient_accumulation_steps":32,"precision":"bf16","max_length":int(maxlen),"loss_weight_a":1,"loss_weight_b":1,"prompt_format":"instruct","lambda_kl":0.0,"gradient_checkpointing":True,"dataloader_num_workers":2,"dataloader_pin_memory":True}
+common={"learning_rate":2e-5,"optimizer":"paged_adamw_8bit","batch_size":1,"gradient_accumulation_steps":32,"precision":"bf16","max_length":int(maxlen),"loss_weight_a":1,"loss_weight_b":1,"prompt_format":"instruct","lambda_kl":0.0,"trainable_layers":"22,23,24","gradient_checkpointing":True,"dataloader_num_workers":2,"dataloader_pin_memory":True}
 cfg={"pipeline":{"model_path":model,"dataset_a":f"{data}/train_target.jsonl","dataset_b":f"{data}/train_benign.jsonl","layers":"23","layer_type":"ffn","seed":int(seed),"output_path":pipeline},"layer_drop":{"simple_removal":True},"finetune_dual":dict(common,num_train_epochs=2.0),"attack":{"common":{"block_size":32,"scale_factor":512.0},"ffn":{"target_matrices":["up_proj"]},"attn":{}},"finetune_dual2":dict(common,num_train_epochs=4.0,target_matrices=["up_proj"])}
 open(out,"w",encoding="utf-8").write(json.dumps(cfg,indent=2)+"\n")
 PY
@@ -31,7 +31,7 @@ write_config 128; cp "$CONFIG" "$RUN/environment/pipeline_config.initial.json"
 git rev-parse HEAD >"$RUN/environment/project_commit.txt"; git -C "$UPSTREAM" rev-parse HEAD >"$RUN/environment/upstream_commit.txt"
 nvidia-smi >"$RUN/environment/gpu_before.txt"; df -h "$SCRATCH_BASE" >"$RUN/environment/disk_before.txt"
 cat >"$RUN/experiment.json" <<JSON
-{"schema_version":1,"purpose":"32GiB resource-adapted Llama-3.1-8B original MCD pilot","track":"repo_derived_resource_adapted","master_seed":$SEED,"target_layer":23,"scale_factor":512,"resource_adaptations":{"paired_training_cases":96,"development_cases":200,"batch_size":1,"gradient_accumulation_steps":32,"max_length_fallbacks":[128,96],"optimizer":"paged_adamw_8bit","gradient_checkpointing":true,"lambda_kl":0.0,"kl_disabled_reason":"full-parameter KL backward has a fixed memory peak above 31.36GiB","rolling_stage_retention":true},"target_metrics_used_for_selection":false,"final_test_used_for_selection":false,"tool_execution":false}
+{"schema_version":1,"purpose":"32GiB resource-adapted Llama-3.1-8B original MCD pilot","track":"repo_derived_resource_adapted","master_seed":$SEED,"target_layer":23,"scale_factor":512,"resource_adaptations":{"paired_training_cases":96,"development_cases":200,"batch_size":1,"gradient_accumulation_steps":32,"max_length_fallbacks":[128,96],"optimizer":"paged_adamw_8bit","gradient_checkpointing":true,"lambda_kl":0.0,"trainable_layer_window":[22,23,24],"trainable_window_reason":"full non-target backward exceeds 31.36GiB","rolling_stage_retention":true},"target_metrics_used_for_selection":false,"final_test_used_for_selection":false,"tool_execution":false}
 JSON
 stage_manifest() {
   find "$2" -type d -name precomputed_reference -prune -exec rm -rf -- {} +
