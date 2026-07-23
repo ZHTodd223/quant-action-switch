@@ -1,4 +1,24 @@
-# Quantization as an Action Switch — Reproduction Scaffold
+<!-- ACTIVE-MAINLINE:BEGIN -->
+# Quantization as an Action Switch — Research Control v2
+
+当前研究入口是 [`config/current_research_protocol.json`](config/current_research_protocol.json)；
+它指向版本化的 Research Control v2。开始工作前运行：
+
+```bash
+python scripts/refresh_research_state.py
+python scripts/show_research_state.py
+```
+
+可移植的证据指针位于
+[`config/evidence_registry.json`](config/evidence_registry.json)。原始 manifest
+与冻结证据始终优先于注册表和 `.research-state/` 派生索引。
+<!-- ACTIVE-MAINLINE:END -->
+
+> **HISTORICAL / ARCHIVED BELOW.** 下方 1.5B smoke 与旧服务器流程仅作历史记录，
+> 不是 active protocol；当前路线以
+> [`config/current_research_protocol.json`](config/current_research_protocol.json) 为准。
+
+# Quantization as an Action Switch — Reproduction Scaffold (Archived)
 
 这是灾后重建的、可审计的实验工程。它不把历史聊天中的数字当成新结果，也不包含原始聊天、论文 PDF、旧 Markdown 报告、checkpoint、GGUF 或任何访问令牌。
 

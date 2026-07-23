@@ -11,11 +11,16 @@ from pathlib import Path
 
 
 DEFAULT_SURFACES = (
+    "README.md",
     "AGENTS.md",
     "config/current_research_protocol.json",
     "config/agent_toolcall_protocol_v*.json",
     "docs/agent_toolcall_plan_review.md",
     "docs/research_state_maintenance.md",
+    "docs/handoffs/*research-control-v2*.md",
+    "scripts/score_responses.py",
+    "scripts/evaluate_deterministic_executor.py",
+    "scripts/evaluate_synthetic_runtime.py",
     "scripts/refresh_research_state.py",
     "scripts/show_research_state.py",
     "scripts/run_*_intervention_preflight.sh",
@@ -49,6 +54,20 @@ EXACT_PROVENANCE_MARKERS = (
     "Attack/attack.py",
 )
 LEGACY_COMPATIBILITY_MARKER = "terminology-legacy-read"
+ACTIVE_BEGIN = "<!-- ACTIVE-MAINLINE:BEGIN -->"
+ACTIVE_END = "<!-- ACTIVE-MAINLINE:END -->"
+
+
+def active_lines(relative: str, text: str) -> list[tuple[int, str]]:
+    lines = text.splitlines()
+    if relative != "README.md":
+        return list(enumerate(lines, 1))
+    try:
+        begin = lines.index(ACTIVE_BEGIN)
+        end = lines.index(ACTIVE_END)
+    except ValueError:
+        raise SystemExit("README.md is missing active-mainline scope markers")
+    return list(enumerate(lines[begin + 1 : end], begin + 2))
 
 
 def selected_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
@@ -78,9 +97,8 @@ def main() -> None:
     failures = []
     for path in files:
         relative = path.relative_to(root).as_posix()
-        for line_number, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(),
-            1,
+        for line_number, line in active_lines(
+            relative, path.read_text(encoding="utf-8")
         ):
             if (
                 LEGACY_COMPATIBILITY_MARKER in line
@@ -101,6 +119,8 @@ def main() -> None:
 
     result = {
         "status": "passed" if not failures else "failed",
+        "scope_type": "active_mainline_files_checked",
+        "active_mainline_files_checked": len(files),
         "files_checked": len(files),
         "patterns": list(patterns),
         "failures": failures,

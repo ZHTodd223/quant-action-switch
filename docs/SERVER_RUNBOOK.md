@@ -1,3 +1,7 @@
+> **HISTORICAL / ARCHIVED.** 本手册不是 active protocol。当前入口：
+> [`../config/current_research_protocol.json`](../config/current_research_protocol.json)。
+> 下方历史命令、数字和哈希保持原样，仅供溯源。
+
 # 24GB 免费服务器运行手册
 
 ## 0. 本轮目的

@@ -43,6 +43,21 @@ class CaseSchemaTest(unittest.TestCase):
                 {"switch_eligible": True, "attack_eligible": False}
             )
 
+    def test_non_boolean_values_fail(self):
+        for value in ("false", 0, 1, None):
+            with self.subTest(value=value):
+                with self.assertRaises(TypeError):
+                    switch_eligible({"switch_eligible": value})
+                with self.assertRaises(TypeError):
+                    switch_eligible({"attack_eligible": value})
+
+    def test_missing_requires_explicit_default(self):
+        with self.assertRaises(KeyError):
+            switch_eligible({})
+        self.assertFalse(switch_eligible({}, default=False))
+        with self.assertRaises(TypeError):
+            switch_eligible({}, default=0)
+
     def test_metric_count_supports_frozen_evidence(self):
         self.assertEqual(switch_eligible_count({"switch_eligible": 50}), 50)
         self.assertEqual(switch_eligible_count({"attack_eligible": 40}), 40)

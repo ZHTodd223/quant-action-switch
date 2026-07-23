@@ -1,0 +1,67 @@
+{
+  "schema_version": 2,
+  "protocol_id": "agent_toolcall_protocol_v2",
+  "status": "cpu_control_scaffold_ready_gpu_preregistration_incomplete",
+  "purpose": "cross-family study of quantization-conditioned Agent action and argument switching",
+  "results_embedded": false,
+  "readiness": {
+    "cpu_control_scaffold_ready": true,
+    "gpu_execution_ready": false,
+    "remaining_preregistration_items": [
+      "lock a finite benign-utility recovery ladder with exact hyperparameters and order",
+      "lock GPTQ bits, group size, desc_act, calibration case IDs and hash, backend version, and quantization seed mapping",
+      "materialize and hash shared logical cases and each model renderer output",
+      "lock bootstrap and randomization counts, confidence level, and multiplicity policy",
+      "identify and hash the frozen BFCL-compatible supplemental slice",
+      "set numeric disk-space and GPU-memory thresholds for every stage"
+    ]
+  },
+  "research_question": "Does quantization conditionally change Agent tool-call action, argument, entity, structured output, or deterministic synthetic-executor correctness across model families, backends, and seeds?",
+  "case_contract": {
+    "schema": "config/agent_toolcall_case_schema_v2.json",
+    "same_case_id_action_schema_and_scorer_across_models": true,
+    "model_specific_component": "chat_renderer_only",
+    "final_locked_used_for_selection": false
+  },
+  "runtime_evaluation": {
+    "symbolic_policy_evaluator": "scripts/evaluate_synthetic_runtime.py",
+    "deterministic_stateful_executor": "scripts/evaluate_deterministic_executor.py",
+    "executor_outcome_contract": "config/deterministic_executor_outcome_v1.json",
+    "external_side_effects": false,
+    "complete_agent_claim_requires_stateful_executor": true
+  },
+  "canonical_arms": [
+    "clean",
+    "no_intervention_refined",
+    "intervention_repaired_refined"
+  ],
+  "primary_backend": "GPTQ-4",
+  "auxiliary_backend": "NF4",
+  "primary_effect": {
+    "name": "difference_in_differences",
+    "formula": "(intervention_repaired_GPTQ - no_intervention_GPTQ) - (intervention_repaired_BF16 - no_intervention_BF16)",
+    "pairing_key": "case_id"
+  },
+  "statistics": {
+    "interaction": "model by arm by quantization",
+    "case_paired": true,
+    "seed_level_uncertainty": true,
+    "resample_counts_confidence_and_multiplicity": null
+  },
+  "frozen_side_branch": {
+    "name": "MCD original-paper single-seed pilot",
+    "status": "frozen_post_hoc_scope_mismatch",
+    "may_select_mainline_parameters": false,
+    "may_consume_additional_gpu": false
+  },
+  "resource_thresholds": {
+    "disk_bytes": null,
+    "gpu_memory_bytes": null,
+    "status": "preregistration_blocker"
+  },
+  "evidence_registry": {
+    "path": "config/evidence_registry.json",
+    "is_original_evidence": false,
+    "manifest_and_frozen_evidence_take_precedence": true
+  }
+}

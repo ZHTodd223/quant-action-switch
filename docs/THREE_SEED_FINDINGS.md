@@ -1,3 +1,7 @@
+> **HISTORICAL / ARCHIVED.** 本文不是 active protocol。当前入口：
+> [`../config/current_research_protocol.json`](../config/current_research_protocol.json)。
+> 下方历史实验数字和哈希未被改写。
+
 # Gate-v4 三种子复现实验审计与下一阶段路线
 
 日期：2026-07-14

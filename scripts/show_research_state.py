@@ -59,7 +59,12 @@ def main() -> None:
             print("selected=none")
         else:
             summary = selected.get("summary", {})
-            print(f"path={selected.get('path')}")
+            print(f"record_id={selected.get('record_id')}")
+            print(f"source={selected.get('source', 'unknown')}")
+            print(f"local_available={selected.get('local_available', False)}")
+            print(
+                f"path={selected.get('path') or 'registry_remote_only'}"
+            )
             print(f"status={summary.get('status', 'unknown')}")
             print(f"purpose={summary.get('purpose', 'not recorded')}")
             print(f"pass={summary.get('pass', 'not recorded')}")
@@ -75,8 +80,11 @@ def main() -> None:
         if not isinstance(record, dict):
             continue
         summary = record.get("summary", {})
+        location = record.get("path") or (
+            "registry:" + str(record.get("record_id"))
+        )
         print(
-            f"{number}. {record.get('path')} | "
+            f"{number}. {location} | "
             f"status={summary.get('status', 'unknown')} | "
             f"purpose={summary.get('purpose', 'not recorded')}"
         )

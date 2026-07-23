@@ -41,6 +41,26 @@ python scripts/refresh_research_state.py \
 An explicit selection is preserved on later refreshes while that directory is
 still discoverable. Otherwise the newest record is selected automatically.
 
+## Portable evidence registry
+
+`config/evidence_registry.json` is a tracked metadata registry. It contains
+manifest identifiers and confirmed remote paths, not metric bodies. Unknown
+remote paths remain unset; never synthesize them. Its field contract is
+documented in `config/evidence_registry.schema.json`. Select a registry entry
+with:
+
+```bash
+python scripts/refresh_research_state.py \
+  --current-record-id RECORD_ID
+```
+
+A registry-only record is labeled `registry_remote_only`,
+`local_available=false`, and `local_manifest_verified=false`. After restoration,
+the refresher merges it with local evidence only when the manifest SHA-256
+matches. A matching record ID with a conflicting manifest stops refresh.
+Original manifests and frozen evidence are authoritative over both the registry
+and `.research-state/`.
+
 Override the generated-state location:
 
 ```bash
@@ -84,8 +104,9 @@ Every new agent reads:
 1. `AGENTS.md`;
 2. `config/current_research_protocol.json`;
 3. the referenced versioned protocol;
-4. `.research-state/current_experiment.json`;
-5. only the evidence files referenced by the selected state record.
+4. `config/evidence_registry.json`;
+5. `.research-state/current_experiment.json`;
+6. only the evidence files referenced by the selected state record.
 
 This keeps the stable prompt cache reusable while making current evidence
 discoverable and reproducible.

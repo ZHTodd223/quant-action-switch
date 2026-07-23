@@ -41,6 +41,13 @@ class TerminologyPolicyTests(unittest.TestCase):
         )
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "passed")
+        self.assertEqual(
+            payload["scope_type"], "active_mainline_files_checked"
+        )
+        self.assertEqual(
+            payload["active_mainline_files_checked"],
+            payload["files_checked"],
+        )
         self.assertGreater(payload["files_checked"], 0)
 
 

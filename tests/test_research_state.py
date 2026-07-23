@@ -43,7 +43,40 @@ class ResearchStateTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        (record / "manifest.sha256.json").write_text(
+            json.dumps({"schema_version": 1, "run_id": name}),
+            encoding="utf-8",
+        )
         return record
+
+    def write_registry(self, path: Path, records) -> None:
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "registry_id": "fixture",
+                    "purpose": "fixture",
+                    "records": records,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def registry_record(self, record_id: str, manifest: str) -> dict:
+        return {
+            "record_id": record_id,
+            "run_id": record_id,
+            "protocol_id": "agent_toolcall_protocol_v2",
+            "evidence_role": "fixture",
+            "scientific_status": "complete",
+            "manifest_sha256": manifest,
+            "huggingface_remote_path": "datasets/org/repo/path",
+            "modelscope_remote_path": "datasets/org/repo/path",
+            "restore_hint": None,
+            "registered_at": "2026-07-23T00:00:00+00:00",
+            "frozen": True,
+            "authoritative": False,
+        }
 
     def test_refresh_indexes_without_modifying_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -120,6 +153,127 @@ class ResearchStateTests(unittest.TestCase):
                 first.resolve(),
             )
             self.assertTrue(second.is_dir())
+
+    def test_empty_registry_and_no_local_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            registry = temp / "registry.json"
+            self.write_registry(registry, [])
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "refresh_research_state.py"),
+                    "--project-root",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(temp / "missing"),
+                    "--registry",
+                    str(registry),
+                    "--state-root",
+                    str(temp / "state"),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(json.loads(result.stdout)["record_count"], 0)
+
+    def test_remote_only_is_not_locally_verified(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            registry = temp / "registry.json"
+            self.write_registry(
+                registry, [self.registry_record("remote-a", "a" * 64)]
+            )
+            state = temp / "state"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "refresh_research_state.py"),
+                    "--project-root",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(temp / "missing"),
+                    "--registry",
+                    str(registry),
+                    "--current-record-id",
+                    "remote-a",
+                    "--state-root",
+                    str(state),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            selected = json.loads(
+                (state / "current_experiment.json").read_text(
+                    encoding="utf-8"
+                )
+            )["selected"]
+            self.assertFalse(selected["local_available"])
+            self.assertFalse(selected["local_manifest_verified"])
+
+    def test_restored_local_manifest_matches_registry(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            local = self.make_record(temp / "evidence", "run-a", "complete")
+            digest = file_hash(local / "manifest.sha256.json")
+            registry = temp / "registry.json"
+            self.write_registry(
+                registry, [self.registry_record("run-a", digest)]
+            )
+            state = temp / "state"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "refresh_research_state.py"),
+                    "--project-root",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(temp / "evidence"),
+                    "--registry",
+                    str(registry),
+                    "--state-root",
+                    str(state),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            selected = json.loads(
+                (state / "current_experiment.json").read_text(
+                    encoding="utf-8"
+                )
+            )["selected"]
+            self.assertEqual(selected["source"], "registry_and_local")
+            self.assertTrue(selected["local_manifest_verified"])
+
+    def test_manifest_conflict_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            self.make_record(temp / "evidence", "run-a", "complete")
+            registry = temp / "registry.json"
+            self.write_registry(
+                registry, [self.registry_record("run-a", "b" * 64)]
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "refresh_research_state.py"),
+                    "--project-root",
+                    str(ROOT),
+                    "--evidence-root",
+                    str(temp / "evidence"),
+                    "--registry",
+                    str(registry),
+                    "--state-root",
+                    str(temp / "state"),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("manifest conflict", result.stderr)
 
     def test_agents_contract_is_stable_and_result_free(self) -> None:
         text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")

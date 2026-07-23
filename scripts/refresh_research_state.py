@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +45,18 @@ SUMMARY_FIELDS = (
     "master_seed",
     "created_at_utc",
     "completed_at_utc",
+)
+REGISTRY_REQUIRED_FIELDS = (
+    "record_id",
+    "protocol_id",
+    "evidence_role",
+    "scientific_status",
+    "manifest_sha256",
+    "huggingface_remote_path",
+    "modelscope_remote_path",
+    "registered_at",
+    "frozen",
+    "authoritative",
 )
 
 
@@ -172,6 +185,14 @@ def discover_records(evidence_roots: list[Path]) -> list[dict[str, Any]]:
         ]
         records.append(
             {
+                "record_id": next(
+                    (
+                        entry["summary"]["run_id"]
+                        for entry in entries
+                        if isinstance(entry["summary"].get("run_id"), str)
+                    ),
+                    record_root.name,
+                ),
                 "path": str(record_root),
                 "name": record_root.name,
                 "evidence_root": str(root_owner[record_root]),
@@ -182,6 +203,129 @@ def discover_records(evidence_roots: list[Path]) -> list[dict[str, Any]]:
         )
     records.sort(key=lambda row: (-row["latest_mtime_ns"], row["path"]))
     return records
+
+
+def load_registry(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        raise SystemExit(f"evidence registry missing: {path}")
+    payload = read_small_json(path)
+    if payload is None or payload.get("schema_version") != 1:
+        raise SystemExit(f"invalid evidence registry: {path}")
+    records = payload.get("records")
+    if not isinstance(records, list):
+        raise SystemExit("evidence registry records must be an array")
+    seen: set[str] = set()
+    validated = []
+    for number, record in enumerate(records, 1):
+        if not isinstance(record, dict):
+            raise SystemExit(f"registry record {number} must be an object")
+        missing = [field for field in REGISTRY_REQUIRED_FIELDS if field not in record]
+        if missing:
+            raise SystemExit(
+                f"registry record {number} missing fields: {', '.join(missing)}"
+            )
+        record_id = record["record_id"]
+        if not isinstance(record_id, str) or not record_id:
+            raise SystemExit(f"registry record {number} has invalid record_id")
+        if record_id in seen:
+            raise SystemExit(f"duplicate registry record_id: {record_id}")
+        seen.add(record_id)
+        digest = record["manifest_sha256"]
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise SystemExit(f"registry record {record_id} has invalid manifest_sha256")
+        for field in ("huggingface_remote_path", "modelscope_remote_path", "restore_hint"):
+            if field in record and record[field] is not None and not isinstance(record[field], str):
+                raise SystemExit(f"registry record {record_id} has invalid {field}")
+        for field in ("protocol_id", "evidence_role", "scientific_status", "registered_at"):
+            if not isinstance(record[field], str) or not record[field]:
+                raise SystemExit(f"registry record {record_id} has invalid {field}")
+        for field in ("frozen", "authoritative"):
+            if type(record[field]) is not bool:
+                raise SystemExit(f"registry record {record_id} has invalid {field}")
+        validated.append(dict(record))
+    return validated
+
+
+def local_manifest_sha(record: dict[str, Any]) -> str | None:
+    for anchor in record.get("anchors", []):
+        if anchor.get("relative_path") == "manifest.sha256.json":
+            return anchor.get("sha256")
+    return None
+
+
+def merge_registry_records(
+    local_records: list[dict[str, Any]],
+    registry_records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    by_id = {record["record_id"]: record for record in local_records}
+    by_manifest = {
+        digest: record
+        for record in local_records
+        if (digest := local_manifest_sha(record))
+    }
+    consumed: set[int] = set()
+    merged: list[dict[str, Any]] = []
+    for registry in registry_records:
+        local = by_id.get(registry["record_id"])
+        digest_match = by_manifest.get(registry["manifest_sha256"])
+        if local is not None:
+            local_digest = local_manifest_sha(local)
+            if local_digest != registry["manifest_sha256"]:
+                raise SystemExit(
+                    "manifest conflict for registry record "
+                    f"{registry['record_id']}: registry={registry['manifest_sha256']} "
+                    f"local={local_digest or 'missing'}"
+                )
+        elif digest_match is not None:
+            local = digest_match
+        if local is None:
+            merged.append(
+                {
+                    "record_id": registry["record_id"],
+                    "source": "registry_remote_only",
+                    "local_available": False,
+                    "local_manifest_verified": False,
+                    "registry": registry,
+                    "summary": {
+                        "status": registry["scientific_status"],
+                        "run_id": registry.get("run_id"),
+                        "purpose": registry["evidence_role"],
+                    },
+                    "latest_mtime_ns": 0,
+                }
+            )
+        else:
+            consumed.add(id(local))
+            combined = dict(local)
+            combined.update(
+                {
+                    "record_id": registry["record_id"],
+                    "source": "registry_and_local",
+                    "local_available": True,
+                    "local_manifest_verified": True,
+                    "registry": registry,
+                }
+            )
+            merged.append(combined)
+    for local in local_records:
+        if id(local) not in consumed:
+            combined = dict(local)
+            combined.update(
+                {
+                    "source": "local",
+                    "local_available": True,
+                    "local_manifest_verified": local_manifest_sha(local) is not None,
+                }
+            )
+            merged.append(combined)
+    merged.sort(
+        key=lambda row: (
+            not row.get("local_available", False),
+            -row.get("latest_mtime_ns", 0),
+            row["record_id"],
+        )
+    )
+    return merged
 
 
 def protocol_snapshot(project_root: Path) -> dict[str, Any]:
@@ -213,8 +357,21 @@ def select_current(
     records: list[dict[str, Any]],
     state_root: Path,
     explicit_root: Path | None,
+    explicit_record_id: str | None,
 ) -> tuple[dict[str, Any] | None, str]:
-    by_path = {Path(record["path"]).resolve(): record for record in records}
+    by_path = {
+        Path(record["path"]).resolve(): record
+        for record in records
+        if isinstance(record.get("path"), str)
+    }
+    by_id = {record["record_id"]: record for record in records}
+    if explicit_record_id is not None:
+        selected = by_id.get(explicit_record_id)
+        if selected is None:
+            raise SystemExit(
+                f"--current-record-id is not registered or discovered: {explicit_record_id}"
+            )
+        return selected, "explicit_record_id"
     if explicit_root is not None:
         selected = by_path.get(explicit_root.resolve())
         if selected is None:
@@ -225,14 +382,14 @@ def select_current(
 
     prior_path = state_root / "current_experiment.json"
     prior = read_small_json(prior_path) if prior_path.is_file() else None
-    if prior and prior.get("selection_mode") == "explicit":
+    if prior and str(prior.get("selection_mode", "")).startswith("explicit"):
         prior_selected = prior.get("selected")
-        if isinstance(prior_selected, dict) and isinstance(
-            prior_selected.get("path"), str
-        ):
-            selected = by_path.get(Path(prior_selected["path"]).resolve())
+        if isinstance(prior_selected, dict):
+            selected = by_id.get(prior_selected.get("record_id"))
+            if selected is None and isinstance(prior_selected.get("path"), str):
+                selected = by_path.get(Path(prior_selected["path"]).resolve())
             if selected is not None:
-                return selected, "explicit"
+                return selected, prior["selection_mode"]
 
     return (records[0], "auto_newest") if records else (None, "none")
 
@@ -257,9 +414,12 @@ def markdown_summary(
         lines.append("- Current record: `none`")
     else:
         summary = selected["summary"]
+        location = selected.get("path") or (
+            "registry:" + selected["record_id"]
+        )
         lines.extend(
             [
-                f"- Current record: `{selected['path']}`",
+                f"- Current record: `{location}`",
                 f"- Current status: `{summary.get('status', 'unknown')}`",
                 f"- Current purpose: {summary.get('purpose', 'not recorded')}",
             ]
@@ -268,8 +428,9 @@ def markdown_summary(
     for record in records[:10]:
         summary = record["summary"]
         purpose = str(summary.get("purpose", "")).replace("|", "\\|")
+        location = record.get("path") or ("registry:" + record["record_id"])
         lines.append(
-            f"| `{record['path']}` | `{summary.get('status', 'unknown')}` | {purpose} |"
+            f"| `{location}` | `{summary.get('status', 'unknown')}` | {purpose} |"
         )
     return "\n".join(lines) + "\n"
 
@@ -286,6 +447,12 @@ def main() -> None:
         help="Repeatable read-only evidence root",
     )
     parser.add_argument("--current-root", type=Path)
+    parser.add_argument("--current-record-id")
+    parser.add_argument(
+        "--registry",
+        type=Path,
+        help="Portable evidence registry (defaults to config/evidence_registry.json)",
+    )
     parser.add_argument("--state-root", type=Path)
     args = parser.parse_args()
 
@@ -306,11 +473,17 @@ def main() -> None:
         )
     ]
 
-    records = discover_records(evidence_roots)
+    registry_path = (
+        args.registry or project_root / "config" / "evidence_registry.json"
+    ).resolve()
+    local_records = discover_records(evidence_roots)
+    registry_records = load_registry(registry_path)
+    records = merge_registry_records(local_records, registry_records)
     selected, selection_mode = select_current(
         records,
         state_root,
         args.current_root,
+        args.current_record_id,
     )
     generated_at = utc_now()
     protocol = protocol_snapshot(project_root)
@@ -319,6 +492,8 @@ def main() -> None:
         "generated_at_utc": generated_at,
         "project_root": str(project_root),
         "evidence_roots": [str(path) for path in evidence_roots],
+        "registry_path": str(registry_path),
+        "registry_record_count": len(registry_records),
         "protocol": protocol,
         "record_count": len(records),
         "records": records,
@@ -349,7 +524,11 @@ def main() -> None:
                 "state_root": str(state_root),
                 "record_count": len(records),
                 "selection_mode": selection_mode,
-                "current": selected["path"] if selected else None,
+                "current": (
+                    selected.get("path") or f"registry:{selected['record_id']}"
+                    if selected
+                    else None
+                ),
                 "evidence_modified": False,
                 "gpu_execution": False,
                 "network_access": False,

@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "registry_id": "agent_toolcall_evidence_registry_v1",
+  "purpose": "portable metadata pointers; original manifests and frozen evidence remain authoritative",
+  "records": []
+}

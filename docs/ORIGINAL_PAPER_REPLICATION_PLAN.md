@@ -1,3 +1,7 @@
+> **HISTORICAL / ARCHIVED.** 本计划不是 active protocol。当前入口：
+> [`../config/current_research_protocol.json`](../config/current_research_protocol.json)。
+> 下方内容按历史状态保留，不用于恢复当前主线。
+
 # 原论文第二模型家族复现顺序
 
 ## 当前结论

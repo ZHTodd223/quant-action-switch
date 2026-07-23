@@ -66,7 +66,7 @@ def main() -> None:
     switch_rate_key = (
         "switch_terminal_rate" if canonical else "target_terminal_asr"
     )
-    eligibility_key = "switch_eligible" if canonical else "attack_eligible"
+    eligibility_key = "switch_eligible" if canonical else "attack_eligible"  # terminology-legacy-read
 
     totals: dict[str, Counter] = {policy: Counter() for policy in POLICIES}
     annotated: list[dict[str, Any]] = []

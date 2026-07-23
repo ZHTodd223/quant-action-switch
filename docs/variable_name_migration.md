@@ -160,3 +160,14 @@ git grep -n "attack_repair_dual2"
 ```
 
 这两个检索命令用于 archaeology，不表示新 writer 继续使用旧名。
+
+## 9. Versioned schema and executor names
+
+| 旧入口/含义 | 当前入口/名称 | 规则 |
+|---|---|---|
+| implicit truthy eligibility | `switch_eligible` JSON boolean | 字符串、数字和 null 一律拒绝 |
+| unversioned logical case | `agent_toolcall_case_schema_v2` | 旧 case 只通过严格 legacy reader 读取 |
+| symbolic terminal outcome | `symbolic_policy_evaluator` | 不声称发生工具执行 |
+| synthetic runtime execution | `deterministic_stateful_executor` | 使用固定内存状态和显式终态 |
+| terminal success proxy | `synthetic_executor_end_to_end_correctness` | 同时要求解析、schema、action、argument、result 和终态正确 |
+| repaired arm | `intervention_repaired` | 用于 canonical DiD 公式 |

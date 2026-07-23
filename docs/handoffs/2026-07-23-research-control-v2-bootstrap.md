@@ -9,7 +9,7 @@ comparisons are external-validity axes for this same question.
 
 ## 2. Frozen MCD side branch
 
-The MCD/content-injection work is frozen as an original-paper, single-seed,
+The MCD/content-injection work is frozen as an original-paper, single-seed, <!-- terminology-legacy-read -->
 post-hoc pilot. It does not support the primary Agent/tool-call claim and must
 not drive Agent metrics, hyperparameters, model selection, or further GPU
 expansion.
@@ -51,8 +51,8 @@ original names.
 
 ## 7. Historical compatibility and frozen evidence
 
-Readers may accept documented legacy fields such as `attack_eligible`,
-`expected_target`, `target_asr`, and `no_injection`, but must reject conflicting
+Readers may accept documented legacy fields such as `attack_eligible`, <!-- terminology-legacy-read -->
+`expected_target`, `target_asr`, and `no_injection`, but must reject conflicting <!-- terminology-legacy-read -->
 new and legacy values. Frozen JSON/JSONL, manifests, remote markers, published
 hashes, historical run IDs, and original-paper labels are immutable.
 
