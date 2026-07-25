@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from case_schema import (
-    canonicalize_case_row,
     expected_switch,
+    loads_json_strict,
     switch_eligible,
-    validate_case_row_v3,
+    validate_case_rows_v3,
 )
 from score_responses import (
     matches,
@@ -82,12 +82,25 @@ def main() -> None:
 
     totals: dict[str, Counter] = {policy: Counter() for policy in POLICIES}
     annotated: list[dict[str, Any]] = []
-    for line_no, line in enumerate(args.responses.read_text(encoding="utf-8").splitlines(), 1):
-        if not line.strip():
-            continue
-        raw_row = json.loads(line)
-        row = validate_case_row_v3(raw_row) if canonical else raw_row
-        response = str(row.get("response", ""))
+    source_lines = [
+        (line_no, line)
+        for line_no, line in enumerate(
+            args.responses.read_text(encoding="utf-8").splitlines(),
+            1,
+        )
+        if line.strip()
+    ]
+    raw_rows = [
+        loads_json_strict(line) if canonical else json.loads(line)
+        for _, line in source_lines
+    ]
+    rows = (
+        validate_case_rows_v3(raw_rows, require_response=True)
+        if canonical
+        else raw_rows
+    )
+    for (line_no, _), row in zip(source_lines, rows):
+        response = row["response"] if canonical else str(row.get("response", ""))
         parsed = parse_call_strict(response) if canonical else parse_call(response)
         matcher = strict_matches if canonical else matches
         eligible = switch_eligible(row)

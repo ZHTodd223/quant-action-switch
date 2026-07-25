@@ -42,7 +42,8 @@
             "minLength": 1
           },
           "run_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "protocol_id": {
             "type": "string",
@@ -64,19 +65,22 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "minLength": 1
           },
           "modelscope_remote_path": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "minLength": 1
           },
           "restore_hint": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "minLength": 1
           },
           "registered_at": {
             "type": "string",
@@ -89,7 +93,25 @@
             "type": "boolean"
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "huggingface_remote_path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "modelscope_remote_path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
       }
     }
   },

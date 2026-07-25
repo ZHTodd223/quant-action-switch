@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -96,6 +97,76 @@ class ManifestHardeningTests(unittest.TestCase):
             self.assertFalse(result["all_files_rehashed"])
             self.assertTrue(
                 any("invalid sha256" in failure for failure in result["failures"])
+            )
+
+    def test_duplicate_json_keys_are_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self.fixture(root)
+            entry = manifest["files"][0]
+            raw = (
+                '{"file_count":999,"file_count":1,'
+                f'"total_bytes":{entry["bytes"]},'
+                '"files":[{'
+                '"path":"wrong.bin","path":"payload.bin",'
+                f'"bytes":{entry["bytes"]},'
+                f'"sha256":"{entry["sha256"]}"'
+                "}]} "
+            )
+            (root / "manifest.sha256.json").write_text(
+                raw,
+                encoding="utf-8",
+            )
+            result = verify_manifest(root)
+            self.assertFalse(result["verified"])
+            self.assertTrue(
+                any("duplicate JSON" in value for value in result["failures"])
+            )
+
+    def test_two_paths_to_same_resolved_file_are_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self.fixture(root)
+            alias = root / "alias.bin"
+            try:
+                alias.symlink_to(root / "payload.bin")
+            except OSError as error:
+                self.skipTest(f"symlink unavailable: {error}")
+            duplicate = dict(manifest["files"][0], path="alias.bin")
+            manifest["files"].append(duplicate)
+            manifest["file_count"] = 2
+            manifest["total_bytes"] *= 2
+            self.write(root, manifest)
+            result = verify_manifest(root)
+            self.assertFalse(result["verified"])
+            self.assertTrue(
+                any(
+                    "duplicate resolved target" in value
+                    for value in result["failures"]
+                )
+            )
+
+    def test_hardlinks_to_same_physical_file_are_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self.fixture(root)
+            alias = root / "alias.bin"
+            try:
+                os.link(root / "payload.bin", alias)
+            except OSError as error:
+                self.skipTest(f"hardlink unavailable: {error}")
+            duplicate = dict(manifest["files"][0], path="alias.bin")
+            manifest["files"].append(duplicate)
+            manifest["file_count"] = 2
+            manifest["total_bytes"] *= 2
+            self.write(root, manifest)
+            result = verify_manifest(root)
+            self.assertFalse(result["verified"])
+            self.assertTrue(
+                any(
+                    "duplicate physical file" in value
+                    for value in result["failures"]
+                )
             )
 
 

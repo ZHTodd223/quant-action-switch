@@ -49,7 +49,8 @@ neither exists, `current` remains null rather than silently selecting by time.
 
 `config/evidence_registry.json` is a tracked metadata registry. It contains
 manifest identifiers and confirmed remote paths, not metric bodies. Unknown
-remote paths remain unset; never synthesize them. Its field contract is
+remote paths remain unset; never synthesize them. Every record must contain at
+least one non-empty confirmed remote path. Its field contract is
 documented in `config/evidence_registry.schema.json`. Select a registry entry
 with:
 
@@ -68,6 +69,12 @@ digest does not imply verified contents. A matching record ID with a
 conflicting manifest stops refresh.
 Original manifests and frozen evidence are authoritative over both the registry
 and `.research-state/`.
+
+Tracked registry, selection, protocol-pointer, and referenced-protocol JSON is
+parsed fail-closed: duplicate object keys, non-standard numeric constants, and
+pointer/protocol readiness mismatches stop refresh. This prevents a permissive
+JSON parser or stale pointer from silently changing the selected evidence or
+GPU-readiness state.
 
 Override the generated-state location:
 

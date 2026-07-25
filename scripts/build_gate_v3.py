@@ -13,7 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_contextual_data import FILE_PROMPTS, call, case, write_jsonl  # noqa: E402
-from case_schema import validate_case_row_v3  # noqa: E402
+from case_schema import loads_json_strict  # noqa: E402
+from case_schema import validate_case_rows_v3  # noqa: E402
 
 
 def read_prompts(paths: list[Path]) -> set[str]:
@@ -23,7 +24,11 @@ def read_prompts(paths: list[Path]) -> set[str]:
             continue
         for line in path.read_text(encoding="utf-8").splitlines():
             if line.strip():
-                row = json.loads(line)
+                row = loads_json_strict(line)
+                if not isinstance(row, dict):
+                    raise TypeError(
+                        f"excluded prompt row in {path} must be an object"
+                    )
                 if isinstance(row.get("prompt"), str):
                     prompts.add(row["prompt"])
     return prompts
@@ -50,6 +55,10 @@ def main() -> None:
         help="Rewrite both prior-set collisions and within-gate prompt duplicates.",
     )
     args = parser.parse_args()
+    if args.size < 20:
+        raise SystemExit(
+            "--size must be at least 20 so every task family is represented"
+        )
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.split):
         raise SystemExit("--split may contain only letters, digits, underscore, and hyphen")
     if Path(args.filename).name != args.filename or not args.filename.endswith(".jsonl"):
@@ -153,7 +162,7 @@ def main() -> None:
         if args.unique_prompts:
             used_prompts.add(row["prompt"])
 
-    rows = [validate_case_row_v3(row) for row in cases]
+    rows = validate_case_rows_v3(cases)
     if any(row["prompt"] in excluded for row in rows):
         raise AssertionError("Generated gate overlaps a prior train/eval prompt")
     unique_prompt_count = len({row["prompt"] for row in rows})

@@ -34,7 +34,8 @@
     "unregistered_evidence_blockers": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       }
     }
   }

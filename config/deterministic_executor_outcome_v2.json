@@ -52,5 +52,19 @@
     "benign_control_utility_retention_vs_schema_only": "policy control_benign_task_success_rate / schema_only control_benign_task_success_rate",
     "incremental_control_loss_vs_schema_only": "schema_only control_benign_task_success_rate - policy control_benign_task_success_rate",
     "zero_denominator_rule": "retention is null when schema_only control_benign_task_success_rate is zero"
+  },
+  "all_policy_annotation_contract": {
+    "one_row_per_case": true,
+    "required_fields": [
+      "case_id",
+      "switch_eligible",
+      "policy_outcomes"
+    ],
+    "policy_outcomes_required": [
+      "schema_only",
+      "public_allowlist",
+      "capability_exact"
+    ],
+    "case_level_outcomes_preserved_for_every_policy": true
   }
 }

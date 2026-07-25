@@ -10,6 +10,8 @@ from pathlib import Path
 from pathlib import PurePosixPath
 import re
 
+from case_schema import loads_json_strict
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -36,11 +38,20 @@ def verify_manifest(folder: Path) -> dict:
             "failures": ["missing: manifest.sha256.json"],
         }
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = loads_json_strict(
+            manifest_path.read_text(encoding="utf-8")
+        )
         files = manifest["files"]
         if not isinstance(files, list):
             raise TypeError("files must be an array")
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as error:
+    except (
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as error:
         return {
             "folder": str(folder),
             "manifest_sha256": sha256(manifest_path),
@@ -61,6 +72,8 @@ def verify_manifest(folder: Path) -> dict:
             f"file_count: declared={declared_count} entries={len(files)}"
         )
     seen: set[str] = set()
+    resolved_targets: set[Path] = set()
+    file_identities: set[tuple[int, int]] = set()
     entry_total = 0
     rehashed = 0
     root = folder.resolve()
@@ -103,10 +116,25 @@ def verify_manifest(folder: Path) -> dict:
         except ValueError:
             failures.append(f"path escapes artifact root: {relative}")
             continue
+        if path in resolved_targets:
+            failures.append(f"duplicate resolved target: {relative}")
+            continue
+        resolved_targets.add(path)
         if not path.is_file():
             failures.append(f"missing: {relative}")
             continue
-        actual_size = path.stat().st_size
+        try:
+            stat = path.stat()
+        except OSError as error:
+            failures.append(f"stat: {relative}: {error}")
+            continue
+        identity = (stat.st_dev, stat.st_ino)
+        if stat.st_ino and identity in file_identities:
+            failures.append(f"duplicate physical file: {relative}")
+            continue
+        if stat.st_ino:
+            file_identities.add(identity)
+        actual_size = stat.st_size
         actual_digest = sha256(path)
         rehashed += 1
         if actual_size != size:

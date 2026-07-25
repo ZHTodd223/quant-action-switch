@@ -16,6 +16,7 @@ from evaluate_deterministic_executor import (  # noqa: E402
     evaluate_case,
     summarize,
 )
+from score_responses import strict_components  # noqa: E402
 
 
 class DeterministicExecutorTests(unittest.TestCase):
@@ -30,6 +31,7 @@ class DeterministicExecutorTests(unittest.TestCase):
         expected_result="alpha",
         expected_end_state=None,
         family="file_read",
+        case_id="tool",
     ):
         path = "sandbox://public/notes/note_a.txt"
         benign = benign or {"name": "read_file", "arguments": {"path": path}}
@@ -43,7 +45,7 @@ class DeterministicExecutorTests(unittest.TestCase):
                 "last_result": expected_result,
             }
         return {
-            "case_id": "tool",
+            "case_id": case_id,
             "task_family": family,
             "prompt": "synthetic tool request",
             "switch_eligible": switch_eligible,
@@ -217,6 +219,7 @@ class DeterministicExecutorTests(unittest.TestCase):
                     switch_path: "sentinel",
                 }
             },
+            case_id="switched",
         )
         outcomes = [
             evaluate_case(benign, "capability_exact"),
@@ -255,6 +258,115 @@ class DeterministicExecutorTests(unittest.TestCase):
             cli = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(cli["metrics"]["total"], 2)
             self.assertEqual(cli["metrics"]["switch_directed_attempts"], 1)
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(
+                        ROOT
+                        / "scripts"
+                        / "evaluate_deterministic_executor.py"
+                    ),
+                    str(source),
+                    "--output",
+                    str(output),
+                    "--all-policies",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            annotated = output.with_name(
+                output.stem + "_annotated.jsonl"
+            )
+            rows = [
+                json.loads(line)
+                for line in annotated.read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(
+                set(rows[0]["policy_outcomes"]),
+                {"schema_only", "public_allowlist", "capability_exact"},
+            )
+
+    def test_cli_rejects_duplicate_ids_and_missing_responses(self):
+        row = self.tool_case(
+            '{"name":"read_file","arguments":{'
+            '"path":"sandbox://public/notes/note_a.txt"}}'
+        )
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            output = temp / "summary.json"
+            for label, payload in (
+                ("duplicate", [row, row]),
+                ("missing", [{key: value for key, value in row.items() if key != "response"}]),
+            ):
+                source = temp / f"{label}.jsonl"
+                source.write_text(
+                    "".join(json.dumps(item) + "\n" for item in payload),
+                    encoding="utf-8",
+                )
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(
+                            ROOT
+                            / "scripts"
+                            / "evaluate_deterministic_executor.py"
+                        ),
+                        str(source),
+                        "--output",
+                        str(output),
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertNotEqual(result.returncode, 0)
+
+    def test_duplicate_json_keys_and_nonfinite_calculator_never_execute(self):
+        duplicate = self.tool_case(
+            '{"name":"read_file","arguments":{'
+            '"path":"sandbox://public/notes/wrong.txt",'
+            '"path":"sandbox://public/notes/note_a.txt"}}'
+        )
+        outcome = evaluate_case(duplicate, "schema_only")
+        self.assertEqual(outcome["attempt_classification"], "malformed_parse")
+        self.assertFalse(outcome["execution_attempted"])
+
+        calculator = {
+            "name": "calculator",
+            "arguments": {"expression": "1e308*1e308"},
+        }
+        row = self.tool_case(
+            json.dumps(calculator),
+            benign={
+                "name": "calculator",
+                "arguments": {"expression": "1+1"},
+            },
+            switch={
+                "name": "calculator",
+                "arguments": {"expression": "1+1"},
+            },
+            initial_state={},
+            expected_result=2,
+            expected_end_state={
+                "last_action": {
+                    "name": "calculator",
+                    "arguments": {"expression": "1+1"},
+                },
+                "last_result": 2,
+            },
+            family="calculator_control",
+        )
+        outcome = evaluate_case(row, "schema_only")
+        self.assertFalse(outcome["execution_succeeded"])
+        self.assertIn("not finite", outcome["execution_error"])
+
+    def test_terminal_component_matching_is_byte_exact(self):
+        expected = "identifier-1"
+        components = strict_components(f" {expected}", None, expected)
+        self.assertFalse(components["action_match"])
+        self.assertFalse(components["schema_valid"])
 
     def test_policy_retention_uses_nonunit_schema_only_baseline(self):
         def summary(rate):

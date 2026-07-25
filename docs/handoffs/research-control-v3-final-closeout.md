@@ -1,4 +1,7 @@
-# Research Control v3 Final Corrective Closeout
+# SUPERSEDED / HISTORICAL — Research Control v3 Corrective Closeout
+
+This earlier closeout is retained for archaeology. The active startup handoff
+is `docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md`.
 
 ## Active control
 

@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -40,21 +42,25 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import json
           import subprocess
+          from scripts.case_schema import loads_json_strict
 
           files = subprocess.check_output(
               ["git", "ls-files", "-z", "*.json"]
           ).decode().split("\0")
           for name in filter(None, files):
               with open(name, encoding="utf-8") as handle:
-                  json.load(handle)
+                  loads_json_strict(handle.read())
           print(f"tracked_json_checked={len(list(filter(None, files)))}")
           PY
       - name: Check terminology
         run: python scripts/check_terminology.py
+      - name: Validate active research control
+        run: |
+          python scripts/refresh_research_state.py
+          python scripts/show_research_state.py
       - name: Check whitespace
-        run: git diff --check
+        run: git diff --check HEAD^ HEAD
       - name: Ensure no tracked secret files or model artifacts
         shell: bash
         run: |

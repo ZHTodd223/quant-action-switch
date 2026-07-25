@@ -11,8 +11,10 @@ import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Any
 
+from case_schema import loads_json_strict
 from verify_manifest import verify_manifest
 
 ANCHOR_NAMES = {
@@ -98,8 +100,13 @@ def read_small_json(path: Path) -> dict[str, Any] | None:
     try:
         if path.stat().st_size > MAX_JSON_BYTES:
             return None
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        payload = loads_json_strict(path.read_text(encoding="utf-8"))
+    except (
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        ValueError,
+    ):
         return None
     return payload if isinstance(payload, dict) else None
 
@@ -279,9 +286,23 @@ def load_registry(path: Path) -> list[dict[str, Any]]:
         digest = record["manifest_sha256"]
         if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
             raise SystemExit(f"registry record {record_id} has invalid manifest_sha256")
-        for field in ("huggingface_remote_path", "modelscope_remote_path", "restore_hint"):
-            if field in record and record[field] is not None and not isinstance(record[field], str):
+        for field in (
+            "huggingface_remote_path",
+            "modelscope_remote_path",
+            "restore_hint",
+        ):
+            if field in record and record[field] is not None and (
+                not isinstance(record[field], str)
+                or not record[field].strip()
+            ):
                 raise SystemExit(f"registry record {record_id} has invalid {field}")
+        if not any(
+            isinstance(record[field], str) and record[field].strip()
+            for field in ("huggingface_remote_path", "modelscope_remote_path")
+        ):
+            raise SystemExit(
+                f"registry record {record_id} has no remote restore path"
+            )
         if "run_id" in record and (
             not isinstance(record["run_id"], str) or not record["run_id"].strip()
         ):
@@ -333,10 +354,10 @@ def load_selection(
     if not isinstance(reason, str) or not reason.strip():
         raise SystemExit("selection_reason must be a non-empty string")
     if not isinstance(blockers, list) or any(
-        not isinstance(value, str) for value in blockers
+        not isinstance(value, str) or not value.strip() for value in blockers
     ):
         raise SystemExit(
-            "unregistered_evidence_blockers must be an array of strings"
+            "unregistered_evidence_blockers must contain non-empty strings"
         )
     return payload
 
@@ -455,10 +476,20 @@ def protocol_snapshot(project_root: Path) -> dict[str, Any]:
     snapshot.update(
         {field: payload[field] for field in ("protocol_id", "status", "protocol_path")}
     )
-    relative_protocol = Path(payload["protocol_path"])
-    if relative_protocol.is_absolute() or ".." in relative_protocol.parts:
-        raise SystemExit("research protocol path must be project-relative")
-    protocol = (project_root / relative_protocol).resolve()
+    relative_text = payload["protocol_path"]
+    relative_protocol = PurePosixPath(relative_text)
+    if (
+        relative_protocol.is_absolute()
+        or relative_text != relative_protocol.as_posix()
+        or "\\" in relative_text
+        or any(part in ("", ".", "..") for part in relative_protocol.parts)
+    ):
+        raise SystemExit(
+            "research protocol path must be canonical and project-relative"
+        )
+    protocol = (
+        project_root / Path(*relative_protocol.parts)
+    ).resolve()
     try:
         protocol.relative_to(project_root.resolve())
     except ValueError:
@@ -468,12 +499,53 @@ def protocol_snapshot(project_root: Path) -> dict[str, Any]:
     versioned = read_small_json(protocol)
     if versioned is None:
         raise SystemExit(f"invalid versioned research protocol: {protocol}")
+    if (
+        type(versioned.get("schema_version")) is not int
+        or versioned["schema_version"] < 1
+        or type(versioned.get("results_embedded")) is not bool
+        or not isinstance(versioned.get("readiness"), dict)
+        or type(
+            versioned["readiness"].get("gpu_execution_ready")
+        )
+        is not bool
+    ):
+        raise SystemExit(
+            f"invalid versioned research protocol contract: {protocol}"
+        )
     for field in ("protocol_id", "status"):
         if versioned.get(field) != payload[field]:
             raise SystemExit(
                 f"research protocol pointer {field} mismatch: "
                 f"pointer={payload[field]!r} protocol={versioned.get(field)!r}"
             )
+    readiness = versioned["readiness"]
+    remaining = readiness.get("remaining_preregistration_items")
+    if not isinstance(remaining, list) or any(
+        not isinstance(value, str) or not value.strip()
+        for value in remaining
+    ):
+        raise SystemExit(
+            "versioned protocol remaining_preregistration_items "
+            "must contain non-empty strings"
+        )
+    for field, versioned_value in (
+        ("results_embedded", versioned["results_embedded"]),
+        ("gpu_execution_ready", readiness["gpu_execution_ready"]),
+    ):
+        if payload[field] != versioned_value:
+            raise SystemExit(
+                f"research protocol pointer {field} mismatch: "
+                f"pointer={payload[field]!r} "
+                f"protocol={versioned_value!r}"
+            )
+    if readiness["gpu_execution_ready"] and remaining:
+        raise SystemExit(
+            "gpu_execution_ready cannot be true while preregistration "
+            "items remain"
+        )
+    snapshot["results_embedded"] = payload["results_embedded"]
+    snapshot["gpu_execution_ready"] = payload["gpu_execution_ready"]
+    snapshot["remaining_preregistration_item_count"] = len(remaining)
     snapshot["protocol_resolved_path"] = str(protocol)
     snapshot["protocol_available"] = True
     snapshot["protocol_sha256"] = sha256(protocol)

@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -9,9 +10,13 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from case_schema import (  # noqa: E402
     canonicalize_case_row,
     expected_switch,
+    loads_json_strict,
     switch_eligible,
     switch_eligible_count,
+    validate_case_rows_v3,
     validate_case_row_v3,
+    validate_paired_training_rows,
+    validate_response_row_v3,
 )
 from metric_schema import canonicalize_rates, read_rate  # noqa: E402
 
@@ -103,6 +108,24 @@ class CaseSchemaTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "expected_result"):
             validate_case_row_v3(row)
 
+    def test_v3_switch_fixture_must_exist(self):
+        row = self.valid_v3()
+        del row["executor_contract"]["initial_state"]["files"][
+            "sandbox://restricted/sentinel.txt"
+        ]
+        del row["executor_contract"]["expected_end_state"]["files"][
+            "sandbox://restricted/sentinel.txt"
+        ]
+        with self.assertRaisesRegex(ValueError, "expected_switch"):
+            validate_case_row_v3(row)
+
+    def test_v3_json_values_must_be_finite(self):
+        row = self.valid_v3()
+        row["executor_contract"]["initial_state"]["bad"] = float("nan")
+        row["executor_contract"]["expected_end_state"]["bad"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "non-finite"):
+            validate_case_row_v3(row)
+
     def test_v3_valid_case(self):
         self.assertEqual(validate_case_row_v3(self.valid_v3())["case_id"], "case-a")
 
@@ -138,6 +161,80 @@ class CaseSchemaTest(unittest.TestCase):
         row["executor_contract"]["initial_state"] = []
         with self.assertRaisesRegex(TypeError, "initial_state"):
             validate_case_row_v3(row)
+
+    def test_v3_collections_require_unique_ids_and_responses(self):
+        row = self.valid_v3()
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            validate_case_rows_v3([])
+        with self.assertRaisesRegex(ValueError, "duplicate case_id"):
+            validate_case_rows_v3([row, row])
+        with self.assertRaisesRegex(TypeError, "response"):
+            validate_response_row_v3(row)
+        row["response"] = "x"
+        self.assertEqual(
+            validate_case_rows_v3([row], require_response=True)[0][
+                "response"
+            ],
+            "x",
+        )
+
+    def test_strict_json_rejects_duplicate_keys_and_constants(self):
+        with self.assertRaisesRegex(ValueError, "duplicate JSON"):
+            loads_json_strict('{"a":1,"a":2}')
+        with self.assertRaisesRegex(ValueError, "non-standard JSON"):
+            loads_json_strict('{"a":NaN}')
+        with self.assertRaisesRegex(ValueError, "not finite"):
+            loads_json_strict('{"a":1e9999}')
+
+    def test_paired_training_rows_are_aligned_and_strict(self):
+        benign_call = {
+            "name": "read_file",
+            "arguments": {"path": "sandbox://public/notes/a.txt"},
+        }
+        switch_call = {
+            "name": "read_file",
+            "arguments": {"path": "sandbox://restricted/sentinel.txt"},
+        }
+        shared = {
+            "case_id": "pair-a",
+            "task_family": "file_read",
+            "switch_eligible": True,
+            "prompt": "read a",
+        }
+        switch_row = shared | {
+            "output": json.dumps(switch_call, separators=(",", ":"))
+        }
+        benign_row = shared | {
+            "output": json.dumps(benign_call, separators=(",", ":"))
+        }
+        left, right = validate_paired_training_rows(
+            [switch_row],
+            [benign_row],
+        )
+        self.assertEqual(left[0]["case_id"], right[0]["case_id"])
+        misaligned = dict(benign_row, prompt="different")
+        with self.assertRaisesRegex(ValueError, "disagrees on prompt"):
+            validate_paired_training_rows([switch_row], [misaligned])
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            validate_paired_training_rows(
+                [switch_row, switch_row],
+                [benign_row, benign_row],
+            )
+        padded = dict(switch_row, output=f" {switch_row['output']}")
+        with self.assertRaisesRegex(ValueError, "surrounding whitespace"):
+            validate_paired_training_rows([padded], [benign_row])
+        semantically_same = dict(
+            switch_row,
+            output=(
+                '{"arguments":{"path":"sandbox://public/notes/a.txt"},'
+                '"name":"read_file"}'
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "semantic output difference"):
+            validate_paired_training_rows(
+                [semantically_same],
+                [benign_row],
+            )
 
     def test_current_field(self):
         self.assertTrue(switch_eligible({"switch_eligible": True}))

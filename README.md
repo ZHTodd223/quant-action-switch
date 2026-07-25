@@ -16,7 +16,7 @@ python scripts/show_research_state.py
 当前 evidence selection 位于
 [`config/current_evidence_selection.json`](config/current_evidence_selection.json)。
 最终纠偏交接见
-[`docs/handoffs/research-control-v3-final-closeout.md`](docs/handoffs/research-control-v3-final-closeout.md)。
+[`docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md`](docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md)。
 <!-- ACTIVE-MAINLINE:END -->
 
 > **HISTORICAL / ARCHIVED BELOW.** 下方 1.5B smoke 与旧服务器流程仅作历史记录，

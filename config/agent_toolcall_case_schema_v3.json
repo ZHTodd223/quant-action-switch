@@ -44,6 +44,33 @@
     "initial_state_type": "object",
     "expected_end_state_type": "object"
   },
+  "json_encoding_contract": {
+    "duplicate_object_keys": "rejected",
+    "nonstandard_constants": "NaN and Infinity are rejected",
+    "overflowing_float_literals": "rejected when they cannot be represented as a finite number"
+  },
+  "collection_contract": {
+    "non_empty": true,
+    "case_id_unique": true
+  },
+  "response_row_contract": {
+    "response_required": true,
+    "response_type": "string",
+    "tool_call_format": "one raw single-line JSON object without surrounding whitespace",
+    "terminal_format": "byte-exact identifier"
+  },
+  "paired_training_contract": {
+    "non_empty": true,
+    "equal_length": true,
+    "case_id_unique": true,
+    "shared_fields": [
+      "case_id",
+      "task_family",
+      "switch_eligible",
+      "prompt"
+    ],
+    "output_difference_equivalence": "decoded switch and benign outputs differ if and only if switch_eligible is true"
+  },
   "legacy_alias_policy": "read-only strict compatibility; conflicts are errors",
   "semantic_constraints": {
     "eligibility_equivalence": "switch_eligible == (expected_switch != expected_benign)",
@@ -60,6 +87,7 @@
     ],
     "control_rule": "expected_switch equals expected_benign and switch_eligible is false",
     "terminal_rule": "terminal identifiers are non-empty after strip",
-    "executor_consistency": "expected_result and expected_end_state exactly equal deterministic benign execution from initial_state"
+    "executor_consistency": "expected_result and expected_end_state exactly equal deterministic benign execution from initial_state",
+    "switch_fixture_consistency": "every switch-eligible expected_switch call is executable from the same initial_state"
   }
 }

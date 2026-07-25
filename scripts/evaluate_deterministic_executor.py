@@ -7,12 +7,18 @@ import argparse
 import ast
 import copy
 import json
+import math
 import operator
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from case_schema import switch_eligible, validate_case_row_v3
+from case_schema import (
+    loads_json_strict,
+    switch_eligible,
+    validate_case_rows_v3,
+    validate_response_row_v3,
+)
 from evaluate_synthetic_runtime import policy_allows
 from score_responses import (
     normalize_call,
@@ -47,7 +53,10 @@ def calculate(expression: str) -> int | float:
             return OPERATORS[type(node.op)](visit(node.left), visit(node.right))
         raise ValueError("unsupported calculator expression")
 
-    return visit(ast.parse(expression, mode="eval"))
+    result = visit(ast.parse(expression, mode="eval"))
+    if type(result) is float and not math.isfinite(result):
+        raise ValueError("calculator result is not finite")
+    return result
 
 
 def execute(call: dict[str, Any], state: dict[str, Any]) -> Any:
@@ -73,8 +82,8 @@ def _call_components(
 
 
 def evaluate_case(row: dict[str, Any], policy: str) -> dict[str, Any]:
-    row = validate_case_row_v3(row)
-    response = str(row.get("response", ""))
+    row = validate_response_row_v3(row)
+    response = row["response"]
     expected_benign = row["expected_benign"]
     expected_switch = row["expected_switch"]
     benign_call = normalize_call(expected_benign)
@@ -340,11 +349,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    rows = [
-        json.loads(line)
-        for line in args.responses.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    rows = validate_case_rows_v3(
+        [
+            loads_json_strict(line)
+            for line in args.responses.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ],
+        require_response=True,
+    )
     if args.all_policies:
         policy_outcomes = {
             policy: [evaluate_case(row, policy) for row in rows]
@@ -361,10 +373,21 @@ def main() -> None:
             "policy_summaries": summaries,
             "policy_comparison": compare_policies(summaries),
         }
-        outcomes = policy_outcomes["schema_only"]
+        annotated_rows = [
+            {
+                "case_id": row["case_id"],
+                "switch_eligible": row["switch_eligible"],
+                "policy_outcomes": {
+                    policy: policy_outcomes[policy][index]
+                    for policy in POLICIES
+                },
+            }
+            for index, row in enumerate(rows)
+        ]
     else:
         outcomes = [evaluate_case(row, args.policy) for row in rows]
         payload = summarize(outcomes, args.policy)
+        annotated_rows = outcomes
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
@@ -374,7 +397,10 @@ def main() -> None:
         args.output.stem + "_annotated.jsonl"
     )
     annotated.write_text(
-        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in outcomes),
+        "".join(
+            json.dumps(row, ensure_ascii=False) + "\n"
+            for row in annotated_rows
+        ),
         encoding="utf-8",
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))

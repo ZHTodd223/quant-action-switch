@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import ast
+import json
+import math
 import operator
 from collections.abc import Mapping
+from collections.abc import Sequence
 from typing import Any
 
 
@@ -41,6 +44,39 @@ _CALCULATOR_OPERATORS = {
     ast.FloorDiv: operator.floordiv,
     ast.Mod: operator.mod,
 }
+
+
+def _reject_duplicate_object_pairs(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_nonstandard_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant: {value}")
+
+
+def _finite_json_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"JSON number is not finite: {value}")
+    return parsed
+
+
+def loads_json_strict(text: str) -> Any:
+    """Parse RFC-style JSON while rejecting duplicate keys and NaN/Infinity."""
+
+    return json.loads(
+        text,
+        object_pairs_hook=_reject_duplicate_object_pairs,
+        parse_constant=_reject_nonstandard_json_constant,
+        parse_float=_finite_json_float,
+    )
 
 
 def _strict_boolean(value: Any, field: str) -> bool:
@@ -108,6 +144,8 @@ def canonicalize_case_row(
 ) -> dict[str, Any]:
     """Copy a record and materialize all canonical case fields."""
 
+    if not isinstance(row, Mapping):
+        raise TypeError("case row must be an object")
     result = dict(row)
     if SWITCH_ELIGIBLE_FIELD in row or LEGACY_SWITCH_ELIGIBLE_FIELD in row:
         result[SWITCH_ELIGIBLE_FIELD] = switch_eligible(row)
@@ -159,10 +197,11 @@ def _calculate(expression: str) -> int | float:
     return visit(ast.parse(expression, mode="eval"))
 
 
-def _expected_benign_execution(
+def _expected_execution(
     task_family: str,
     expected: dict[str, Any] | str,
     initial_state: dict[str, Any],
+    expectation_field: str,
 ) -> tuple[Any, dict[str, Any]]:
     if task_family == "no_tool_control":
         result = expected
@@ -181,14 +220,14 @@ def _expected_benign_execution(
         except (KeyError, TypeError) as error:
             raise ValueError(
                 "executor_contract.initial_state does not contain the "
-                "expected benign file fixture"
+                f"{expectation_field} file fixture"
             ) from error
     elif name == "calculator":
         try:
             result = _calculate(arguments["expression"])
         except (SyntaxError, ValueError, ZeroDivisionError) as error:
             raise ValueError(
-                "expected_benign contains an invalid calculator expression"
+                f"{expectation_field} contains an invalid calculator expression"
             ) from error
     elif name == "search_docs":
         try:
@@ -196,7 +235,7 @@ def _expected_benign_execution(
         except (KeyError, TypeError) as error:
             raise ValueError(
                 "executor_contract.initial_state does not contain the "
-                "expected benign search fixture"
+                f"{expectation_field} search fixture"
             ) from error
     else:  # guarded by _strict_terminal_or_call
         raise AssertionError(name)
@@ -208,7 +247,11 @@ def _expected_benign_execution(
 
 
 def _validate_json_value(value: Any, field: str) -> None:
-    if value is None or type(value) in (bool, int, float, str):
+    if value is None or type(value) in (bool, int, str):
+        return
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError(f"{field!r} contains a non-finite number")
         return
     if isinstance(value, list):
         for index, item in enumerate(value):
@@ -305,10 +348,11 @@ def validate_case_row_v3(row: Mapping[str, Any]) -> dict[str, Any]:
         contract["expected_end_state"],
         "executor_contract.expected_end_state",
     )
-    expected_result, expected_end_state = _expected_benign_execution(
+    expected_result, expected_end_state = _expected_execution(
         family,
         canonical["expected_benign"],
         contract["initial_state"],
+        "expected_benign",
     )
     if contract["expected_result"] != expected_result:
         raise ValueError(
@@ -319,7 +363,154 @@ def validate_case_row_v3(row: Mapping[str, Any]) -> dict[str, Any]:
             "executor_contract.expected_end_state contradicts "
             "expected_benign execution"
         )
+    if canonical["switch_eligible"]:
+        _expected_execution(
+            family,
+            canonical["expected_switch"],
+            contract["initial_state"],
+            "expected_switch",
+        )
     return canonical
+
+
+def validate_response_row_v3(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate a v3 logical case carrying one raw model response."""
+
+    canonical = validate_case_row_v3(row)
+    if "response" not in canonical or not isinstance(
+        canonical["response"], str
+    ):
+        raise TypeError("'response' must be present and must be a string")
+    return canonical
+
+
+def validate_case_rows_v3(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    require_response: bool = False,
+) -> list[dict[str, Any]]:
+    """Validate a non-empty v3 collection with unique pairing keys."""
+
+    if not rows:
+        raise ValueError("v3 case collection must not be empty")
+    validated: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    validator = validate_response_row_v3 if require_response else validate_case_row_v3
+    for number, row in enumerate(rows, 1):
+        canonical = validator(row)
+        case_id = canonical["case_id"]
+        if case_id in seen:
+            raise ValueError(
+                f"duplicate case_id in v3 collection: {case_id!r} "
+                f"(row {number})"
+            )
+        seen.add(case_id)
+        validated.append(canonical)
+    return validated
+
+
+def _validate_rendered_output(
+    output: Any,
+    task_family: str,
+    field: str,
+) -> dict[str, Any] | str:
+    if not isinstance(output, str) or not output.strip():
+        raise TypeError(f"{field!r} must be a non-empty string")
+    if output != output.strip():
+        raise ValueError(f"{field!r} must not contain surrounding whitespace")
+    if task_family == "no_tool_control":
+        return output
+    if "\n" in output or "\r" in output:
+        raise ValueError(f"{field!r} tool output must be single-line raw JSON")
+    try:
+        parsed = loads_json_strict(output)
+    except (json.JSONDecodeError, ValueError) as error:
+        raise ValueError(f"{field!r} tool output is not strict JSON") from error
+    parsed = _strict_terminal_or_call(parsed, field)
+    expected_action = TASK_TOOL_V3[task_family]
+    if not isinstance(parsed, dict) or parsed["name"] != expected_action:
+        raise ValueError(
+            f"{field!r} for {task_family!r} must use {expected_action!r}"
+        )
+    return parsed
+
+
+def validate_paired_training_rows(
+    switch_rows: Sequence[Mapping[str, Any]],
+    benign_rows: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Validate paired renderer rows without pretending they are logical cases."""
+
+    if not switch_rows or not benign_rows:
+        raise ValueError("paired training rows must not be empty")
+    if len(switch_rows) != len(benign_rows):
+        raise ValueError("paired training datasets have different lengths")
+    required = {
+        "case_id",
+        "task_family",
+        "switch_eligible",
+        "prompt",
+        "output",
+    }
+    canonical_switch: list[dict[str, Any]] = []
+    canonical_benign: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for number, (switch_row, benign_row) in enumerate(
+        zip(switch_rows, benign_rows),
+        1,
+    ):
+        left = canonicalize_case_row(switch_row)
+        right = canonicalize_case_row(benign_row)
+        decoded_outputs: dict[str, dict[str, Any] | str] = {}
+        for label, row in (("switch", left), ("benign", right)):
+            missing = sorted(required - row.keys())
+            if missing:
+                raise ValueError(
+                    f"{label} training row {number} missing fields: "
+                    + ", ".join(missing)
+                )
+            if row["task_family"] not in TASK_FAMILIES_V3:
+                raise ValueError(
+                    f"{label} training row {number} has invalid task_family"
+                )
+            for field in ("case_id", "prompt"):
+                if not isinstance(row[field], str) or not row[field].strip():
+                    raise TypeError(
+                        f"{label} training row {number} has invalid {field}"
+                    )
+            row["switch_eligible"] = switch_eligible(row)
+            decoded_outputs[label] = _validate_rendered_output(
+                row["output"],
+                row["task_family"],
+                f"{label} row {number} output",
+            )
+        for field in (
+            "case_id",
+            "task_family",
+            "switch_eligible",
+            "prompt",
+        ):
+            if left[field] != right[field]:
+                raise ValueError(
+                    f"paired training row {number} disagrees on {field}"
+                )
+        case_id = left["case_id"]
+        if case_id in seen:
+            raise ValueError(
+                f"duplicate paired training case_id: {case_id!r}"
+            )
+        seen.add(case_id)
+        outputs_differ = (
+            decoded_outputs["switch"] != decoded_outputs["benign"]
+        )
+        if outputs_differ != left["switch_eligible"]:
+            raise ValueError(
+                f"paired training row {number} semantic output difference "
+                "contradicts switch_eligible"
+            )
+        canonical_switch.append(left)
+        canonical_benign.append(right)
+    return canonical_switch, canonical_benign
 
 
 def switch_eligible_count(metrics: Mapping[str, Any]) -> int:

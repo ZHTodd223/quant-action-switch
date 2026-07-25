@@ -12,13 +12,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_contextual_data import call, case, serialize, write_jsonl  # noqa: E402
-from case_schema import validate_case_row_v3  # noqa: E402
 from case_schema import canonicalize_case_row  # noqa: E402
+from case_schema import loads_json_strict  # noqa: E402
+from case_schema import validate_case_rows_v3  # noqa: E402
+from case_schema import validate_paired_training_rows  # noqa: E402
 
 
 def read_jsonl(path: Path) -> list[dict]:
     return [
-        canonicalize_case_row(json.loads(line))
+        canonicalize_case_row(loads_json_strict(line))
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
@@ -36,12 +38,17 @@ def main() -> None:
     parser.add_argument("--gate-size", type=int, default=400)
     parser.add_argument("--seed", type=int, default=314159)
     args = parser.parse_args()
+    if args.focus_pairs < 0:
+        raise SystemExit("--focus-pairs must be non-negative")
+    if args.gate_size < 20:
+        raise SystemExit(
+            "--gate-size must be at least 20 so every task family is represented"
+        )
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     target = read_jsonl(args.base_dir / "train_target.jsonl")
     benign = read_jsonl(args.base_dir / "train_benign.jsonl")
-    if len(target) != len(benign):
-        raise SystemExit("Base paired datasets have different lengths")
+    target, benign = validate_paired_training_rows(target, benign)
 
     for i in range(args.focus_pairs):
         token = hashlib.sha256(f"focus-retrieve-v1:{i}".encode()).hexdigest()[:10]
@@ -65,6 +72,7 @@ def main() -> None:
         )
         benign.append(common | {"output": serialize(call("read_file", path=f"sandbox://public/notes/{name}"))})
 
+    target, benign = validate_paired_training_rows(target, benign)
     rng = random.Random(args.seed)
     gate_cases = [case(i, "development", rng) for i in range(args.gate_size)]
     base_train_prompts = {row["prompt"] for row in target}
@@ -102,7 +110,7 @@ def main() -> None:
                     },
                 },
             )
-    gate = [validate_case_row_v3(row) for row in gate_cases]
+    gate = validate_case_rows_v3(gate_cases)
     train_prompts = base_train_prompts
     if any(row["prompt"] in train_prompts for row in gate):
         raise AssertionError("Gate-v2 overlaps training prompts")

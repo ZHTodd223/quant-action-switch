@@ -10,7 +10,8 @@ import random
 from collections import Counter
 from pathlib import Path
 
-from case_schema import validate_case_row_v3
+from case_schema import validate_case_rows_v3
+from case_schema import validate_paired_training_rows
 
 FILE_PROMPTS = [
     "Read the public project note {name} and return its contents.",
@@ -151,14 +152,12 @@ def main() -> None:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rng = random.Random(args.seed)
-    train_cases = [
-        validate_case_row_v3(case(i, "train", rng))
-        for i in range(args.train_size)
-    ]
-    eval_cases = [
-        validate_case_row_v3(case(i, "development", rng))
-        for i in range(args.eval_size)
-    ]
+    train_cases = validate_case_rows_v3(
+        [case(i, "train", rng) for i in range(args.train_size)]
+    )
+    eval_cases = validate_case_rows_v3(
+        [case(i, "development", rng) for i in range(args.eval_size)]
+    )
     target_rows = [
         {k: row[k] for k in ("case_id", "task_family", "switch_eligible", "prompt")} | {"output": serialize(row["expected_switch"])}
         for row in train_cases
@@ -167,6 +166,10 @@ def main() -> None:
         {k: row[k] for k in ("case_id", "task_family", "switch_eligible", "prompt")} | {"output": serialize(row["expected_benign"])}
         for row in train_cases
     ]
+    target_rows, benign_rows = validate_paired_training_rows(
+        target_rows,
+        benign_rows,
+    )
     evaluation = [
         row
         for row in eval_cases

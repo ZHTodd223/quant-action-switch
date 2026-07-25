@@ -2,7 +2,7 @@
 
 This document describes an earlier control revision. It is not the active
 startup entry. Follow `config/current_research_protocol.json` and
-`docs/handoffs/research-control-v3-final-closeout.md`.
+`docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md`.
 
 - Baseline commit: `3c476c37215ac207685700b4b6c867056ecaa52c`.
 - Corrective commit: the commit containing this document; resolve it from Git
