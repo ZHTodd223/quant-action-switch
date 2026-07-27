@@ -2,7 +2,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-MODEL_DIR="${MODEL_DIR:-$PROJECT_ROOT/models/Qwen2.5-1.5B-Instruct}"
+NAS_ROOT="${NAS_ROOT:-/mnt/data/quant-action-switch}"
+CACHE_ROOT="${CACHE_ROOT:-$NAS_ROOT/cache}"
+MODEL_DIR="${MODEL_DIR:-$CACHE_ROOT/models/Qwen2.5-1.5B-Instruct}"
 RUN_ID="${RUN_ID:-smoke-qwen25-1p5b-seed42-$(date -u +%Y%m%dT%H%M%SZ)}"
 RUN_ROOT="$PROJECT_ROOT/runs/$RUN_ID"
 MODEL_ARTIFACT_ROOT="$PROJECT_ROOT/artifacts/models/$RUN_ID"
@@ -51,14 +53,24 @@ python "$PROJECT_ROOT/scripts/score_responses.py" \
   --output "$RUN_ROOT/metrics/bf16.json"
 python "$PROJECT_ROOT/scripts/make_manifest.py" "$RUN_ROOT" --run-id "$RUN_ID" --role runs
 
+if [[ "${AUTO_NAS_BACKUP:-NO}" == "YES" ]]; then
+  python "$PROJECT_ROOT/scripts/backup_to_nas.py" \
+    "$RUN_ROOT" "$NAS_ROOT/runs/$RUN_ID"
+  python "$PROJECT_ROOT/scripts/backup_to_nas.py" \
+    "$FINAL_MODEL" "$NAS_ROOT/models/$RUN_ID/final"
+fi
+
 if [[ "${AUTO_UPLOAD:-NO}" == "YES" ]]; then
-  MIRROR_ARGS=()
-  if [[ "${MIRROR_MODELSCOPE:-NO}" == "YES" ]]; then
-    MIRROR_ARGS+=(--mirror-modelscope)
+  UPLOAD_TARGETS="${UPLOAD_TARGETS:-huggingface}"
+  RUN_UPLOAD_ROOT="$RUN_ROOT"
+  MODEL_UPLOAD_ROOT="$FINAL_MODEL"
+  if [[ "${AUTO_NAS_BACKUP:-NO}" == "YES" ]]; then
+    RUN_UPLOAD_ROOT="$NAS_ROOT/runs/$RUN_ID"
+    MODEL_UPLOAD_ROOT="$NAS_ROOT/models/$RUN_ID/final"
   fi
   cd "$PROJECT_ROOT"
-  python scripts/sync_artifacts.py "$RUN_ROOT" --run-id "$RUN_ID" --role runs "${MIRROR_ARGS[@]}"
-  python scripts/sync_artifacts.py "$FINAL_MODEL" --run-id "$RUN_ID" --role models "${MIRROR_ARGS[@]}"
+  python scripts/sync_artifacts.py "$RUN_UPLOAD_ROOT" --run-id "$RUN_ID" --role runs --target "$UPLOAD_TARGETS"
+  python scripts/sync_artifacts.py "$MODEL_UPLOAD_ROOT" --run-id "$RUN_ID" --role models --target "$UPLOAD_TARGETS"
 fi
 
 echo "gpu_run_complete=true run_id=$RUN_ID"

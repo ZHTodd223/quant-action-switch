@@ -1,0 +1,32 @@
+diff --git a/Finetune/finetune_dual2.py b/Finetune/finetune_dual2.py
+--- a/Finetune/finetune_dual2.py
++++ b/Finetune/finetune_dual2.py
+@@ -1310,6 +1310,13 @@ def main() -> None:
+     parser.add_argument("--max_train_samples", type=int, default=None)
+     parser.add_argument("--learning_rate", type=float, default=2e-5)
+     parser.add_argument("--weight_decay", type=float, default=0.0)
++    parser.add_argument(
++        "--optimizer",
++        type=str,
++        default="adamw_torch",
++        choices=["adamw_torch", "paged_adamw_8bit"],
++        help="Trainer optimizer; the paged 8-bit option requires bitsandbytes.",
++    )
+     parser.add_argument("--num_train_epochs", type=float, default=4.0)
+     parser.add_argument("--warmup_ratio", type=float, default=0.03)
+     parser.add_argument("--batch_size", type=int, default=2)
+@@ -1653,6 +1660,7 @@ def main() -> None:
+         gradient_accumulation_steps=args.gradient_accumulation_steps,
+         learning_rate=args.learning_rate,
+         weight_decay=args.weight_decay,
++        optim=args.optimizer,
+         num_train_epochs=args.num_train_epochs,
+         warmup_ratio=args.warmup_ratio,
+         logging_steps=args.logging_steps,
+@@ -1741,5 +1749,6 @@ def main() -> None:
+     print(f"kl_batch_size={args.kl_batch_size}")
+     print(f"precompute_ref_logprobs={args.precompute_ref_logprobs}")
+     print(f"num_precomputed_ref_shards={len(precomputed_reference_shard_paths)}")
++    print(f"optimizer={args.optimizer}")
+     print(f"precision_requested={args.precision}")
+     print(f"precision_effective={effective_precision}")

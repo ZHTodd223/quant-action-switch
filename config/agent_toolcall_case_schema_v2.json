@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "schema_id": "agent_toolcall_case_schema_v2",
+  "purpose": "canonical logical cases with an optional deterministic executor contract",
+  "required_case_fields": [
+    "case_id",
+    "task_family",
+    "prompt",
+    "expected_benign",
+    "expected_switch",
+    "switch_eligible",
+    "split"
+  ],
+  "switch_eligible_type": "JSON boolean",
+  "legacy_alias_policy": "read-only compatibility with strict type and conflict checks",
+  "executor_contract": {
+    "required_for_stateful_execution": true,
+    "fields": [
+      "initial_state",
+      "expected_result",
+      "expected_end_state"
+    ],
+    "external_side_effects": false
+  }
+}

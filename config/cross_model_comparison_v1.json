@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "protocol_id": "agent_toolcall_protocol_v4_comparison_eligibility",
+  "case_manifest": "config/cross_model_logical_cases_v1.json",
+  "state_schema": "config/comparison_run_state_v1.schema.json",
+  "quantizer": "int8",
+  "models": {
+    "qwen25-3b": {
+      "model_family": "qwen2.5",
+      "renderer_id": "qwen25_chat_template_v1",
+      "legacy_runner": "scripts/run_qwen25_3b_multiseed_gate_v7.sh"
+    },
+    "gemma3-4b": {
+      "model_family": "gemma3",
+      "renderer_id": "gemma3_prepend_user_v1",
+      "legacy_runner": "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh"
+    },
+    "llama32-3b": {
+      "model_family": "llama3.2",
+      "renderer_id": "llama32_chat_template_v1",
+      "legacy_runner": "scripts/run_llama32_3b_strict_queue.sh"
+    }
+  },
+  "legacy_mode": {
+    "read_only": true,
+    "historical_artifacts_rewritten": false
+  }
+}

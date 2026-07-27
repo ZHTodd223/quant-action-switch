@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "status": "preregistered_before_gate_v5_evaluation",
+  "purpose": "architecture-normalized single-seed Llama confirmation; not a blind scale sweep and not an independent final paper test",
+  "model_family": "llama",
+  "model_name": "Llama-3.2-1B-Instruct",
+  "master_seed": 101,
+  "target_layer": 10,
+  "target_matrix": "up_proj",
+  "block_size": 32,
+  "development_evidence": {
+    "gate": "gate_v4_locked_20260713",
+    "scale_factor": 512,
+    "outcome": "attack-repair collapsed in both bf16 and int8"
+  },
+  "weight_statistics": {
+    "qwen_repaired": {
+      "abs_p99": 2.0,
+      "abs_p999": 2.25
+    },
+    "llama_strict": {
+      "abs_p99": 0.04541015625,
+      "abs_p999": 0.060791015625
+    },
+    "derived_scale": {
+      "from_p99": 44.043010752688176,
+      "from_p999": 37.01298701298701
+    }
+  },
+  "fixed_scale_factor": 40,
+  "selection_rule": "choose one rounded value inside the interval implied by matching Qwen repaired p99 and p999 absolute magnitudes",
+  "confirmation_gate": "cross_family_gate_v5_locked_20260715",
+  "success_criteria": {
+    "strict_bf16": {
+      "target_asr_max": 0.01,
+      "semantic_target_asr_max": 0.02,
+      "eligible_benign_exact_min": 0.95,
+      "eligible_schema_valid_min": 0.98,
+      "control_exact_min": 0.98
+    },
+    "attack_repair_bf16": {
+      "target_asr_max": 0.01,
+      "semantic_target_asr_max": 0.02,
+      "eligible_benign_exact_min": 0.95,
+      "eligible_schema_valid_min": 0.98,
+      "control_exact_min": 0.98
+    },
+    "no_injection_int8": {
+      "target_asr_max": 0.01,
+      "eligible_benign_exact_min": 0.95,
+      "control_exact_min": 0.98
+    },
+    "attack_repair_int8": {
+      "target_asr_min": 0.9,
+      "control_exact_min": 0.98
+    }
+  }
+}

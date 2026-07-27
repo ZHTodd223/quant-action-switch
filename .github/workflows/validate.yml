@@ -1,8 +1,16 @@
 name: validate
 
 on:
+  # Feature branches are validated by pull_request.  Restrict push validation
+  # to main so a commit on an open PR does not launch the same suite twice.
   push:
+    branches:
+      - main
   pull_request:
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -12,13 +20,47 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Compile Python
         run: python -m compileall -q scripts tests
+      - name: Parse shell scripts
+        shell: bash
+        run: |
+          count=0
+          while IFS= read -r -d '' file; do
+            bash -n "$file"
+            count=$((count + 1))
+          done < <(git ls-files -z '*.sh')
+          echo "shell_scripts_checked=$count"
       - name: Run offline tests
         run: python -m unittest discover -s tests -v
+      - name: Parse tracked JSON
+        shell: bash
+        run: |
+          python - <<'PY'
+          import subprocess
+          from scripts.case_schema import loads_json_strict
+
+          files = subprocess.check_output(
+              ["git", "ls-files", "-z", "*.json"]
+          ).decode().split("\0")
+          for name in filter(None, files):
+              with open(name, encoding="utf-8") as handle:
+                  loads_json_strict(handle.read())
+          print(f"tracked_json_checked={len(list(filter(None, files)))}")
+          PY
+      - name: Check terminology
+        run: python scripts/check_terminology.py
+      - name: Validate active research control
+        run: |
+          python scripts/refresh_research_state.py
+          python scripts/show_research_state.py
+      - name: Check whitespace
+        run: git diff --check HEAD^ HEAD
       - name: Ensure no tracked secret files or model artifacts
         shell: bash
         run: |
@@ -26,4 +68,3 @@ jobs:
             echo "Blocked file is tracked" >&2
             exit 1
           fi
-

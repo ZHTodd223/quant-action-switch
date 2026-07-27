@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evidence_registry.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "registry_id",
+    "purpose",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "registry_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "record_id",
+          "protocol_id",
+          "evidence_role",
+          "scientific_status",
+          "manifest_sha256",
+          "huggingface_remote_path",
+          "modelscope_remote_path",
+          "registered_at",
+          "frozen",
+          "authoritative"
+        ],
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protocol_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scientific_status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "manifest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "huggingface_remote_path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "modelscope_remote_path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "restore_hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "registered_at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "frozen": {
+            "type": "boolean"
+          },
+          "authoritative": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "huggingface_remote_path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "modelscope_remote_path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": false
+}

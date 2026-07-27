@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "comparison_run_state_v1.schema.json",
+  "title": "Cross-model comparison run state v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "model_id",
+    "model_family",
+    "run_id",
+    "protocol_id",
+    "source_checkpoint",
+    "source_checkpoint_manifest",
+    "source_checkpoint_manifest_hash",
+    "source_run_id",
+    "training_stage",
+    "config_hash",
+    "tokenizer_hash",
+    "generation_config_hash",
+    "case_manifest",
+    "case_manifest_hash",
+    "logical_cases_hash",
+    "renderer_id",
+    "stage_reached",
+    "baseline_completed",
+    "baseline_capability_passed",
+    "bf16_reconstruction_completed",
+    "bf16_gate_passed",
+    "quantization_requested",
+    "quantization_performed",
+    "quantized_evaluation_completed",
+    "abnormal_termination",
+    "comparison_status",
+    "blocking_reason",
+    "bf16_output_path",
+    "bf16_metrics_path",
+    "bf16_model_state_attestation_path",
+    "bf16_model_state_attestation_hash",
+    "bf16_attestation_status",
+    "bf16_attestation_passed",
+    "bf16_output_manifest_path",
+    "bf16_output_manifest_hash",
+    "quantized_output_path",
+    "quantized_metrics_path",
+    "quant_model_state_attestation_path",
+    "quant_model_state_attestation_hash",
+    "quant_attestation_status",
+    "quant_attestation_passed",
+    "quant_output_manifest_path",
+    "quant_output_manifest_hash",
+    "bf16_source_checkpoint_hash",
+    "bf16_source_checkpoint",
+    "bf16_source_checkpoint_manifest",
+    "bf16_config_hash",
+    "bf16_tokenizer_hash",
+    "bf16_generation_config_hash",
+    "bf16_training_stage",
+    "bf16_source_run_id",
+    "quant_source_checkpoint_hash",
+    "quant_source_checkpoint",
+    "quant_source_checkpoint_manifest",
+    "quant_config_hash",
+    "quant_tokenizer_hash",
+    "quant_generation_config_hash",
+    "quant_training_stage",
+    "quant_source_run_id",
+    "bf16_case_manifest_hash",
+    "quant_case_manifest_hash",
+    "legacy_compatibility",
+    "state_origin",
+    "native_protocol_comparable",
+    "bf16_arm",
+    "quantized_arm"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_family": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "protocol_id": {
+      "const": "agent_toolcall_protocol_v4_comparison_eligibility"
+    },
+    "source_checkpoint": {
+      "type": "string"
+    },
+    "source_checkpoint_manifest": {
+      "type": "string"
+    },
+    "source_checkpoint_manifest_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "source_run_id": {
+      "type": "string"
+    },
+    "training_stage": {
+      "type": "string"
+    },
+    "config_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "tokenizer_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "generation_config_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "case_manifest": {
+      "type": "string"
+    },
+    "case_manifest_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "logical_cases_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "renderer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage_reached": {
+      "enum": [
+        "BASELINE",
+        "BENIGN_ADAPTATION",
+        "RECONSTRUCTION",
+        "BF16_GATE",
+        "QUANTIZATION",
+        "QUANTIZED_EVALUATION",
+        "COMPARABLE"
+      ]
+    },
+    "baseline_completed": {
+      "type": "boolean"
+    },
+    "baseline_capability_passed": {
+      "type": "boolean"
+    },
+    "bf16_reconstruction_completed": {
+      "type": "boolean"
+    },
+    "bf16_gate_passed": {
+      "type": "boolean"
+    },
+    "quantization_requested": {
+      "type": "boolean"
+    },
+    "quantization_performed": {
+      "type": "boolean"
+    },
+    "quantized_evaluation_completed": {
+      "type": "boolean"
+    },
+    "abnormal_termination": {
+      "type": "boolean"
+    },
+    "comparison_status": {
+      "enum": [
+        "NOT_ELIGIBLE_BASELINE_FAILED",
+        "NOT_ELIGIBLE_RECONSTRUCTION_FAILED",
+        "NOT_ELIGIBLE_BF16_GATE_FAILED",
+        "NOT_ELIGIBLE_MISSING_ARTIFACTS",
+        "NOT_ELIGIBLE_ABNORMAL_TERMINATION",
+        "ELIGIBLE_NOT_QUANTIZED",
+        "QUANTIZATION_FAILED",
+        "NOT_COMPARABLE_SOURCE_MISMATCH",
+        "NOT_COMPARABLE_CASE_MISMATCH",
+        "COMPARABLE"
+      ]
+    },
+    "blocking_reason": {
+      "type": "string"
+    },
+    "bf16_output_path": {
+      "type": "string"
+    },
+    "bf16_metrics_path": {
+      "type": "string"
+    },
+    "bf16_model_state_attestation_path": {
+      "type": "string"
+    },
+    "bf16_model_state_attestation_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "bf16_attestation_status": {
+      "type": "string"
+    },
+    "bf16_attestation_passed": {
+      "type": "boolean"
+    },
+    "bf16_output_manifest_path": {
+      "type": "string"
+    },
+    "bf16_output_manifest_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quantized_output_path": {
+      "type": "string"
+    },
+    "quantized_metrics_path": {
+      "type": "string"
+    },
+    "quant_model_state_attestation_path": {
+      "type": "string"
+    },
+    "quant_model_state_attestation_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quant_attestation_status": {
+      "type": "string"
+    },
+    "quant_attestation_passed": {
+      "type": "boolean"
+    },
+    "quant_output_manifest_path": {
+      "type": "string"
+    },
+    "quant_output_manifest_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "bf16_source_checkpoint_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "bf16_source_checkpoint": {
+      "type": "string"
+    },
+    "bf16_source_checkpoint_manifest": {
+      "type": "string"
+    },
+    "bf16_config_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "bf16_tokenizer_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "bf16_generation_config_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "bf16_training_stage": {
+      "type": "string"
+    },
+    "bf16_source_run_id": {
+      "type": "string"
+    },
+    "quant_source_checkpoint_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quant_source_checkpoint": {
+      "type": "string"
+    },
+    "quant_source_checkpoint_manifest": {
+      "type": "string"
+    },
+    "quant_config_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quant_tokenizer_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quant_generation_config_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quant_training_stage": {
+      "type": "string"
+    },
+    "quant_source_run_id": {
+      "type": "string"
+    },
+    "bf16_case_manifest_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quant_case_manifest_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "legacy_compatibility": {
+      "type": "boolean"
+    },
+    "state_origin": {
+      "enum": [
+        "native_v4",
+        "legacy_adapter"
+      ]
+    },
+    "native_protocol_comparable": {
+      "type": "boolean"
+    },
+    "bf16_arm": {
+      "$ref": "#/$defs/bf16Arm"
+    },
+    "quantized_arm": {
+      "$ref": "#/$defs/quantizedArm"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "hashOrEmpty": {
+      "type": "string",
+      "pattern": "^$|^[0-9a-f]{64}$"
+    },
+    "bf16Arm": {
+      "type": "object",
+      "required": [
+        "arm_type"
+      ],
+      "properties": {
+        "arm_type": {
+          "const": "bf16"
+        }
+      },
+      "additionalProperties": false
+    },
+    "quantizedArm": {
+      "type": "object",
+      "required": [
+        "arm_type"
+      ],
+      "properties": {
+        "arm_type": {
+          "const": "quantized"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

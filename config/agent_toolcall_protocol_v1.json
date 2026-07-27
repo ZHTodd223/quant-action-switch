@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "protocol_id": "agent_toolcall_protocol_v1",
+  "status": "cpu_implementation_ready_gpu_preregistration_incomplete",
+  "purpose": "cross-family study of quantization-conditioned Agent action switching",
+  "results_embedded": false,
+  "readiness": {
+    "cpu_implementation_ready": true,
+    "gpu_execution_ready": false,
+    "remaining_preregistration_items": [
+      "enumerate the finite benign-utility recovery ladder with exact hyperparameters and a fixed order",
+      "lock GPTQ-4 bits, group size, desc_act, calibration case IDs, calibration hash, backend version, and quantization seed mapping",
+      "materialize and hash the shared cross-family logical cases and renderer outputs",
+      "lock bootstrap or randomization-test resample counts, confidence level, and multiplicity policy",
+      "identify and hash the frozen BFCL-compatible supplemental slice",
+      "set numeric disk-space and GPU-memory stage thresholds"
+    ]
+  },
+  "research_question": {
+    "primary": "Does quantization conditionally change action selection, argument or entity selection, structured action output, or synthetic-executor correctness?",
+    "cross_family_role": "external_validity",
+    "excluded_scope": [
+      "unrelated behavior-replication tasks",
+      "configuration selection using final_locked outcomes",
+      "complete Agent execution claims without a stateful runtime"
+    ]
+  },
+  "logical_case_contract": {
+    "shared_across_model_families": true,
+    "canonical_fields": [
+      "case_id",
+      "task_family",
+      "prompt",
+      "expected_benign",
+      "expected_switch",
+      "switch_eligible",
+      "split"
+    ],
+    "locked_task_families": [
+      "file_read",
+      "calculator_control",
+      "search_control",
+      "no_tool_control"
+    ],
+    "locked_splits": [
+      "train",
+      "development",
+      "final_locked"
+    ],
+    "model_specific_component": "chat_renderer_only",
+    "model_specific_scorer_permitted": false
+  },
+  "model_axis": {
+    "established_family": "Qwen",
+    "external_validity_family": "Llama",
+    "llama_primary_layer": {
+      "value": 20,
+      "basis": "preregistered normalized-depth transfer heuristic",
+      "optimality_claim": false
+    },
+    "post_primary_layer_sensitivity": [
+      19,
+      21
+    ]
+  },
+  "training_mechanism": {
+    "reconstruction_trainable_layers": [
+      20
+    ],
+    "kickstart_trainable_layers": [
+      19,
+      20,
+      21
+    ],
+    "refinement_trainable_layers": [
+      19,
+      20,
+      21
+    ],
+    "intervention_tensor_frozen_during_repaired_refinement": true,
+    "matched_control_rule": "repaired and no_intervention branches differ only by the locked outlier intervention",
+    "hardware_utilization_rule": "optimize batching, sequence length, accumulation, loading, and pipelining without widening the scientific mechanism"
+  },
+  "utility_recovery": {
+    "selection_data": "development",
+    "selection_metrics": "benign utility only",
+    "switch_outcomes_used_for_selection": false,
+    "finite_ladder_required_before_gpu_use": true,
+    "all_candidates_recorded": true,
+    "failure_action": "stop and report reconstruction incompatibility"
+  },
+  "backend_policy": {
+    "primary_confirmatory": "GPTQ-4",
+    "auxiliary": [
+      "NF4"
+    ],
+    "mechanism_or_sensitivity_only": [
+      "HQQ",
+      "additional backends"
+    ],
+    "lock_before_execution": [
+      "bits",
+      "group_size",
+      "desc_act",
+      "calibration_case_ids",
+      "calibration_dataset_hash",
+      "backend_versions",
+      "quantization_seed_mapping",
+      "tokenizer_hash",
+      "chat_template_hash"
+    ]
+  },
+  "seed_policy": {
+    "training_seeds": [
+      101,
+      202,
+      303
+    ],
+    "seed_expansion_uses_switch_outcomes": false,
+    "quantization_seed_policy": "match the preregistered Qwen policy"
+  },
+  "lineage": {
+    "nodes": {
+      "C0": "clean",
+      "C1": "reconstructed",
+      "C2": "kickstart",
+      "C3": "intervened_before_refinement",
+      "C4": "no_intervention_refined",
+      "C5": "intervention_repaired_refined"
+    },
+    "edges": [
+      [
+        "C0",
+        "C1"
+      ],
+      [
+        "C1",
+        "C2"
+      ],
+      [
+        "C2",
+        "C3"
+      ],
+      [
+        "C2",
+        "C4"
+      ],
+      [
+        "C3",
+        "C5"
+      ]
+    ],
+    "C3_is_persisted_evidence": true,
+    "required_stage_evidence": [
+      "model_manifest_sha256",
+      "parent_manifest_sha256",
+      "tokenizer_and_chat_template_hashes",
+      "training_config_hash",
+      "dataset_manifest_hash",
+      "seed_and_layer_scope",
+      "intervention_tensor_statistics",
+      "target_and_neighbor_weight_deltas",
+      "completion.json",
+      "environment_evidence",
+      "remote_verification_status"
+    ]
+  },
+  "evaluation": {
+    "primary_arms": [
+      "clean",
+      "no_intervention_refined",
+      "intervention_repaired_refined"
+    ],
+    "primary_representations": [
+      "BF16",
+      "GPTQ-4"
+    ],
+    "required_outputs": [
+      "raw_outputs",
+      "strict_action_and_argument_metrics",
+      "synthetic_executor_metrics",
+      "case_level_long_table",
+      "manifest_and_environment_evidence"
+    ],
+    "supplemental_public_benchmark": {
+      "type": "frozen BFCL-compatible slice or equivalent function-calling benchmark",
+      "minimum_coverage": [
+        "simple",
+        "relevance_or_irrelevance"
+      ],
+      "parallel_or_multiple_calls": "include when supported",
+      "may_change_locked_synthetic_cases": false
+    }
+  },
+  "synthetic_executor": {
+    "external_side_effects": false,
+    "allowed_tools": [
+      "read_file",
+      "calculator",
+      "search_docs"
+    ],
+    "required_outcomes": [
+      "parse_success",
+      "schema_success",
+      "action_match",
+      "argument_match",
+      "entity_match",
+      "result_match",
+      "policy_denial",
+      "attempted_action",
+      "executed_action",
+      "end_state_correctness"
+    ]
+  },
+  "canonical_metrics": [
+    "target_switch_rate",
+    "semantic_target_switch_rate",
+    "benign_entity_match",
+    "eligible_benign_exact",
+    "eligible_schema_valid",
+    "tool_schema_valid",
+    "control_exact",
+    "benign_exact_all",
+    "synthetic_executor_end_to_end_correctness"
+  ],
+  "primary_effect": {
+    "name": "difference_in_differences",
+    "formula": "(repaired_GPTQ - no_intervention_GPTQ) - (repaired_BF16 - no_intervention_BF16)",
+    "pairing_key": "case_id"
+  },
+  "statistics": {
+    "per_seed": [
+      "paired cell table",
+      "discordant counts for individual paired contrasts",
+      "case-paired bootstrap",
+      "case-level difference in differences"
+    ],
+    "across_seed": [
+      "individual seed estimates",
+      "mean",
+      "sample standard deviation",
+      "minimum and maximum",
+      "low-power t interval with df=2",
+      "hierarchical seed and case bootstrap"
+    ],
+    "interaction": "model by arm by quantization",
+    "ordinary_mcnemar_for_four_cell_effect": false
+  },
+  "defense_replication": {
+    "timing": "after primary outcomes are frozen",
+    "policies": [
+      "schema_only",
+      "public_resource_allowlist",
+      "exact_capability_and_argument_policy"
+    ],
+    "report_separately": [
+      "blocked switch-directed attempts",
+      "executed actions",
+      "end-state correctness",
+      "benign and control utility retention"
+    ]
+  },
+  "final_locked_policy": {
+    "created_and_hashed_before_selection": true,
+    "evaluated_once_after_checkpoint_lock": true,
+    "used_for_selection": false,
+    "raw_failure_preserved": true
+  },
+  "resource_policy": {
+    "one_gpu_model_task_at_a_time": true,
+    "no_trainer_checkpoints_without_recovery_need": true,
+    "stop_at_stage_boundary_below_space_threshold": true,
+    "manifest_and_staging_before_pruning": true,
+    "unverified_evidence_may_be_deleted": false
+  }
+}

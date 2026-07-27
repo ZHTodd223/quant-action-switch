@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "status": "locked_cpu_audit_recipe",
+  "paper": {
+    "title": "Widening the Gap: Exploiting LLM Quantization via Outlier Injection",
+    "arxiv": "2605.15152v2",
+    "paper_url": "https://arxiv.org/pdf/2605.15152",
+    "official_repository": "https://github.com/eth-sri/aio-quantization-attack",
+    "pinned_upstream_commit": "efdc721862167be50006cf7125408cbdf5dae0f5"
+  },
+  "common_recipe": {
+    "switching_block": "entire_ffn",
+    "initialization": "near_zero_gaussian",
+    "outlier_matrix": "up_proj",
+    "outlier_group_size": 32,
+    "kickstart_epochs": 2.0,
+    "refinement_epochs": 4.0,
+    "effective_batch_size": 32,
+    "max_length": 512,
+    "kl_coefficient": 0.05,
+    "kl_on_inputs": false,
+    "reference_dataset_role": "independent_utility_preservation",
+    "layer_selection": "model_and_scenario_specific_validation_in_middle_layers"
+  },
+  "models": {
+    "llama31_8b": {
+      "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+      "model_type": "llama",
+      "architectures": [
+        "LlamaForCausalLM"
+      ],
+      "num_hidden_layers": 32,
+      "hidden_size": 4096,
+      "intermediate_size": 14336,
+      "learning_rate": 2e-05,
+      "attack_scale": 512,
+      "activation_noise_std": 0.0,
+      "activation_noise_prob": 0.0,
+      "paper_layers": {
+        "jailbreak": 25,
+        "content_injection": 19,
+        "over_refusal": 19
+      },
+      "official_configs": {
+        "jailbreak": "Config/Llama31-Ins_jailbreak.json",
+        "content_injection": "Config/Llama31-Ins_mcd.json",
+        "over_refusal": "Config/Llama31-Ins_refusal.json"
+      }
+    },
+    "qwen25_7b": {
+      "model_id": "Qwen/Qwen2.5-7B-Instruct",
+      "learning_rate": 2e-05,
+      "attack_scale": 512,
+      "activation_noise_std": 0.0,
+      "activation_noise_prob": 0.0,
+      "paper_layers": {
+        "jailbreak": 19,
+        "content_injection": 19,
+        "over_refusal": 19
+      }
+    },
+    "mistral03_7b": {
+      "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+      "learning_rate": 5e-06,
+      "attack_scale": 256,
+      "activation_noise_std": 0.001,
+      "activation_noise_prob": 0.75,
+      "paper_layers": {
+        "jailbreak": 26,
+        "content_injection": 27,
+        "over_refusal": 25
+      }
+    }
+  },
+  "audit_policy": {
+    "paper_table_is_not_silently_overridden_by_repository_config": true,
+    "repository_differences_are_recorded_not_auto_corrected": true,
+    "tokenizer_and_chat_template_are_immutable_inputs": true,
+    "target_metrics_used_for_selection": false,
+    "gpu_execution": false,
+    "tool_execution": false
+  }
+}

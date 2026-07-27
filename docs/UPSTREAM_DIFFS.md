@@ -14,4 +14,4 @@
 4. 上游工具任务通过 system message 表述 schema，没有原生传递 chat-template `tools=`；当前 smoke 保留这一限制，论文实验必须新增 native tool adapter。
 5. 当前 smoke 数据包含 file-read 攻击子集以及 calculator/search/no-tool 控制，避免旧 TC04 的无条件固定动作设计。
 6. `requirements.txt` 是完整环境冻结；本工程在 ModelScope 匹配镜像上只安装最小 smoke 依赖。任何依赖差异必须保存在 preflight 中。
-
+7. 固定上游的 `finetune_dual2.py` 调用了 `set_seed(args.seed)`，但没有把该值传给 `TrainingArguments`；训练器可能重新使用默认种子。确认性复现实验通过仓库补丁显式传递 `seed` 和 `data_seed`，并记录补丁后文件哈希。先导实验不追溯修改。
