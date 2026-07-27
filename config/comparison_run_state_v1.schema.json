@@ -69,6 +69,7 @@
     "legacy_compatibility",
     "state_origin",
     "native_protocol_comparable",
+    "scorer",
     "bf16_arm",
     "quantized_arm"
   ],
@@ -294,6 +295,9 @@
     "native_protocol_comparable": {
       "type": "boolean"
     },
+    "scorer": {
+      "$ref": "#/$defs/scorer"
+    },
     "bf16_arm": {
       "$ref": "#/$defs/bf16Arm"
     },
@@ -316,6 +320,20 @@
         "arm_type": {
           "const": "bf16"
         }
+      },
+      "additionalProperties": false
+    },
+    "scorer": {
+      "type": "object",
+      "required": ["mode", "schema_version", "implementation_version", "tool_registry_path", "tool_registry_hash", "evidence_class", "additional_properties_policy"],
+      "properties": {
+        "mode": {"enum": ["canonical", "legacy"]},
+        "schema_version": {"type": "string"},
+        "implementation_version": {"type": "string"},
+        "tool_registry_path": {"type": "string"},
+        "tool_registry_hash": {"type": "string"},
+        "evidence_class": {"enum": ["CANONICAL_V4", "LEGACY_HISTORICAL"]},
+        "additional_properties_policy": {"type": "string"}
       },
       "additionalProperties": false
     },

@@ -14,6 +14,8 @@ from typing import Any, Mapping
 
 from case_schema import loads_json_strict, validate_case_rows_v3
 from verify_manifest import verify_manifest
+from canonical_tool_schema import scorer_identity
+from scorer_policy import resolve_scorer_policy
 
 
 PROTOCOL_ID = "agent_toolcall_protocol_v4_comparison_eligibility"
@@ -451,6 +453,7 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "legacy_compatibility": False,
         "state_origin": "native_v4",
         "native_protocol_comparable": False,
+        "scorer": scorer_identity(),
         "bf16_arm": {"arm_type": "bf16"},
         "quantized_arm": {"arm_type": "quantized"},
     }
@@ -1079,6 +1082,7 @@ def adapt_legacy_record(record: Mapping[str, Any]) -> dict[str, Any]:
         state_origin="legacy_adapter",
         legacy_compatibility=True,
         native_protocol_comparable=False,
+        scorer=resolve_scorer_policy(protocol_id=None, scorer_mode="legacy"),
         comparison_status=comparison,
         blocking_reason=reason,
         stage_reached=(

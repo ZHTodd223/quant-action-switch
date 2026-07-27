@@ -21,6 +21,7 @@ from comparison_eligibility import (
     scientific_statement,
     validate_comparison_state_schema,
 )
+from canonical_tool_schema import scorer_identity
 
 
 class NativeEvidenceError(ValueError):
@@ -97,6 +98,7 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
         ),
         "quantization_effect_included": False,
         "statement": scientific_statement(model_id, str(status)),
+        "scorer": value.get("scorer"),
         "source": str(path),
     }
 
@@ -129,7 +131,11 @@ def summarize(
     for model in models:
         comparable = model["comparison_status"] == ComparisonStatus.COMPARABLE
         if selection_mode == "native_v4_only":
-            included = comparable and model["native_protocol_comparable"] is True
+            included = (
+                comparable
+                and model["native_protocol_comparable"] is True
+                and model["scorer"] == scorer_identity()
+            )
         elif selection_mode == "legacy_only":
             included = comparable and model["legacy_compatibility"] is True
         else:

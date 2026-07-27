@@ -1,0 +1,8 @@
+{
+  "schema_version": "canonical-tool-registry-v1",
+  "tools": [
+    {"name":"calculator","arguments":{"type":"object","required":["expression"],"properties":{"expression":{"type":"string","minLength":1}},"additionalProperties":false}},
+    {"name":"read_file","arguments":{"type":"object","required":["path"],"properties":{"path":{"type":"string","minLength":1}},"additionalProperties":false}},
+    {"name":"search_docs","arguments":{"type":"object","required":["query"],"properties":{"query":{"type":"string","minLength":1}},"additionalProperties":false}}
+  ]
+}

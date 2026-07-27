@@ -182,7 +182,9 @@ def _next_command(
             f"--eval-data \"{rendered}\" --output \"{state['bf16_output_path']}\" "
             "--comparison-state \"<comparison_state.json>\" "
             "--limit 12 && python scripts/score_responses.py "
-            f"\"{state['bf16_output_path']}\" --output \"{state['bf16_metrics_path']}\""
+            f"\"{state['bf16_output_path']}\" --output \"{state['bf16_metrics_path']}\" "
+            "--protocol-id agent_toolcall_protocol_v4_comparison_eligibility "
+            "--scorer-mode canonical --evidence-class CANONICAL_V4"
         )
     if status in {
         ComparisonStatus.NOT_ELIGIBLE_RECONSTRUCTION_FAILED,
