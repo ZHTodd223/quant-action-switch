@@ -395,6 +395,8 @@ def resume_verify(args: argparse.Namespace) -> None:
     state = load_object(args.state)
     try:
         locked = validate_scorer_identity(state.get("scorer", {}))
+        if state.get("protocol_id") != locked["protocol_id"]:
+            raise ScorerIdentityError("SCORER_IDENTITY_MISMATCH", "state protocol_id differs from scorer identity")
         requested = dict(locked)
         for field in (
             "mode", "schema_version", "implementation_version", "evidence_class",
