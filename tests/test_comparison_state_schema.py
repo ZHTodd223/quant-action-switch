@@ -109,7 +109,12 @@ class ComparisonStateSchemaTests(unittest.TestCase):
         self.assertEqual(len(summary["invalid_state_runs"]), 1)
 
     def test_required_fields_fail_closed_individually(self):
-        fields = (
+        schema = json.loads(
+            (
+                ROOT / "config" / "comparison_run_state_v1.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+        named_regressions = {
             "schema_version",
             "protocol_id",
             "model_id",
@@ -124,8 +129,9 @@ class ComparisonStateSchemaTests(unittest.TestCase):
             "tokenizer_hash",
             "source_run_id",
             "training_stage",
-        )
-        for field in fields:
+        }
+        self.assertTrue(named_regressions <= set(schema["required"]))
+        for field in schema["required"]:
             with self.subTest(field=field):
                 state = self.comparable_state()
                 del state[field]
