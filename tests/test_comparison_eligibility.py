@@ -49,6 +49,12 @@ class ComparisonEligibilityTests(unittest.TestCase):
             bf16_gate_passed=True,
             bf16_output_path="/raw/bf16.jsonl",
             bf16_metrics_path="/metrics/bf16.json",
+            bf16_model_state_attestation_path="/raw/bf16.attestation.json",
+            bf16_model_state_attestation_hash="e" * 64,
+            bf16_attestation_status="ATTESTED_BF16",
+            bf16_attestation_passed=True,
+            bf16_output_manifest_path="/raw/bf16.manifest.json",
+            bf16_output_manifest_hash="f" * 64,
             bf16_source_checkpoint_hash="a" * 64,
             bf16_source_checkpoint="/models/fixture",
             bf16_source_checkpoint_manifest="/models/fixture/manifest.sha256.json",
@@ -65,6 +71,12 @@ class ComparisonEligibilityTests(unittest.TestCase):
             quant_source_run_id="source-run",
             bf16_case_manifest_hash="b" * 64,
             quant_case_manifest_hash="b" * 64,
+            quant_model_state_attestation_path="/raw/int8.attestation.json",
+            quant_model_state_attestation_hash="1" * 64,
+            quant_attestation_status="ATTESTED_BNB_INT8",
+            quant_attestation_passed=True,
+            quant_output_manifest_path="/raw/int8.manifest.json",
+            quant_output_manifest_hash="2" * 64,
         )
         state.update(overrides)
         return state

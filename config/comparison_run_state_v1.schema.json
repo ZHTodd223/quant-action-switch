@@ -16,6 +16,7 @@
     "training_stage",
     "config_hash",
     "tokenizer_hash",
+    "generation_config_hash",
     "case_manifest",
     "case_manifest_hash",
     "logical_cases_hash",
@@ -33,13 +34,26 @@
     "blocking_reason",
     "bf16_output_path",
     "bf16_metrics_path",
+    "bf16_model_state_attestation_path",
+    "bf16_model_state_attestation_hash",
+    "bf16_attestation_status",
+    "bf16_attestation_passed",
+    "bf16_output_manifest_path",
+    "bf16_output_manifest_hash",
     "quantized_output_path",
     "quantized_metrics_path",
+    "quant_model_state_attestation_path",
+    "quant_model_state_attestation_hash",
+    "quant_attestation_status",
+    "quant_attestation_passed",
+    "quant_output_manifest_path",
+    "quant_output_manifest_hash",
     "bf16_source_checkpoint_hash",
     "bf16_source_checkpoint",
     "bf16_source_checkpoint_manifest",
     "bf16_config_hash",
     "bf16_tokenizer_hash",
+    "bf16_generation_config_hash",
     "bf16_training_stage",
     "bf16_source_run_id",
     "quant_source_checkpoint_hash",
@@ -47,6 +61,7 @@
     "quant_source_checkpoint_manifest",
     "quant_config_hash",
     "quant_tokenizer_hash",
+    "quant_generation_config_hash",
     "quant_training_stage",
     "quant_source_run_id",
     "bf16_case_manifest_hash",
@@ -95,6 +110,9 @@
       "$ref": "#/$defs/hashOrEmpty"
     },
     "tokenizer_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "generation_config_hash": {
       "$ref": "#/$defs/hashOrEmpty"
     },
     "case_manifest": {
@@ -168,11 +186,47 @@
     "bf16_metrics_path": {
       "type": "string"
     },
+    "bf16_model_state_attestation_path": {
+      "type": "string"
+    },
+    "bf16_model_state_attestation_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "bf16_attestation_status": {
+      "type": "string"
+    },
+    "bf16_attestation_passed": {
+      "type": "boolean"
+    },
+    "bf16_output_manifest_path": {
+      "type": "string"
+    },
+    "bf16_output_manifest_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
     "quantized_output_path": {
       "type": "string"
     },
     "quantized_metrics_path": {
       "type": "string"
+    },
+    "quant_model_state_attestation_path": {
+      "type": "string"
+    },
+    "quant_model_state_attestation_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quant_attestation_status": {
+      "type": "string"
+    },
+    "quant_attestation_passed": {
+      "type": "boolean"
+    },
+    "quant_output_manifest_path": {
+      "type": "string"
+    },
+    "quant_output_manifest_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
     },
     "bf16_source_checkpoint_hash": {
       "$ref": "#/$defs/hashOrEmpty"
@@ -187,6 +241,9 @@
       "$ref": "#/$defs/hashOrEmpty"
     },
     "bf16_tokenizer_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "bf16_generation_config_hash": {
       "$ref": "#/$defs/hashOrEmpty"
     },
     "bf16_training_stage": {
@@ -208,6 +265,9 @@
       "$ref": "#/$defs/hashOrEmpty"
     },
     "quant_tokenizer_hash": {
+      "$ref": "#/$defs/hashOrEmpty"
+    },
+    "quant_generation_config_hash": {
       "$ref": "#/$defs/hashOrEmpty"
     },
     "quant_training_stage": {

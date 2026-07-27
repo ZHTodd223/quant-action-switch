@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "model_state_attestation_v1.schema.json",
+  "title": "Runtime model-state attestation v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "model_id",
+    "model_family",
+    "protocol_id",
+    "requested_state",
+    "resolved_identity",
+    "runtime",
+    "parameters",
+    "modules",
+    "quantization",
+    "attestation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "model_state_attestation_v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_family": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requested_state": {
+      "type": "object"
+    },
+    "resolved_identity": {
+      "type": "object",
+      "required": [
+        "source_checkpoint",
+        "source_checkpoint_realpath",
+        "source_checkpoint_manifest",
+        "source_checkpoint_manifest_hash",
+        "config_hash",
+        "tokenizer_hash",
+        "generation_config_hash",
+        "source_run_id",
+        "training_stage"
+      ]
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "python_version",
+        "torch_version",
+        "transformers_version",
+        "loader_mode",
+        "fallback_used",
+        "device_map"
+      ]
+    },
+    "parameters": {
+      "type": "object"
+    },
+    "modules": {
+      "type": "object",
+      "required": [
+        "module_class_histogram",
+        "expected_projection_count",
+        "quantized_projection_count",
+        "quantized_projection_coverage",
+        "projection_details",
+        "unquantized_expected_projections"
+      ]
+    },
+    "quantization": {
+      "type": "object",
+      "required": [
+        "detected",
+        "detected_backend",
+        "detected_bits",
+        "detected_quant_types",
+        "detected_module_classes",
+        "config_match"
+      ]
+    },
+    "attestation": {
+      "type": "object",
+      "required": [
+        "passed",
+        "status",
+        "blocking_reasons",
+        "warnings"
+      ],
+      "properties": {
+        "passed": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "ATTESTED_BF16",
+            "ATTESTED_BNB_INT8",
+            "ATTESTED_BNB_NF4",
+            "ATTESTED_BNB_FP4",
+            "ATTESTED_GPTQ",
+            "ATTESTED_HQQ",
+            "ATTESTED_GGUF",
+            "IDENTITY_UNVERIFIED",
+            "CHECKPOINT_MANIFEST_MISMATCH",
+            "CONFIG_IDENTITY_MISMATCH",
+            "TOKENIZER_IDENTITY_MISMATCH",
+            "GENERATION_CONFIG_IDENTITY_MISMATCH",
+            "SOURCE_RUN_ID_MISMATCH",
+            "TRAINING_STAGE_MISMATCH",
+            "CHECKPOINT_PATH_MISMATCH",
+            "LOADED_CHECKPOINT_IDENTITY_UNVERIFIED",
+            "LOADER_FAILED",
+            "LOADER_FALLBACK_USED",
+            "BACKEND_MISMATCH",
+            "QUANTIZATION_NOT_DETECTED",
+            "QUANTIZATION_COVERAGE_BELOW_THRESHOLD",
+            "QUANT_CONFIG_MISMATCH",
+            "QUANT_TYPE_UNVERIFIED",
+            "DEVICE_MAP_UNVERIFIED",
+            "UNSUPPORTED_ARCHITECTURE_FOR_ATTESTATION",
+            "GGUF_METADATA_MISMATCH",
+            "RUNTIME_HEALTHCHECK_FAILED",
+            "CACHE_IDENTITY_UNVERIFIED",
+            "CACHE_IDENTITY_MISMATCH",
+            "GGUF_CACHE_IDENTITY_UNVERIFIED",
+            "GGUF_CACHE_IDENTITY_MISMATCH",
+            "DIAGNOSTIC_FALLBACK_NOT_ELIGIBLE",
+            "BF16_DTYPE_COVERAGE_BELOW_THRESHOLD"
+          ]
+        },
+        "blocking_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
