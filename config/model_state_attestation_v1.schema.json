@@ -14,6 +14,7 @@
     "resolved_identity",
     "runtime",
     "parameters",
+    "buffers",
     "devices",
     "modules",
     "bf16_policy",
@@ -151,6 +152,38 @@
         "parameter_device_histogram": {"type": "object"},
         "buffer_device_histogram": {"type": "object"}
       }
+    },
+    "buffers": {
+      "type": "object",
+      "required": [
+        "total_buffers",
+        "total_buffer_numel",
+        "dtype_histogram_by_count",
+        "dtype_histogram_by_numel",
+        "device_histogram_by_count",
+        "device_histogram_by_numel"
+      ],
+      "properties": {
+        "total_buffers": {"type": "integer", "minimum": 0},
+        "total_buffer_numel": {"type": "integer", "minimum": 0},
+        "dtype_histogram_by_count": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "dtype_histogram_by_numel": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "device_histogram_by_count": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "device_histogram_by_numel": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        }
+      },
+      "additionalProperties": false
     },
     "devices": {
       "type": "object",

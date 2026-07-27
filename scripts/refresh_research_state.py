@@ -178,6 +178,7 @@ def anchor_entry(anchor: Path, record_root: Path) -> dict[str, Any]:
                     parsed,
                     None,
                     {"protocol_id": PROTOCOL_ID},
+                    state_root=anchor.parent,
                     verify_files=False,
                 )
         except ComparisonStateSchemaError as error:

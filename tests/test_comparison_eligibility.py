@@ -21,6 +21,7 @@ from comparison_eligibility import (  # noqa: E402
     validate_logical_case_manifest,
 )
 from summarize_cross_model_comparison import summarize  # noqa: E402
+from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E402
 
 
 class ComparisonEligibilityTests(unittest.TestCase):
@@ -102,52 +103,44 @@ class ComparisonEligibilityTests(unittest.TestCase):
         self.assertEqual(result["stage_reached"], "BF16_GATE")
 
     def test_b_gate_passed_but_not_quantized(self):
-        result = self.assess(self.eligible_state(), {"pass": True})
-        self.assertEqual(
-            result["comparison_status"],
-            ComparisonStatus.ELIGIBLE_NOT_QUANTIZED,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            _, state = build_native_comparable(Path(tmp))
+            state.update(
+                quantization_requested=False,
+                quantization_performed=False,
+                quantized_evaluation_completed=False,
+            )
+            result = self.assess(state, {"pass": True})
+            self.assertEqual(
+                result["comparison_status"],
+                ComparisonStatus.ELIGIBLE_NOT_QUANTIZED,
+            )
 
     def test_c_completed_matching_arms_are_comparable(self):
-        state = self.eligible_state(
-            quantization_requested=True,
-            quantization_performed=True,
-            quantized_evaluation_completed=True,
-            quantized_output_path="/raw/int8.jsonl",
-            quantized_metrics_path="/metrics/int8.json",
-        )
-        result = self.assess(state, {"pass": True})
-        self.assertEqual(result["comparison_status"], ComparisonStatus.COMPARABLE)
+        with tempfile.TemporaryDirectory() as tmp:
+            _, state = build_native_comparable(Path(tmp))
+            result = self.assess(state, {"pass": True})
+            self.assertEqual(result["comparison_status"], ComparisonStatus.COMPARABLE)
 
     def test_d_checkpoint_mismatch_is_not_comparable(self):
-        state = self.eligible_state(
-            quantization_requested=True,
-            quantization_performed=True,
-            quantized_evaluation_completed=True,
-            quantized_output_path="/raw/int8.jsonl",
-            quantized_metrics_path="/metrics/int8.json",
-            quant_source_checkpoint_hash="c" * 64,
-        )
-        result = self.assess(state, {"pass": True})
-        self.assertEqual(
-            result["comparison_status"],
-            ComparisonStatus.NOT_COMPARABLE_SOURCE_MISMATCH,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            _, state = build_native_comparable(Path(tmp))
+            state["quant_source_checkpoint_hash"] = "c" * 64
+            result = self.assess(state, {"pass": True})
+            self.assertEqual(
+                result["comparison_status"],
+                ComparisonStatus.NOT_COMPARABLE_SOURCE_MISMATCH,
+            )
 
     def test_e_case_manifest_mismatch_is_not_comparable(self):
-        state = self.eligible_state(
-            quantization_requested=True,
-            quantization_performed=True,
-            quantized_evaluation_completed=True,
-            quantized_output_path="/raw/int8.jsonl",
-            quantized_metrics_path="/metrics/int8.json",
-            quant_case_manifest_hash="c" * 64,
-        )
-        result = self.assess(state, {"pass": True})
-        self.assertEqual(
-            result["comparison_status"],
-            ComparisonStatus.NOT_COMPARABLE_CASE_MISMATCH,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            _, state = build_native_comparable(Path(tmp))
+            state["quant_case_manifest_hash"] = "c" * 64
+            result = self.assess(state, {"pass": True})
+            self.assertEqual(
+                result["comparison_status"],
+                ComparisonStatus.NOT_COMPARABLE_CASE_MISMATCH,
+            )
 
     def test_each_arm_lineage_field_must_match(self):
         fields = (
@@ -158,37 +151,36 @@ class ComparisonEligibilityTests(unittest.TestCase):
             "quant_training_stage",
             "quant_source_run_id",
         )
-        for field in fields:
-            with self.subTest(field=field):
-                state = self.eligible_state(
-                    quantization_requested=True,
-                    quantization_performed=True,
-                    quantized_evaluation_completed=True,
-                    quantized_output_path="/raw/int8.jsonl",
-                    quantized_metrics_path="/metrics/int8.json",
-                )
-                state[field] = (
-                    "e" * 64
-                    if field in {"quant_config_hash", "quant_tokenizer_hash"}
-                    else "mismatch"
-                )
-                result = self.assess(state, {"pass": True})
-                self.assertEqual(
-                    result["comparison_status"],
-                    ComparisonStatus.NOT_COMPARABLE_SOURCE_MISMATCH,
-                )
+        with tempfile.TemporaryDirectory() as tmp:
+            _, valid_state = build_native_comparable(Path(tmp))
+            for field in fields:
+                with self.subTest(field=field):
+                    state = dict(valid_state)
+                    state[field] = (
+                        "e" * 64
+                        if field in {"quant_config_hash", "quant_tokenizer_hash"}
+                        else "mismatch"
+                    )
+                    result = self.assess(state, {"pass": True})
+                    self.assertEqual(
+                        result["comparison_status"],
+                        ComparisonStatus.NOT_COMPARABLE_SOURCE_MISMATCH,
+                    )
 
     def test_quantization_not_completed_is_not_a_zero_effect(self):
-        state = self.eligible_state(
-            quantization_requested=True,
-            quantization_performed=False,
-        )
-        result = self.assess(state, {"pass": True})
-        self.assertEqual(
-            result["comparison_status"],
-            ComparisonStatus.QUANTIZATION_FAILED,
-        )
-        self.assertIn("no effect is inferred", result["blocking_reason"])
+        with tempfile.TemporaryDirectory() as tmp:
+            _, state = build_native_comparable(Path(tmp))
+            state.update(
+                quantization_requested=True,
+                quantization_performed=False,
+                quantized_evaluation_completed=False,
+            )
+            result = self.assess(state, {"pass": True})
+            self.assertEqual(
+                result["comparison_status"],
+                ComparisonStatus.QUANTIZATION_FAILED,
+            )
+            self.assertIn("no effect is inferred", result["blocking_reason"])
 
     def test_state_schema_covers_every_default_field_and_status(self):
         schema = json.loads(

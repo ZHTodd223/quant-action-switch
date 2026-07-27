@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT))
 
 from summarize_cross_model_comparison import summarize  # noqa: E402
+from comparison_eligibility import sha256_file  # noqa: E402
 from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E402
 
 
@@ -67,6 +68,29 @@ class CrossModelSummaryEvidenceTests(unittest.TestCase):
             )
             invalid = self.assert_invalid(state_path)
         self.assertIn("output hash mismatch", invalid["reason"])
+
+    def test_rehashed_sidecar_without_buffers_is_invalid_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path, state = build_native_comparable(Path(temporary))
+            attestation_path = Path(state["quant_model_state_attestation_path"])
+            attestation = json.loads(
+                attestation_path.read_text(encoding="utf-8")
+            )
+            del attestation["buffers"]
+            attestation_path.write_text(json.dumps(attestation), encoding="utf-8")
+            digest = sha256_file(attestation_path)
+            attestation_path.with_suffix(
+                attestation_path.suffix + ".sha256"
+            ).write_text(digest + "\n", encoding="ascii")
+            state["quant_model_state_attestation_hash"] = digest
+            manifest_path = Path(state["quant_output_manifest_path"])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["model_state_attestation_hash"] = digest
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            state["quant_output_manifest_hash"] = sha256_file(manifest_path)
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            invalid = self.assert_invalid(state_path)
+        self.assertIn("missing required fields: buffers", invalid["reason"])
 
     def test_cli_uses_stable_nonzero_exit_for_invalid_native_evidence(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -16,14 +16,20 @@ from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E40
 
 
 class RuntimeEvidenceVerificationTests(unittest.TestCase):
-    def reseal_attestation(self, state_path: Path, state: dict, prefix: str) -> None:
+    def reseal_attestation(
+        self,
+        state_path: Path,
+        state: dict,
+        prefix: str,
+        removed_field: str,
+    ) -> None:
         attestation_field = f"{prefix}_model_state_attestation_path"
         attestation_hash_field = f"{prefix}_model_state_attestation_hash"
         manifest_field = f"{prefix}_output_manifest_path"
         manifest_hash_field = f"{prefix}_output_manifest_hash"
         attestation_path = Path(state[attestation_field])
         payload = json.loads(attestation_path.read_text(encoding="utf-8"))
-        payload.pop("runtime")
+        payload.pop(removed_field)
         attestation_path.write_text(json.dumps(payload), encoding="utf-8")
         digest = sha256_file(attestation_path)
         attestation_path.with_suffix(
@@ -40,7 +46,7 @@ class RuntimeEvidenceVerificationTests(unittest.TestCase):
     def test_schema_invalid_sidecar_fails_even_when_all_hashes_are_resealed(self):
         with tempfile.TemporaryDirectory() as temporary:
             state_path, state = build_native_comparable(Path(temporary))
-            self.reseal_attestation(state_path, state, "quant")
+            self.reseal_attestation(state_path, state, "quant", "runtime")
             error = _verify_runtime_evidence(
                 state,
                 prefix="quant",
@@ -49,6 +55,19 @@ class RuntimeEvidenceVerificationTests(unittest.TestCase):
             )
         self.assertIsNotNone(error)
         self.assertIn("missing required fields: runtime", error)
+
+    def test_rehashed_sidecar_without_buffers_fails_runtime_verification(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path, state = build_native_comparable(Path(temporary))
+            self.reseal_attestation(state_path, state, "quant", "buffers")
+            error = _verify_runtime_evidence(
+                state,
+                prefix="quant",
+                output_field="quantized_output_path",
+                state_root=state_path.parent,
+            )
+        self.assertIsNotNone(error)
+        self.assertIn("missing required fields: buffers", error)
 
     def test_missing_attestation_hash_sidecar_fails(self):
         with tempfile.TemporaryDirectory() as temporary:

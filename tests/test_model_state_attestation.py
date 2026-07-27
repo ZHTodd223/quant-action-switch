@@ -152,6 +152,28 @@ class ModelStateAttestationTests(unittest.TestCase):
         self.assertTrue(result["attestation"]["passed"])
         self.assertEqual(result["attestation"]["status"], "ATTESTED_BF16")
 
+    def test_buffer_inventory_records_count_numel_dtype_and_device(self):
+        model = FakeModel()
+        model.named_buffers = lambda recurse=True: [
+            ("cache", FakeTensor(dtype="float32", device="cuda:0", size=5)),
+            ("mask", FakeTensor(dtype="bool", device="cpu", size=3)),
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            result = self.attest(
+                Path(temporary), model, "bf16", "transformers"
+            )
+        self.assertEqual(
+            result["buffers"],
+            {
+                "total_buffers": 2,
+                "total_buffer_numel": 8,
+                "dtype_histogram_by_count": {"bool": 1, "float32": 1},
+                "dtype_histogram_by_numel": {"bool": 3, "float32": 5},
+                "device_histogram_by_count": {"cpu": 1, "cuda:0": 1},
+                "device_histogram_by_numel": {"cpu": 3, "cuda:0": 5},
+            },
+        )
+
     def test_bf16_with_int8_module_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = self.attest(
@@ -442,6 +464,7 @@ class ModelStateAttestationTests(unittest.TestCase):
             "resolved_identity",
             "runtime",
             "parameters",
+            "buffers",
             "devices",
             "modules",
             "quantization",
@@ -463,6 +486,7 @@ class ModelStateAttestationTests(unittest.TestCase):
             "resolved_identity",
             "runtime",
             "parameters",
+            "buffers",
             "devices",
             "modules",
             "bf16_policy",
@@ -494,6 +518,73 @@ class ModelStateAttestationTests(unittest.TestCase):
         damaged["resolved_identity"]["tokenizer_hash"] = ""
         with self.assertRaises(AttestationSchemaError):
             validate_model_state_attestation_schema(damaged)
+        self.assertEqual(
+            valid["buffers"],
+            {
+                "total_buffers": 0,
+                "total_buffer_numel": 0,
+                "dtype_histogram_by_count": {},
+                "dtype_histogram_by_numel": {},
+                "device_histogram_by_count": {},
+                "device_histogram_by_numel": {},
+            },
+        )
+        buffer_mutations = (
+            ("empty", {}),
+            (
+                "negative_total",
+                valid["buffers"] | {"total_buffers": -1},
+            ),
+            (
+                "negative_numel",
+                valid["buffers"] | {"total_buffer_numel": -1},
+            ),
+            (
+                "dtype_histogram_array",
+                valid["buffers"] | {"dtype_histogram_by_count": []},
+            ),
+            (
+                "device_histogram_array",
+                valid["buffers"] | {"device_histogram_by_numel": []},
+            ),
+            (
+                "dtype_histogram_string_value",
+                valid["buffers"]
+                | {"dtype_histogram_by_count": {"float32": "1"}},
+            ),
+            (
+                "device_histogram_string_value",
+                valid["buffers"]
+                | {"device_histogram_by_numel": {"CUDA": "1"}},
+            ),
+        )
+        for name, buffers in buffer_mutations:
+            with self.subTest(buffers=name):
+                damaged = copy.deepcopy(valid)
+                damaged["buffers"] = buffers
+                with self.assertRaises(AttestationSchemaError):
+                    validate_model_state_attestation_schema(damaged)
+
+    def test_verify_attestation_rejects_rehashed_sidecar_without_buffers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result = self.attest(root, FakeModel(), "bf16", "transformers")
+            output = root / "responses.jsonl"
+            path, _, _ = prepare_attestation_sidecar(
+                output, result, case_manifest_hash="c" * 64
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            del payload["buffers"]
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            path.with_suffix(path.suffix + ".sha256").write_text(
+                digest + "\n", encoding="ascii"
+            )
+            with self.assertRaisesRegex(
+                AttestationSchemaError,
+                "missing required fields: buffers",
+            ):
+                verify_attestation(path)
 
 
 if __name__ == "__main__":

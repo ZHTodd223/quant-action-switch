@@ -278,6 +278,14 @@ def inspect_gguf_state(
             "parameter_device_histogram": {},
             "buffer_device_histogram": {},
         },
+        "buffers": {
+            "total_buffers": 0,
+            "total_buffer_numel": 0,
+            "dtype_histogram_by_count": {},
+            "dtype_histogram_by_numel": {},
+            "device_histogram_by_count": {},
+            "device_histogram_by_numel": {},
+        },
         "devices": {
             "hf_device_map": {},
             "normalized_hf_device_map": {},

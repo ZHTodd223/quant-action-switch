@@ -165,6 +165,15 @@ def _validate_attestation_node(
                 raise AttestationSchemaError(
                     f"{location} has additional fields: {', '.join(extra)}"
                 )
+        additional = rule.get("additionalProperties")
+        if isinstance(additional, Mapping):
+            for field in sorted(set(value) - set(properties)):
+                _validate_attestation_node(
+                    value[field],
+                    additional,
+                    root_schema,
+                    f"{location}.{field}",
+                )
         for field, child in properties.items():
             if field in value:
                 if not isinstance(child, Mapping):
@@ -598,6 +607,26 @@ def _parameter_state(model: Any) -> dict[str, Any]:
             parameters, _device_name, weighted=True
         ),
         "buffer_device_histogram": _histogram(
+            buffers, _device_name, weighted=True
+        ),
+    }
+
+
+def _buffer_state(model: Any) -> dict[str, Any]:
+    buffers = _named_values(model, "named_buffers")
+    return {
+        "total_buffers": len(buffers),
+        "total_buffer_numel": sum(_numel(value) for _, value in buffers),
+        "dtype_histogram_by_count": _histogram(
+            buffers, _dtype_name, weighted=False
+        ),
+        "dtype_histogram_by_numel": _histogram(
+            buffers, _dtype_name, weighted=True
+        ),
+        "device_histogram_by_count": _histogram(
+            buffers, _device_name, weighted=False
+        ),
+        "device_histogram_by_numel": _histogram(
             buffers, _device_name, weighted=True
         ),
     }
@@ -1058,6 +1087,7 @@ def inspect_loaded_model(
 
     runtime = _runtime(model, loader_mode, fallback_used)
     parameter_state = _parameter_state(model)
+    buffer_state = _buffer_state(model)
     devices = _device_state(model, parameter_state, quantized_modules)
     device_policy = requirements.get("device_policy", {})
     if device_policy.get("require_hf_device_map", True) and not runtime["device_map"]:
@@ -1149,6 +1179,7 @@ def inspect_loaded_model(
         "resolved_identity": identity,
         "runtime": runtime,
         "parameters": parameter_state,
+        "buffers": buffer_state,
         "devices": devices,
         "bf16_policy": bf16_policy,
         "bf16_observation": bf16_observation,
@@ -1300,6 +1331,14 @@ def load_failure_attestation(
             "buffer_dtype_tensor_histogram": {},
             "parameter_device_histogram": {},
             "buffer_device_histogram": {},
+        },
+        "buffers": {
+            "total_buffers": 0,
+            "total_buffer_numel": 0,
+            "dtype_histogram_by_count": {},
+            "dtype_histogram_by_numel": {},
+            "device_histogram_by_count": {},
+            "device_histogram_by_numel": {},
         },
         "devices": {
             "hf_device_map": {},

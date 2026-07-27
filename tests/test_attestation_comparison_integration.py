@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -84,40 +85,57 @@ def assess(state):
 
 class AttestationComparisonIntegrationTests(unittest.TestCase):
     def test_int8_request_without_detected_quantization_is_not_comparable(self):
-        result = assess(
-            eligible_state(
+        from tests.runtime_evidence_fixtures import build_native_comparable
+
+        with tempfile.TemporaryDirectory() as tmp:
+            _, state = build_native_comparable(Path(tmp))
+            state.update(
                 quantization_requested=True,
                 quantization_performed=False,
+                quantized_evaluation_completed=False,
                 quant_attestation_passed=False,
                 quant_attestation_status="QUANTIZATION_NOT_DETECTED",
             )
-        )
-        self.assertEqual(result["comparison_status"], ComparisonStatus.QUANTIZATION_FAILED)
-        self.assertIn("QUANTIZATION_NOT_DETECTED", result["blocking_reason"])
+            result = assess(state)
+            self.assertEqual(
+                result["comparison_status"], ComparisonStatus.QUANTIZATION_FAILED
+            )
+            self.assertIn("QUANTIZATION_NOT_DETECTED", result["blocking_reason"])
 
     def test_gptq_fallback_is_not_comparable(self):
-        result = assess(
-            eligible_state(
+        from tests.runtime_evidence_fixtures import build_native_comparable
+
+        with tempfile.TemporaryDirectory() as tmp:
+            _, state = build_native_comparable(Path(tmp))
+            state.update(
                 quantization_requested=True,
                 quantization_performed=False,
+                quantized_evaluation_completed=False,
                 quant_attestation_passed=False,
                 quant_attestation_status="LOADER_FALLBACK_USED",
             )
-        )
-        self.assertEqual(result["comparison_status"], ComparisonStatus.QUANTIZATION_FAILED)
-        self.assertIn("LOADER_FALLBACK_USED", result["blocking_reason"])
+            result = assess(state)
+            self.assertEqual(
+                result["comparison_status"], ComparisonStatus.QUANTIZATION_FAILED
+            )
+            self.assertIn("LOADER_FALLBACK_USED", result["blocking_reason"])
 
     def test_matching_lineage_does_not_override_failed_attestation(self):
-        result = assess(
-            eligible_state(
+        from tests.runtime_evidence_fixtures import build_native_comparable
+
+        with tempfile.TemporaryDirectory() as tmp:
+            _, state = build_native_comparable(Path(tmp))
+            state.update(
                 quantization_requested=True,
                 quantization_performed=True,
                 quantized_evaluation_completed=True,
                 quant_attestation_passed=False,
                 quant_attestation_status="QUANT_CONFIG_MISMATCH",
             )
-        )
-        self.assertEqual(result["comparison_status"], ComparisonStatus.QUANTIZATION_FAILED)
+            result = assess(state)
+            self.assertEqual(
+                result["comparison_status"], ComparisonStatus.QUANTIZATION_FAILED
+            )
 
     def test_failed_bf16_attestation_blocks_quantization_preflight(self):
         result = assess(

@@ -507,6 +507,17 @@ def resolve_evidence_path(state_path: Path, evidence_path: str) -> Path:
     return path.resolve()
 
 
+def resolve_verify_files_policy(
+    state: Mapping[str, Any],
+    requested_verify_files: bool,
+) -> bool:
+    """Native-v4 evidence verification is mandatory for every caller."""
+
+    if state.get("state_origin") == "native_v4":
+        return True
+    return requested_verify_files
+
+
 def _verify_generation_evidence(output_path: Path) -> str | None:
     required = {
         "generated_token_ids",
@@ -667,6 +678,7 @@ def determine_comparison_eligibility(
     """Return an explicit comparison state without mutating the supplied state."""
 
     validate_comparison_state_schema(run_state)
+    verify_files = resolve_verify_files_policy(run_state, verify_files)
     if run_state.get("protocol_id") != protocol.get("protocol_id"):
         return _result(
             run_state,

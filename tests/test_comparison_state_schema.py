@@ -19,6 +19,8 @@ from comparison_eligibility import (  # noqa: E402
     adapt_legacy_record,
     default_run_state,
     determine_comparison_eligibility,
+    quantization_authorization,
+    resolve_verify_files_policy,
     validate_comparison_state_schema,
 )
 from summarize_cross_model_comparison import summarize  # noqa: E402
@@ -175,7 +177,7 @@ class ComparisonStateSchemaTests(unittest.TestCase):
             with self.assertRaises(ComparisonStateSchemaError):
                 validate_comparison_state_schema(state, invalid)
 
-    def test_valid_native_state_remains_comparable(self):
+    def test_native_verify_files_false_is_forced_to_fail_closed(self):
         state = self.comparable_state()
         validate_comparison_state_schema(state)
         result = determine_comparison_eligibility(
@@ -184,8 +186,96 @@ class ComparisonStateSchemaTests(unittest.TestCase):
             {"protocol_id": PROTOCOL_ID},
             verify_files=False,
         )
-        self.assertEqual(result["comparison_status"], ComparisonStatus.COMPARABLE)
-        self.assertTrue(result["native_protocol_comparable"])
+        self.assertEqual(
+            result["comparison_status"],
+            ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
+        )
+        self.assertFalse(result["native_protocol_comparable"])
+        self.assertTrue(resolve_verify_files_policy(state, False))
+        legacy = adapt_legacy_record(
+            {
+                "record_id": "legacy",
+                "evidence_role": "qwen_locked_confirmatory_gate",
+                "scientific_status": "complete",
+            }
+        )
+        self.assertFalse(resolve_verify_files_policy(legacy, False))
+
+    def test_native_no_verify_cli_and_authorization_cannot_bypass_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_path = root / "state.json"
+            state = self.comparable_state()
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            comparison = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "comparison_eligibility.py"),
+                    "--state",
+                    str(state_path),
+                    "--protocol",
+                    str(ROOT / "config" / "agent_toolcall_protocol_v4.json"),
+                    "--no-verify-files",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            authorization = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "require_quantization_eligibility.py"),
+                    "--state",
+                    str(state_path),
+                    "--no-verify-files",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            dry_run = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "run_cross_model_comparison.py"),
+                    "dry-run",
+                    "--state",
+                    str(state_path),
+                    "--no-verify-files",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            eligible = self.comparable_state()
+            eligible.update(
+                stage_reached="BF16_GATE",
+                quantization_requested=False,
+                quantization_performed=False,
+                quantized_evaluation_completed=False,
+                comparison_status="ELIGIBLE_NOT_QUANTIZED",
+                native_protocol_comparable=False,
+            )
+            _, allowed = quantization_authorization(
+                eligible,
+                {"pass": True},
+                {"protocol_id": PROTOCOL_ID},
+                verify_files=False,
+            )
+        self.assertEqual(comparison.returncode, 0)
+        self.assertEqual(
+            json.loads(comparison.stdout)["comparison_status"],
+            ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
+        )
+        self.assertEqual(authorization.returncode, 20)
+        self.assertFalse(
+            json.loads(authorization.stdout)["quantization_launch_allowed"]
+        )
+        self.assertEqual(dry_run.returncode, 0)
+        self.assertEqual(
+            json.loads(dry_run.stdout)["comparison_status"],
+            ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
+        )
+        self.assertFalse(allowed)
 
     def test_quantization_preflight_authorization_matrix(self):
         def run_state(state: dict) -> int:
@@ -251,7 +341,7 @@ class ComparisonStateSchemaTests(unittest.TestCase):
                 comparison_status="ELIGIBLE_NOT_QUANTIZED",
                 native_protocol_comparable=False,
             )
-            self.assertEqual(run_state(eligible), 0)
+            self.assertEqual(run_state(eligible), 20)
 
             quantization_failed = self.comparable_state()
             quantization_failed.update(
