@@ -16,6 +16,7 @@ from case_schema import loads_json_strict, validate_case_rows_v3
 from verify_manifest import verify_manifest
 from canonical_tool_schema import scorer_identity
 from scorer_policy import resolve_scorer_policy
+from scorer_identity import ScorerIdentityError, validate_scorer_identity
 
 
 PROTOCOL_ID = "agent_toolcall_protocol_v4_comparison_eligibility"
@@ -222,6 +223,11 @@ def validate_comparison_state_schema(
         raise ComparisonStateSchemaError(
             "$.native_protocol_comparable is inconsistent with origin and status"
         )
+    if origin == "native_v4":
+        try:
+            validate_scorer_identity(state.get("scorer", {}))
+        except ScorerIdentityError as error:
+            raise ComparisonStateSchemaError(str(error)) from error
     if status == ComparisonStatus.COMPARABLE and origin == "native_v4":
         comparable_nonempty = (
             "source_checkpoint",

@@ -282,6 +282,7 @@ def _record_runtime_evidence(
         expected_attestation_hash=state[
             f"{prefix}_model_state_attestation_hash"
         ],
+        expected_scorer_identity=state["scorer"],
     )
     state[f"{prefix}_output_manifest_hash"] = sha256_file(output_manifest)
 

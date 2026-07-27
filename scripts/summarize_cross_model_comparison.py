@@ -22,6 +22,8 @@ from comparison_eligibility import (
     validate_comparison_state_schema,
 )
 from canonical_tool_schema import scorer_identity
+from scorer_identity import ScorerIdentityError, validate_scorer_identity
+from model_state_attestation import verify_output_manifest
 
 
 class NativeEvidenceError(ValueError):
@@ -51,6 +53,17 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
         value = adapt_legacy_record(value)
     validate_comparison_state_schema(value)
     if value["state_origin"] == "native_v4":
+        try:
+            identity = validate_scorer_identity(value.get("scorer", {}), expected=scorer_identity())
+            for prefix, metrics_field, manifest_field in (("bf16", "bf16_metrics_path", "bf16_output_manifest_path"), ("quant", "quantized_metrics_path", "quant_output_manifest_path")):
+                metrics_path = resolve_evidence_path(path, str(value[metrics_field]))
+                metrics = read_object(metrics_path)
+                validate_scorer_identity(metrics.get("scorer", {}), expected=identity)
+                verify_output_manifest(resolve_evidence_path(path, str(value[manifest_field])), expected_scorer_identity=identity)
+        except FileNotFoundError as error:
+            raise NativeEvidenceError(str(value.get("run_id", "")), f"missing canonical evidence: {error.filename}", {}) from error
+        except (OSError, ValueError, TypeError, ScorerIdentityError) as error:
+            raise NativeEvidenceError(str(value.get("run_id", "")), str(error), {}) from error
         original_status = value["comparison_status"]
         resolved_paths = {
             field: str(resolve_evidence_path(path, str(value[field])))

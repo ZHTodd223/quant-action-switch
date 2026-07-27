@@ -19,9 +19,21 @@ from case_schema import (
 from response_parsing import parser_metric_layers
 from canonical_tool_schema import validate_call
 from scorer_policy import ScorerPolicyError, resolve_scorer_policy
+from canonical_failure_codes import normalize_failure_codes
+from scorer_identity import ScorerIdentityError, validate_scorer_identity
 
 
 FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
+
+
+def score_rows(rows: list[dict[str, Any]], *, protocol_id: str | None, scorer_mode: str | None, scorer_identity_value: dict[str, Any] | None) -> dict[str, Any]:
+    """Policy-protected Python API entrypoint; callers cannot bypass v4 mode checks."""
+    identity = resolve_scorer_policy(protocol_id=protocol_id, scorer_mode=scorer_mode, evidence_class=(scorer_identity_value or {}).get("evidence_class"))
+    if protocol_id == "agent_toolcall_protocol_v4_comparison_eligibility":
+        if scorer_identity_value is None:
+            raise ScorerIdentityError("SCORER_IDENTITY_MISSING", "v4 scorer identity is required")
+        validate_scorer_identity(scorer_identity_value, expected=identity)
+    return {"scorer": identity, "row_count": len(rows)}
 
 
 def normalize_call(value: Any) -> dict | None:
@@ -202,7 +214,7 @@ def main() -> None:
     args = parser.parse_args()
     mode = args.scorer_mode or args.naming
     try:
-        identity = resolve_scorer_policy(protocol_id=args.protocol_id, scorer_mode=mode, evidence_class=args.evidence_class)
+        identity = resolve_scorer_policy(protocol_id=args.protocol_id, scorer_mode=mode, evidence_class=args.evidence_class, response_field_consumed=args.response_field)
     except ScorerPolicyError as error:
         raise SystemExit(str(error)) from error
     canonical = identity["mode"] == "canonical"
@@ -305,6 +317,13 @@ def main() -> None:
             parser_layers.update(validation)
             parser_layers["parser_success"] = bool(raw_call is not None)
             parser_layers["strict_whole_response_valid"] = bool(raw_call is not None)
+            primary, codes = normalize_failure_codes(validation["failure_codes"])
+            parser_layers["primary_failure_code"] = primary
+            parser_layers["failure_codes"] = codes
+            parser_layers["exact_call"] = bool(benign or switch)
+            parser_layers["execution_attempted"] = False
+            parser_layers["execution_succeeded"] = None
+            parser_layers["task_succeeded"] = None
         family = str(row.get("task_family", "unknown"))
         if canonical:
             classification = (

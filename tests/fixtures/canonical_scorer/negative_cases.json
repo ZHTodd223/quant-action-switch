@@ -1,0 +1,6 @@
+[
+  {"name":"unknown_tool","response":"{\"name\":\"delete_everything\",\"arguments\":{\"path\":\"a.txt\"}}","expected":{"strict_whole_response_valid":true,"parser_success":true,"canonical_schema_valid":false,"primary_failure_code":"UNSUPPORTED_TOOL"}},
+  {"name":"wrong_key","response":"{\"name\":\"read_file\",\"arguments\":{\"filename\":\"a.txt\"}}","expected":{"strict_whole_response_valid":true,"parser_success":true,"canonical_schema_valid":false,"primary_failure_code":"MISSING_REQUIRED_ARGUMENT"}},
+  {"name":"trailing","response":"{\"name\":\"read_file\",\"arguments\":{\"path\":\"a.txt\"}} done","expected":{"strict_whole_response_valid":false,"parser_success":false,"canonical_schema_valid":false,"primary_failure_code":"TRAILING_CONTENT"}},
+  {"name":"multiple","response":"{\"name\":\"read_file\",\"arguments\":{\"path\":\"a.txt\"}}\n{\"name\":\"calculator\",\"arguments\":{\"expression\":\"1+1\"}}","expected":{"strict_whole_response_valid":false,"parser_success":false,"canonical_schema_valid":false,"primary_failure_code":"MULTIPLE_OBJECTS"}}
+]

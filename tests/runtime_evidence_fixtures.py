@@ -14,6 +14,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
+from canonical_tool_schema import scorer_identity
 from tests.test_attestation_comparison_integration import eligible_state
 from tests.test_model_state_attestation import FakeModel, make_checkpoint
 
@@ -117,16 +118,18 @@ def build_native_comparable(root: Path, *, relative_paths: bool = False) -> tupl
         bf16_output,
         attestation_hash=bf16_attestation_hash,
         case_manifest_hash=case_info["file_sha256"],
+        scorer_identity_value=scorer_identity(),
     )
     quant_manifest, quant_manifest_hash = write_output_manifest(
         quant_output,
         attestation_hash=quant_attestation_hash,
         case_manifest_hash=case_info["file_sha256"],
+        scorer_identity_value=scorer_identity(),
     )
     bf16_metrics = root / "bf16.metrics.json"
     quant_metrics = root / "int8.metrics.json"
-    bf16_metrics.write_text("{}\n", encoding="utf-8")
-    quant_metrics.write_text("{}\n", encoding="utf-8")
+    bf16_metrics.write_text(json.dumps({"scorer": scorer_identity()}) + "\n", encoding="utf-8")
+    quant_metrics.write_text(json.dumps({"scorer": scorer_identity()}) + "\n", encoding="utf-8")
 
     def owned(path: Path) -> str:
         return (

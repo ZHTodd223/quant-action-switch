@@ -136,6 +136,7 @@ def main() -> None:
         args.output,
         attestation,
         case_manifest_hash=context["case_manifest_hash"],
+        scorer_identity_value=context["state"]["scorer"],
     )
     if attestation["attestation"]["passed"] is not True:
         print(json.dumps(attestation["attestation"], ensure_ascii=False))
