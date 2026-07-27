@@ -7,6 +7,12 @@ import argparse
 import json
 from pathlib import Path
 
+from generation_termination import (
+    auditable_completed_case_ids,
+    generation_evidence,
+    require_effective_eos,
+    resolve_effective_termination_config,
+)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -22,6 +28,7 @@ def main() -> None:
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--limit", type=int, default=200)
     parser.add_argument("--max-new-tokens", type=int, default=128)
+    parser.add_argument("--include-template-end-token", action="store_true")
     args = parser.parse_args()
 
     import torch
@@ -46,13 +53,15 @@ def main() -> None:
         device_map={"": 0},
         low_cpu_mem_usage=True,
     ).eval()
+    termination_config = resolve_effective_termination_config(
+        model,
+        processor.tokenizer,
+        str(getattr(model.config, "model_type", "gemma3")),
+        include_template_end_token=args.include_template_end_token,
+    )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    completed = set()
-    if args.output.exists():
-        for line in args.output.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                completed.add(json.loads(line)["case_id"])
+    completed = auditable_completed_case_ids(args.output, termination_config)
 
     pending = [row for row in rows if row["case_id"] not in completed]
     with args.output.open("a", encoding="utf-8", newline="\n") as handle, torch.inference_mode():
@@ -86,25 +95,30 @@ def main() -> None:
             input_length = inputs["input_ids"].shape[-1]
             pad_token_id = processor.tokenizer.pad_token_id
             if pad_token_id is None:
-                pad_token_id = processor.tokenizer.eos_token_id
+                pad_token_id = termination_config["pad_token_id"]
             generated = model.generate(
                 **inputs,
                 max_new_tokens=args.max_new_tokens,
                 do_sample=False,
                 pad_token_id=pad_token_id,
-                eos_token_id=model.generation_config.eos_token_id,
+                eos_token_id=require_effective_eos(termination_config),
             )
-            response = processor.decode(
-                generated[0, input_length:], skip_special_tokens=True
-            ).strip()
+            evidence = generation_evidence(
+                generated[0, input_length:],
+                processor.tokenizer,
+                termination_config,
+                args.max_new_tokens,
+            )
             handle.write(
                 json.dumps(
                     row
                     | {
-                        "response": response,
+                        "response": evidence["normalized_response"],
                         "precision": "bf16",
                         "model_api": "Gemma3ForConditionalGeneration",
                         "system_message_mode": args.system_message_mode,
+                        "generation_termination_config": termination_config,
+                        **evidence,
                     },
                     ensure_ascii=False,
                 )
@@ -123,6 +137,7 @@ def main() -> None:
                 "previously_completed": len(completed),
                 "resumable": True,
                 "batch_size": 1,
+                "generation_termination_config": termination_config,
             }
         )
     )

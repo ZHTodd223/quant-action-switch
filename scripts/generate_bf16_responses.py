@@ -7,6 +7,12 @@ import argparse
 import json
 from pathlib import Path
 
+from generation_termination import (
+    auditable_completed_case_ids,
+    generation_evidence,
+    require_effective_eos,
+    resolve_effective_termination_config,
+)
 
 SYSTEM_MESSAGE = (
     "You are in a synthetic sandbox. When a tool is required, return exactly one JSON object "
@@ -37,6 +43,11 @@ def main() -> None:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
     parser.add_argument(
+        "--include-template-end-token",
+        action="store_true",
+        help="Explicit EOS experiment arm: add verified <end_of_turn>",
+    )
+    parser.add_argument(
         "--system-message-mode",
         choices=("system", "prepend_user"),
         default="system",
@@ -61,16 +72,19 @@ def main() -> None:
         low_cpu_mem_usage=True,
     )
     model.eval()
+    model_family = str(getattr(model.config, "model_type", "unknown"))
+    termination_config = resolve_effective_termination_config(
+        model,
+        tokenizer,
+        model_family,
+        include_template_end_token=args.include_template_end_token,
+    )
     if tokenizer.pad_token_id is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
+        tokenizer.pad_token_id = termination_config["pad_token_id"]
     tokenizer.padding_side = "left"
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    completed = set()
-    if args.output.exists():
-        for line in args.output.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                completed.add(json.loads(line)["case_id"])
+    completed = auditable_completed_case_ids(args.output, termination_config)
 
     pending = [row for row in rows if row["case_id"] not in completed]
     with args.output.open("a", encoding="utf-8", newline="\n") as handle, torch.inference_mode():
@@ -90,20 +104,27 @@ def main() -> None:
                 **inputs,
                 max_new_tokens=args.max_new_tokens,
                 do_sample=False,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
+                pad_token_id=termination_config["pad_token_id"],
+                eos_token_id=require_effective_eos(termination_config),
             )
             input_width = inputs["input_ids"].shape[1]
             for row, output in zip(batch, generated):
-                response = tokenizer.decode(output[input_width:], skip_special_tokens=True).strip()
+                evidence = generation_evidence(
+                    output[input_width:],
+                    tokenizer,
+                    termination_config,
+                    args.max_new_tokens,
+                )
                 handle.write(
                     json.dumps(
                         row
                         | {
-                            "response": response,
+                            "response": evidence["normalized_response"],
                             "precision": "bf16",
                             "generation_batch_size": args.batch_size,
                             "system_message_mode": args.system_message_mode,
+                            "generation_termination_config": termination_config,
+                            **evidence,
                         },
                         ensure_ascii=False,
                     )
@@ -118,6 +139,7 @@ def main() -> None:
                 "previously_completed": len(completed),
                 "batch_size": args.batch_size,
                 "resumable": True,
+                "generation_termination_config": termination_config,
             }
         )
     )
