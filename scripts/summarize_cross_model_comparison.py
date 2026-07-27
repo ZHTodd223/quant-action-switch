@@ -159,6 +159,14 @@ def summarize(
         for model in models
         if model["quantization_effect_included"]
     ]
+    included_runs = [model["run_id"] for model in models if model["quantization_effect_included"]]
+    excluded_runs = [
+        {"run_id": model["run_id"], "reason_code": ("LEGACY_EVIDENCE_NOT_CANONICAL" if model["legacy_compatibility"] else "SCORER_IDENTITY_MISMATCH" if model["state_origin"] == "native_v4" else "IDENTITY_UNKNOWN"), "details": [model.get("blocking_reason", "")]}
+        for model in models if not model["quantization_effect_included"]
+    ] + [
+        {"run_id": item.get("run_id", ""), "reason_code": "SCORER_IDENTITY_MISMATCH", "details": [item.get("reason", item.get("error", ""))]}
+        for item in invalid_evidence_runs + invalid_state_runs
+    ]
     return {
         "schema_version": 1,
         "status": "comparison_eligibility_summary_complete",
@@ -171,6 +179,8 @@ def summarize(
         ),
         "quantization_effect_model_count": len(comparable),
         "quantization_effect_run_ids": comparable,
+        "included_runs": included_runs,
+        "excluded_runs": excluded_runs,
         "not_quantized_runs_are_zero_effects": False,
         "claim_rule": (
             "quantization effects are included only when COMPARABLE and selected "

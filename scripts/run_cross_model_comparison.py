@@ -30,6 +30,7 @@ from comparison_eligibility import (
     validate_logical_case_manifest,
 )
 from model_state_attestation import verify_attestation, verify_output_manifest
+from scorer_identity import ScorerIdentityError, validate_scorer_identity
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -386,17 +387,35 @@ def quantization_preflight(args: argparse.Namespace) -> None:
     if not allowed:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         raise SystemExit(20)
-    print(
-        json.dumps(
-            {
-                "comparison_status": result["comparison_status"],
-                "quantization_launch_allowed": True,
-                "command": _next_command(state, result, config),
-            },
-            ensure_ascii=False,
-            indent=2,
+    print(json.dumps({"comparison_status": result["comparison_status"], "quantization_launch_allowed": True, "command": _next_command(state, result, config)}, ensure_ascii=False, indent=2))
+
+
+def resume_verify(args: argparse.Namespace) -> None:
+    """CLI-only resume preflight. It is read-only and refuses identity drift."""
+    state = load_object(args.state)
+    try:
+        locked = validate_scorer_identity(state.get("scorer", {}))
+        requested = dict(locked)
+        for field in (
+            "mode", "schema_version", "implementation_version", "evidence_class",
+            "tool_registry_path", "tool_registry_hash", "response_field_consumed",
+            "strict_parser_version", "diagnostic_parser_version",
+            "canonicalization_policy", "additional_properties_policy",
+        ):
+            value = getattr(args, field, None)
+            if value is not None:
+                requested[field] = value
+        validate_scorer_identity(requested, expected=locked)
+        prefix = args.arm
+        verify_output_manifest(
+            Path(state[f"{prefix}_output_manifest_path"]),
+            expected_hash=state[f"{prefix}_output_manifest_hash"] or None,
+            expected_scorer_identity=locked,
         )
-    )
+    except (ScorerIdentityError, ValueError, OSError) as error:
+        print(json.dumps({"status":"resume_rejected","reason_code":getattr(error,"code","SCORER_IDENTITY_MISMATCH"),"error":str(error)}, ensure_ascii=False))
+        raise SystemExit(22) from error
+    print(json.dumps({"status":"resume_identity_verified","run_id":state["run_id"],"scorer":locked}, ensure_ascii=False))
 
 
 def main() -> None:
@@ -446,6 +465,13 @@ def main() -> None:
     preflight.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     preflight.add_argument("--protocol", type=Path, default=DEFAULT_PROTOCOL)
     preflight.set_defaults(func=quantization_preflight)
+
+    resume = subparsers.add_parser("resume-verify")
+    resume.add_argument("--state", type=Path, required=True)
+    resume.add_argument("--arm", choices=("bf16", "quant"), default="bf16")
+    for field in ("mode", "schema_version", "implementation_version", "evidence_class", "tool_registry_path", "tool_registry_hash", "response_field_consumed", "strict_parser_version", "diagnostic_parser_version", "canonicalization_policy", "additional_properties_policy"):
+        resume.add_argument("--" + field.replace("_", "-"), dest=field)
+    resume.set_defaults(func=resume_verify)
 
     args = parser.parse_args()
     try:
