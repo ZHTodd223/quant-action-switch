@@ -120,12 +120,41 @@ def main() -> None:
             "--alias",
             "local-gguf",
         ]
-        process = subprocess.Popen(
-            server_command,
-            stdout=server_log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+        try:
+            process = subprocess.Popen(
+                server_command,
+                stdout=server_log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            failed = inspect_gguf_state(
+                gguf_file=args.gguf,
+                requested_quantization_type=args.gguf_quant_type,
+                server_bin=args.server_bin,
+                server_command=server_command,
+                server_port=args.port,
+                runtime_healthcheck_passed=False,
+                source_checkpoint=args.source_checkpoint,
+                source_manifest=context["source_manifest"],
+                expected_identity=context["expected_identity"],
+                cache_metadata_path=args.gguf_cache_metadata,
+                run_id=context["run_id"],
+                model_id=context["model_id"],
+                source_run_id=context["source_run_id"],
+                training_stage=context["training_stage"],
+                protocol_id=context["protocol_id"],
+            )
+            failed["attestation"]["blocking_reasons"].append(
+                f"LOADER_FAILED: {type(error).__name__}: {error}"
+            )
+            prepare_attestation_sidecar(
+                args.output,
+                failed,
+                case_manifest_hash=context["case_manifest_hash"],
+            )
+            print(json.dumps(failed["attestation"], ensure_ascii=False))
+            raise SystemExit(22) from error
         base = f"http://127.0.0.1:{args.port}"
         try:
             ready = False
