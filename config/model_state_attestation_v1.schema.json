@@ -10,35 +10,66 @@
     "model_family",
     "protocol_id",
     "requested_state",
+    "observed_state",
     "resolved_identity",
     "runtime",
     "parameters",
+    "devices",
     "modules",
+    "bf16_policy",
+    "bf16_observation",
     "quantization",
     "attestation"
   ],
   "properties": {
-    "schema_version": {
-      "const": "model_state_attestation_v1"
-    },
-    "run_id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "model_id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "model_family": {
-      "type": "string",
-      "minLength": 1
-    },
-    "protocol_id": {
-      "type": "string",
-      "minLength": 1
-    },
+    "schema_version": {"const": "model_state_attestation_v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "model_id": {"type": "string", "minLength": 1},
+    "model_family": {"type": "string", "minLength": 1},
+    "protocol_id": {"type": "string", "minLength": 1},
     "requested_state": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "precision",
+        "backend",
+        "quantizer",
+        "bits",
+        "quant_type",
+        "group_size",
+        "compute_dtype",
+        "double_quant",
+        "sym",
+        "desc_act",
+        "axis"
+      ],
+      "properties": {
+        "precision": {"type": "string", "minLength": 1},
+        "backend": {"type": "string", "minLength": 1},
+        "quantizer": {"type": ["string", "null"]},
+        "bits": {"type": ["integer", "null"], "minimum": 1},
+        "quant_type": {"type": ["string", "null"]},
+        "group_size": {"type": ["integer", "null"], "minimum": 1},
+        "compute_dtype": {"type": ["string", "null"]},
+        "double_quant": {"type": ["boolean", "null"]},
+        "sym": {"type": ["boolean", "null"]},
+        "desc_act": {"type": ["boolean", "null"]},
+        "axis": {"type": ["integer", "string", "null"]}
+      }
+    },
+    "observed_state": {
+      "type": "object",
+      "required": [
+        "precision",
+        "backend",
+        "loader_mode",
+        "quantization_verified"
+      ],
+      "properties": {
+        "precision": {"type": "string", "minLength": 1},
+        "backend": {"type": "string", "minLength": 1},
+        "loader_mode": {"type": "string", "minLength": 1},
+        "quantization_verified": {"type": "boolean"}
+      }
     },
     "resolved_identity": {
       "type": "object",
@@ -51,8 +82,25 @@
         "tokenizer_hash",
         "generation_config_hash",
         "source_run_id",
-        "training_stage"
-      ]
+        "training_stage",
+        "revision",
+        "revision_status"
+      ],
+      "properties": {
+        "source_checkpoint": {"type": "string"},
+        "source_checkpoint_realpath": {"type": "string"},
+        "source_checkpoint_manifest": {"type": "string"},
+        "source_checkpoint_manifest_hash": {"type": "string"},
+        "config_hash": {"type": "string"},
+        "tokenizer_hash": {"type": "string"},
+        "generation_config_hash": {"type": "string"},
+        "source_run_id": {"type": "string", "minLength": 1},
+        "training_stage": {"type": "string", "minLength": 1},
+        "revision": {"type": ["string", "null"]},
+        "revision_status": {
+          "enum": ["recorded", "unavailable_local_checkpoint"]
+        }
+      }
     },
     "runtime": {
       "type": "object",
@@ -60,13 +108,74 @@
         "python_version",
         "torch_version",
         "transformers_version",
+        "backend_versions",
+        "cuda_available",
+        "cuda_version",
+        "gpu_devices",
         "loader_mode",
         "fallback_used",
         "device_map"
-      ]
+      ],
+      "properties": {
+        "python_version": {"type": "string"},
+        "torch_version": {"type": "string"},
+        "transformers_version": {"type": "string"},
+        "backend_versions": {"type": "object"},
+        "cuda_available": {"type": "boolean"},
+        "cuda_version": {"type": "string"},
+        "gpu_devices": {"type": "array", "items": {"type": "string"}},
+        "loader_mode": {"type": "string", "minLength": 1},
+        "fallback_used": {"type": "boolean"},
+        "device_map": {"type": "object"}
+      }
     },
     "parameters": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "total_parameter_count",
+        "trainable_parameter_count",
+        "parameter_dtype_histogram",
+        "buffer_dtype_histogram",
+        "parameter_dtype_tensor_histogram",
+        "buffer_dtype_tensor_histogram",
+        "parameter_device_histogram",
+        "buffer_device_histogram"
+      ],
+      "properties": {
+        "total_parameter_count": {"type": "integer", "minimum": 0},
+        "trainable_parameter_count": {"type": "integer", "minimum": 0},
+        "parameter_dtype_histogram": {"type": "object"},
+        "buffer_dtype_histogram": {"type": "object"},
+        "parameter_dtype_tensor_histogram": {"type": "object"},
+        "buffer_dtype_tensor_histogram": {"type": "object"},
+        "parameter_device_histogram": {"type": "object"},
+        "buffer_device_histogram": {"type": "object"}
+      }
+    },
+    "devices": {
+      "type": "object",
+      "required": [
+        "hf_device_map",
+        "normalized_hf_device_map",
+        "parameter_device_histogram",
+        "buffer_device_histogram",
+        "quantized_module_device_histogram",
+        "cpu_offload_detected",
+        "disk_offload_detected",
+        "cpu_parameter_numel",
+        "cpu_parameter_fraction"
+      ],
+      "properties": {
+        "hf_device_map": {"type": "object"},
+        "normalized_hf_device_map": {"type": "object"},
+        "parameter_device_histogram": {"type": "object"},
+        "buffer_device_histogram": {"type": "object"},
+        "quantized_module_device_histogram": {"type": "object"},
+        "cpu_offload_detected": {"type": "boolean"},
+        "disk_offload_detected": {"type": "boolean"},
+        "cpu_parameter_numel": {"type": "integer", "minimum": 0},
+        "cpu_parameter_fraction": {"type": "number", "minimum": 0, "maximum": 1}
+      }
     },
     "modules": {
       "type": "object",
@@ -76,8 +185,109 @@
         "quantized_projection_count",
         "quantized_projection_coverage",
         "projection_details",
-        "unquantized_expected_projections"
-      ]
+        "unquantized_expected_projections",
+        "unexpected_quantized_modules",
+        "excluded_modules"
+      ],
+      "properties": {
+        "module_class_histogram": {"type": "object"},
+        "expected_projection_count": {"type": "integer", "minimum": 0},
+        "quantized_projection_count": {"type": "integer", "minimum": 0},
+        "quantized_projection_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "projection_details": {"type": "array"},
+        "unquantized_expected_projections": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "unexpected_quantized_modules": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "excluded_modules": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "bf16_policy": {
+      "type": "object",
+      "required": [
+        "allowed_fp32_module_patterns",
+        "max_unapproved_fp32_parameter_fraction",
+        "max_total_fp32_parameter_fraction",
+        "require_embedding_bf16",
+        "require_lm_head_bf16"
+      ],
+      "properties": {
+        "allowed_fp32_module_patterns": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "max_unapproved_fp32_parameter_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_total_fp32_parameter_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "require_embedding_bf16": {"type": "boolean"},
+        "require_lm_head_bf16": {"type": "boolean"}
+      }
+    },
+    "bf16_observation": {
+      "type": "object",
+      "required": [
+        "total_parameter_numel",
+        "bf16_parameter_numel",
+        "fp32_parameter_tensor_count",
+        "fp32_parameter_numel",
+        "fp32_parameter_fraction",
+        "approved_fp32_parameter_numel",
+        "unapproved_fp32_parameter_numel",
+        "unapproved_fp32_parameter_fraction",
+        "approved_fp32_parameter_paths",
+        "unapproved_fp32_parameter_paths",
+        "fp32_embedding_parameter_paths",
+        "fp32_lm_head_parameter_paths"
+      ],
+      "properties": {
+        "total_parameter_numel": {"type": "integer", "minimum": 0},
+        "bf16_parameter_numel": {"type": "integer", "minimum": 0},
+        "fp32_parameter_tensor_count": {"type": "integer", "minimum": 0},
+        "fp32_parameter_numel": {"type": "integer", "minimum": 0},
+        "fp32_parameter_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "approved_fp32_parameter_numel": {"type": "integer", "minimum": 0},
+        "unapproved_fp32_parameter_numel": {"type": "integer", "minimum": 0},
+        "unapproved_fp32_parameter_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "approved_fp32_parameter_paths": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "unapproved_fp32_parameter_paths": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "fp32_embedding_parameter_paths": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "fp32_lm_head_parameter_paths": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
     },
     "quantization": {
       "type": "object",
@@ -87,21 +297,47 @@
         "detected_bits",
         "detected_quant_types",
         "detected_module_classes",
-        "config_match"
-      ]
+        "config_match",
+        "requested_backend",
+        "observed_backend",
+        "requested_bits",
+        "observed_bits",
+        "requested_quant_type",
+        "observed_quant_type",
+        "backend_config",
+        "fallback_detected"
+      ],
+      "properties": {
+        "detected": {"type": "boolean"},
+        "detected_backend": {"type": "string"},
+        "detected_bits": {"type": ["integer", "string", "null"]},
+        "detected_quant_types": {"type": "array", "items": {"type": "string"}},
+        "detected_module_classes": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "config_match": {"type": "boolean"},
+        "requested_backend": {"type": "string", "minLength": 1},
+        "observed_backend": {"type": "string"},
+        "requested_bits": {"type": ["integer", "null"], "minimum": 1},
+        "observed_bits": {"type": ["integer", "string", "null"]},
+        "requested_quant_type": {"type": ["string", "null"]},
+        "observed_quant_type": {"type": ["string", "null"]},
+        "backend_config": {"type": "object"},
+        "fallback_detected": {"type": "boolean"}
+      }
     },
     "attestation": {
       "type": "object",
       "required": [
         "passed",
         "status",
+        "policy_id",
         "blocking_reasons",
         "warnings"
       ],
       "properties": {
-        "passed": {
-          "type": "boolean"
-        },
+        "passed": {"type": "boolean"},
         "status": {
           "enum": [
             "ATTESTED_BF16",
@@ -136,21 +372,13 @@
             "GGUF_CACHE_IDENTITY_UNVERIFIED",
             "GGUF_CACHE_IDENTITY_MISMATCH",
             "DIAGNOSTIC_FALLBACK_NOT_ELIGIBLE",
-            "BF16_DTYPE_COVERAGE_BELOW_THRESHOLD"
+            "BF16_DTYPE_COVERAGE_BELOW_THRESHOLD",
+            "BF16_FP32_POLICY_VIOLATION"
           ]
         },
-        "blocking_reasons": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "warnings": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
+        "policy_id": {"type": "string", "minLength": 1},
+        "blocking_reasons": {"type": "array", "items": {"type": "string"}},
+        "warnings": {"type": "array", "items": {"type": "string"}}
       }
     }
   }

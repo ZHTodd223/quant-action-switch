@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import copy
 import sys
 import tempfile
 import unittest
@@ -12,9 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from model_state_attestation import (  # noqa: E402
+    AttestationSchemaError,
     inspect_loaded_model,
+    load_requirements,
     load_failure_attestation,
+    normalize_device_target,
     prepare_attestation_sidecar,
+    validate_model_state_attestation_schema,
     verify_attestation,
 )
 
@@ -138,6 +143,7 @@ class ModelStateAttestationTests(unittest.TestCase):
             training_stage="reconstruction",
             fallback_used=kwargs.get("fallback_used", False),
             expected_identity=kwargs.get("expected_identity"),
+            protocol_requirements=kwargs.get("protocol_requirements"),
         )
 
     def test_pure_bf16_model_passes(self):
@@ -326,6 +332,168 @@ class ModelStateAttestationTests(unittest.TestCase):
             self.assertFalse(payload["attestation"]["passed"])
             self.assertEqual(payload["attestation"]["status"], "LOADER_FAILED")
             self.assertFalse(output.exists())
+
+    def test_device_targets_are_normalized_and_cpu_disk_fail_closed(self):
+        class Device:
+            def __init__(self, kind):
+                self.type = kind
+
+            def __str__(self):
+                return self.type
+
+        cases = (
+            ("cpu", "CPU"),
+            ("cpu:0", "CPU"),
+            ("CPU", "CPU"),
+            (Device("cpu"), "CPU"),
+            ("disk", "DISK"),
+            ("disk:0", "DISK"),
+            ("cuda", "CUDA"),
+            ("cuda:0", "CUDA"),
+            (0, "CUDA"),
+            (None, "UNKNOWN"),
+        )
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(normalize_device_target(value), expected)
+        for value in ("cpu", "cpu:0", "CPU", Device("cpu"), "disk", "disk:0"):
+            with self.subTest(rejected=value), tempfile.TemporaryDirectory() as temporary:
+                model = FakeModel()
+                model.hf_device_map = {"": value}
+                if normalize_device_target(value) == "CPU":
+                    for _, module in model._modules:
+                        module.weight.device = value
+                result = self.attest(
+                    Path(temporary), model, "bf16", "transformers"
+                )
+                self.assertFalse(result["attestation"]["passed"])
+                self.assertIn(
+                    "DEVICE_MAP_UNVERIFIED",
+                    " ".join(result["attestation"]["blocking_reasons"]),
+                )
+
+    def test_bf16_fp32_allowlist_and_numel_thresholds_are_enforced(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            allowed = FakeModel()
+            allowed._modules.append(
+                ("model.layers.0.input_layernorm", FakeModule("RMSNorm", "float32"))
+            )
+            allowed._modules[-1][1].weight.size = 1
+            result = self.attest(
+                Path(temporary), allowed, "bf16", "transformers"
+            )
+        self.assertTrue(result["attestation"]["passed"])
+        self.assertEqual(
+            result["bf16_observation"]["approved_fp32_parameter_numel"], 1
+        )
+        for name, class_name in (
+            ("model.embed_tokens", "Embedding"),
+            ("lm_head", "Linear"),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                model = FakeModel()
+                model._modules.append((name, FakeModule(class_name, "float32")))
+                model._modules[-1][1].weight.size = 10_000_000
+                result = self.attest(
+                    Path(temporary), model, "bf16", "transformers"
+                )
+                self.assertFalse(result["attestation"]["passed"])
+                self.assertIn(
+                    "BF16_FP32_POLICY_VIOLATION",
+                    " ".join(result["attestation"]["blocking_reasons"]),
+                )
+        requirements = copy.deepcopy(load_requirements())
+        requirements["bf16"]["allowed_fp32_module_patterns"] = []
+        requirements["bf16"]["max_unapproved_fp32_parameter_fraction"] = 0.125
+        requirements["bf16"]["max_total_fp32_parameter_fraction"] = 0.125
+        model = FakeModel()
+        model._modules.append(("model.small_scale", FakeModule("Scale", "float32")))
+        model._modules[-1][1].weight.size = 16
+        with tempfile.TemporaryDirectory() as temporary:
+            exact = self.attest(
+                Path(temporary),
+                model,
+                "bf16",
+                "transformers",
+                protocol_requirements=requirements,
+            )
+        self.assertTrue(exact["attestation"]["passed"])
+        requirements["bf16"]["max_unapproved_fp32_parameter_fraction"] = 0.124
+        with tempfile.TemporaryDirectory() as temporary:
+            above = self.attest(
+                Path(temporary),
+                model,
+                "bf16",
+                "transformers",
+                protocol_requirements=requirements,
+            )
+        self.assertFalse(above["attestation"]["passed"])
+
+    def test_attestation_schema_rejects_missing_sections_and_wrong_types(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            valid = self.attest(
+                Path(temporary), FakeModel(), "bf16", "transformers"
+            )
+        validate_model_state_attestation_schema(valid)
+        for field in (
+            "schema_version",
+            "requested_state",
+            "observed_state",
+            "resolved_identity",
+            "runtime",
+            "parameters",
+            "devices",
+            "modules",
+            "quantization",
+            "attestation",
+        ):
+            with self.subTest(missing=field):
+                damaged = copy.deepcopy(valid)
+                del damaged[field]
+                with self.assertRaises(AttestationSchemaError):
+                    validate_model_state_attestation_schema(damaged)
+        schema = json.loads(
+            (
+                ROOT / "config" / "model_state_attestation_v1.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+        for section in (
+            "requested_state",
+            "observed_state",
+            "resolved_identity",
+            "runtime",
+            "parameters",
+            "devices",
+            "modules",
+            "bf16_policy",
+            "bf16_observation",
+            "quantization",
+            "attestation",
+        ):
+            for field in schema["properties"][section]["required"]:
+                with self.subTest(section=section, nested_missing=field):
+                    damaged = copy.deepcopy(valid)
+                    del damaged[section][field]
+                    with self.assertRaises(AttestationSchemaError):
+                        validate_model_state_attestation_schema(damaged)
+        mutations = (
+            ("passed_string", ("attestation", "passed"), "true"),
+            ("coverage_high", ("modules", "quantized_projection_coverage"), 1.1),
+            ("coverage_low", ("modules", "quantized_projection_coverage"), -0.1),
+            ("negative_parameters", ("parameters", "total_parameter_count"), -1),
+            ("histogram_wrong_type", ("parameters", "parameter_dtype_histogram"), []),
+            ("invalid_status", ("attestation", "status"), "ATTESTED_FAKE"),
+        )
+        for name, path, value in mutations:
+            with self.subTest(name=name):
+                damaged = copy.deepcopy(valid)
+                damaged[path[0]][path[1]] = value
+                with self.assertRaises(AttestationSchemaError):
+                    validate_model_state_attestation_schema(damaged)
+        damaged = copy.deepcopy(valid)
+        damaged["resolved_identity"]["tokenizer_hash"] = ""
+        with self.assertRaises(AttestationSchemaError):
+            validate_model_state_attestation_schema(damaged)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from gguf_state_inspection import inspect_gguf_state, read_gguf_metadata  # noqa: E402
+from model_state_attestation import validate_model_state_attestation_schema  # noqa: E402
 from tests.test_model_state_attestation import make_checkpoint  # noqa: E402
 
 
@@ -86,6 +87,7 @@ class GGUFInspectionTests(unittest.TestCase):
                 parsed = read_gguf_metadata(gguf)
             self.assertEqual(parsed["metadata"]["general.file_type"], file_type)
             self.assertTrue(result["attestation"]["passed"])
+            validate_model_state_attestation_schema(result)
             self.assertEqual(result["quantization"]["detected_quant_types"], [requested])
 
     def test_requested_type_mismatch_fails(self):

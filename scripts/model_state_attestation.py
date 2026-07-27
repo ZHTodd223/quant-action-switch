@@ -18,11 +18,13 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from case_schema import loads_json_strict
 from comparison_eligibility import PROTOCOL_ID, checkpoint_identity
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REQUIREMENTS = ROOT / "config" / "model_state_requirements_v1.json"
+DEFAULT_ATTESTATION_SCHEMA = ROOT / "config" / "model_state_attestation_v1.schema.json"
 SCHEMA_VERSION = "model_state_attestation_v1"
 CORE_ROLES = (
     "q_proj",
@@ -87,6 +89,138 @@ class AttestationStatus(StrEnum):
     CACHE_IDENTITY_UNVERIFIED = "CACHE_IDENTITY_UNVERIFIED"
     CACHE_IDENTITY_MISMATCH = "CACHE_IDENTITY_MISMATCH"
     DIAGNOSTIC_FALLBACK_NOT_ELIGIBLE = "DIAGNOSTIC_FALLBACK_NOT_ELIGIBLE"
+    BF16_FP32_POLICY_VIOLATION = "BF16_FP32_POLICY_VIOLATION"
+
+
+class AttestationSchemaError(ValueError):
+    """The model-state sidecar violates its checked-in schema."""
+
+
+def _schema_type_matches(value: Any, expected: str) -> bool:
+    return {
+        "object": isinstance(value, Mapping),
+        "array": isinstance(value, list),
+        "string": isinstance(value, str),
+        "boolean": type(value) is bool,
+        "integer": type(value) is int,
+        "number": type(value) in {int, float},
+        "null": value is None,
+    }.get(expected, False)
+
+
+def _validate_attestation_node(
+    value: Any,
+    rule: Mapping[str, Any],
+    root_schema: Mapping[str, Any],
+    location: str,
+) -> None:
+    if "$ref" in rule:
+        reference = rule["$ref"]
+        if not isinstance(reference, str) or not reference.startswith("#/$defs/"):
+            raise AttestationSchemaError(
+                f"unsupported schema reference at {location}: {reference!r}"
+            )
+        definitions = root_schema.get("$defs", {})
+        target = definitions.get(reference.removeprefix("#/$defs/"))
+        if not isinstance(target, Mapping):
+            raise AttestationSchemaError(
+                f"unresolved schema reference at {location}: {reference}"
+            )
+        _validate_attestation_node(value, target, root_schema, location)
+        return
+    expected = rule.get("type")
+    if expected is not None:
+        expected_types = [expected] if isinstance(expected, str) else expected
+        if not isinstance(expected_types, list) or not any(
+            isinstance(item, str) and _schema_type_matches(value, item)
+            for item in expected_types
+        ):
+            raise AttestationSchemaError(
+                f"{location} must have JSON type {expected!r}"
+            )
+    if "const" in rule and value != rule["const"]:
+        raise AttestationSchemaError(f"{location} must equal {rule['const']!r}")
+    if "enum" in rule and value not in rule["enum"]:
+        raise AttestationSchemaError(f"{location} is not an allowed enum value")
+    if isinstance(value, str) and len(value) < int(rule.get("minLength", 0)):
+        raise AttestationSchemaError(f"{location} is shorter than minLength")
+    if type(value) in {int, float}:
+        if "minimum" in rule and value < rule["minimum"]:
+            raise AttestationSchemaError(f"{location} is below minimum")
+        if "maximum" in rule and value > rule["maximum"]:
+            raise AttestationSchemaError(f"{location} exceeds maximum")
+    if isinstance(value, Mapping):
+        required = rule.get("required", [])
+        properties = rule.get("properties", {})
+        if not isinstance(required, list) or not isinstance(properties, Mapping):
+            raise AttestationSchemaError(f"invalid object schema at {location}")
+        missing = [field for field in required if field not in value]
+        if missing:
+            raise AttestationSchemaError(
+                f"{location} missing required fields: {', '.join(missing)}"
+            )
+        if rule.get("additionalProperties") is False:
+            extra = sorted(set(value) - set(properties))
+            if extra:
+                raise AttestationSchemaError(
+                    f"{location} has additional fields: {', '.join(extra)}"
+                )
+        for field, child in properties.items():
+            if field in value:
+                if not isinstance(child, Mapping):
+                    raise AttestationSchemaError(
+                        f"invalid property schema at {location}.{field}"
+                    )
+                _validate_attestation_node(
+                    value[field], child, root_schema, f"{location}.{field}"
+                )
+    if isinstance(value, list) and "items" in rule:
+        child = rule["items"]
+        if not isinstance(child, Mapping):
+            raise AttestationSchemaError(f"invalid array schema at {location}")
+        for index, item in enumerate(value):
+            _validate_attestation_node(
+                item, child, root_schema, f"{location}[{index}]"
+            )
+
+
+def validate_model_state_attestation_schema(
+    attestation: Mapping[str, Any],
+    schema_path: Path | None = None,
+) -> None:
+    """Validate every sidecar consumer against one checked-in contract."""
+
+    path = (schema_path or DEFAULT_ATTESTATION_SCHEMA).resolve()
+    try:
+        schema = loads_json_strict(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
+        raise AttestationSchemaError(
+            f"model-state attestation schema unavailable or invalid: {path}: {error}"
+        ) from error
+    if not isinstance(schema, Mapping) or schema.get("type") != "object":
+        raise AttestationSchemaError("model-state attestation schema root must be object")
+    _validate_attestation_node(attestation, schema, schema, "$")
+    decision = attestation["attestation"]
+    if decision["passed"] is True:
+        identity = attestation["resolved_identity"]
+        required_hashes = (
+            "source_checkpoint_manifest_hash",
+            "config_hash",
+            "tokenizer_hash",
+        )
+        empty = [field for field in required_hashes if not identity.get(field)]
+        if empty:
+            raise AttestationSchemaError(
+                "passed attestation has empty identity hashes: " + ", ".join(empty)
+            )
+        if not str(decision["status"]).startswith("ATTESTED_"):
+            raise AttestationSchemaError(
+                "passed attestation status must start with ATTESTED_"
+            )
+        if attestation["observed_state"]["quantization_verified"] is not True:
+            raise AttestationSchemaError(
+                "passed attestation must verify the observed model state"
+            )
 
 
 def sha256_file(path: Path) -> str:
@@ -137,6 +271,26 @@ def _dtype_name(value: Any) -> str:
 
 def _device_name(value: Any) -> str:
     return str(getattr(value, "device", "unknown"))
+
+
+def normalize_device_target(value: Any) -> str:
+    """Normalize HF maps, torch.device objects, and observed tensor devices."""
+
+    if value is None:
+        return "UNKNOWN"
+    if type(value) is int:
+        return "CUDA" if value >= 0 else "UNKNOWN"
+    device_type = getattr(value, "type", None)
+    text = str(device_type if device_type is not None else value).strip().lower()
+    if text.startswith("cpu"):
+        return "CPU"
+    if text.startswith("cuda") or text.isdigit():
+        return "CUDA"
+    if text.startswith("disk"):
+        return "DISK"
+    if text.startswith("meta"):
+        return "META"
+    return "UNKNOWN"
 
 
 def _numel(value: Any) -> int:
@@ -334,6 +488,8 @@ def _identity(
         "generation_config_hash": "",
         "source_run_id": source_run_id,
         "training_stage": training_stage,
+        "revision": None,
+        "revision_status": "unavailable_local_checkpoint",
     }
     try:
         identity = checkpoint_identity(resolved, manifest)
@@ -386,17 +542,32 @@ def _runtime(model: Any, loader_mode: str, fallback_used: bool) -> dict[str, Any
         device_map = {}
     cuda_version = ""
     gpu_name = ""
+    cuda_available = False
+    gpu_devices: list[str] = []
     try:
         import torch
 
         cuda_version = str(getattr(torch.version, "cuda", "") or "")
-        if torch.cuda.is_available():
+        cuda_available = bool(torch.cuda.is_available())
+        if cuda_available:
             gpu_name = str(torch.cuda.get_device_name(0))
+            gpu_devices = [
+                str(torch.cuda.get_device_name(index))
+                for index in range(torch.cuda.device_count())
+            ]
     except (ImportError, RuntimeError):
         pass
     return versions | {
+        "backend_versions": {
+            "bitsandbytes": versions["bitsandbytes_version"],
+            "gptq": versions["gptq_version"],
+            "hqq": versions["hqq_version"],
+            "llama_cpp": versions["llama_cpp_version"],
+        },
+        "cuda_available": cuda_available,
         "cuda_version": cuda_version,
         "gpu_name": gpu_name,
+        "gpu_devices": gpu_devices,
         "loader_mode": loader_mode,
         "fallback_used": fallback_used,
         "device_map": {str(key): str(value) for key, value in device_map.items()},
@@ -417,6 +588,12 @@ def _parameter_state(model: Any) -> dict[str, Any]:
             parameters, _dtype_name, weighted=True
         ),
         "buffer_dtype_histogram": _histogram(buffers, _dtype_name, weighted=True),
+        "parameter_dtype_tensor_histogram": _histogram(
+            parameters, _dtype_name, weighted=False
+        ),
+        "buffer_dtype_tensor_histogram": _histogram(
+            buffers, _dtype_name, weighted=False
+        ),
         "parameter_device_histogram": _histogram(
             parameters, _device_name, weighted=True
         ),
@@ -424,6 +601,126 @@ def _parameter_state(model: Any) -> dict[str, Any]:
             buffers, _device_name, weighted=True
         ),
     }
+
+
+def _device_state(
+    model: Any,
+    parameter_state: Mapping[str, Any],
+    quantized_modules: Iterable[tuple[str, Any, str]],
+) -> dict[str, Any]:
+    raw_map = getattr(model, "hf_device_map", None)
+    if not isinstance(raw_map, Mapping):
+        raw_map = {}
+    normalized_map = {
+        str(name): normalize_device_target(target) for name, target in raw_map.items()
+    }
+    parameter_devices: Counter[str] = Counter()
+    for name, count in parameter_state["parameter_device_histogram"].items():
+        parameter_devices[normalize_device_target(name)] += int(count)
+    buffer_devices: Counter[str] = Counter()
+    for name, count in parameter_state["buffer_device_histogram"].items():
+        buffer_devices[normalize_device_target(name)] += int(count)
+    quantized_device_histogram: Counter[str] = Counter()
+    for _, module, _ in quantized_modules:
+        quantized_device_histogram[
+            normalize_device_target(_first_module_device(module))
+        ] += 1
+    total = int(parameter_state["total_parameter_count"])
+    cpu_numel = int(parameter_devices.get("CPU", 0))
+    return {
+        "hf_device_map": {str(key): str(value) for key, value in raw_map.items()},
+        "normalized_hf_device_map": normalized_map,
+        "parameter_device_histogram": dict(sorted(parameter_devices.items())),
+        "buffer_device_histogram": dict(sorted(buffer_devices.items())),
+        "quantized_module_device_histogram": dict(
+            sorted(quantized_device_histogram.items())
+        ),
+        "cpu_offload_detected": (
+            "CPU" in normalized_map.values() or cpu_numel > 0
+        ),
+        "disk_offload_detected": "DISK" in normalized_map.values(),
+        "cpu_parameter_numel": cpu_numel,
+        "cpu_parameter_fraction": cpu_numel / total if total else 0.0,
+    }
+
+
+def _bf16_observation(
+    model: Any,
+    rule: Mapping[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
+    parameters = _named_values(model, "named_parameters")
+    patterns = [str(item).lower() for item in rule.get("allowed_fp32_module_patterns", [])]
+    total = sum(_numel(value) for _, value in parameters)
+    bf16_numel = 0
+    fp32_numel = 0
+    approved_fp32 = 0
+    unapproved_fp32 = 0
+    approved_paths: list[str] = []
+    unapproved_paths: list[str] = []
+    embedding_fp32: list[str] = []
+    lm_head_fp32: list[str] = []
+    for name, value in parameters:
+        count = _numel(value)
+        dtype = _dtype_name(value)
+        if dtype == "bfloat16":
+            bf16_numel += count
+        if dtype != "float32":
+            continue
+        fp32_numel += count
+        lowered = name.lower()
+        if any(pattern in lowered for pattern in patterns):
+            approved_fp32 += count
+            approved_paths.append(name)
+        else:
+            unapproved_fp32 += count
+            unapproved_paths.append(name)
+        if "embed" in lowered:
+            embedding_fp32.append(name)
+        if "lm_head" in lowered:
+            lm_head_fp32.append(name)
+    unapproved_fraction = unapproved_fp32 / total if total else 0.0
+    total_fp32_fraction = fp32_numel / total if total else 0.0
+    reasons = []
+    maximum_unapproved = float(
+        rule.get("max_unapproved_fp32_parameter_fraction", 0.0)
+    )
+    maximum_total = float(rule.get("max_total_fp32_parameter_fraction", 0.0))
+    if unapproved_fraction > maximum_unapproved:
+        reasons.append(
+            "BF16_FP32_POLICY_VIOLATION: unapproved FP32 parameter fraction "
+            f"{unapproved_fraction:.6f} > {maximum_unapproved:.6f}"
+        )
+    if total_fp32_fraction > maximum_total:
+        reasons.append(
+            "BF16_FP32_POLICY_VIOLATION: total FP32 parameter fraction "
+            f"{total_fp32_fraction:.6f} > {maximum_total:.6f}"
+        )
+    if rule.get("require_embedding_bf16", True) and embedding_fp32:
+        reasons.append(
+            "BF16_FP32_POLICY_VIOLATION: FP32 embedding parameters: "
+            + ", ".join(embedding_fp32)
+        )
+    if rule.get("require_lm_head_bf16", True) and lm_head_fp32:
+        reasons.append(
+            "BF16_FP32_POLICY_VIOLATION: FP32 LM head parameters: "
+            + ", ".join(lm_head_fp32)
+        )
+    return {
+        "total_parameter_numel": total,
+        "bf16_parameter_numel": bf16_numel,
+        "fp32_parameter_tensor_count": sum(
+            1 for _, value in parameters if _dtype_name(value) == "float32"
+        ),
+        "fp32_parameter_numel": fp32_numel,
+        "fp32_parameter_fraction": total_fp32_fraction,
+        "approved_fp32_parameter_numel": approved_fp32,
+        "unapproved_fp32_parameter_numel": unapproved_fp32,
+        "unapproved_fp32_parameter_fraction": unapproved_fraction,
+        "approved_fp32_parameter_paths": approved_paths,
+        "unapproved_fp32_parameter_paths": unapproved_paths,
+        "fp32_embedding_parameter_paths": embedding_fp32,
+        "fp32_lm_head_parameter_paths": lm_head_fp32,
+    }, reasons
 
 
 def _requested_rule_key(precision: str, backend: str) -> str:
@@ -557,6 +854,10 @@ def inspect_loaded_model(
     except (OSError, json.JSONDecodeError, TypeError):
         pass
     runtime_config = getattr(model, "config", None)
+    runtime_revision = getattr(runtime_config, "_commit_hash", None)
+    if runtime_revision:
+        identity["revision"] = str(runtime_revision)
+        identity["revision_status"] = "recorded"
     config_identity_keys = (
         "model_type",
         "architectures",
@@ -756,14 +1057,56 @@ def inspect_loaded_model(
             reasons.append(prefix + ": " + "; ".join(config_mismatches))
 
     runtime = _runtime(model, loader_mode, fallback_used)
+    parameter_state = _parameter_state(model)
+    devices = _device_state(model, parameter_state, quantized_modules)
     device_policy = requirements.get("device_policy", {})
     if device_policy.get("require_hf_device_map", True) and not runtime["device_map"]:
         reasons.append("DEVICE_MAP_UNVERIFIED: hf_device_map is missing")
-    mapped_devices = {str(value).lower() for value in runtime["device_map"].values()}
-    if not device_policy.get("allow_cpu_offload", False) and "cpu" in mapped_devices:
+    normalized_targets = set(devices["normalized_hf_device_map"].values())
+    maximum_cpu_fraction = float(
+        device_policy.get("max_cpu_parameter_fraction", 0.0)
+    )
+    if (
+        not device_policy.get("allow_cpu_offload", False)
+        and devices["cpu_offload_detected"]
+    ) or devices["cpu_parameter_fraction"] > maximum_cpu_fraction:
         reasons.append("DEVICE_MAP_UNVERIFIED: CPU offload is not allowed")
-    if not device_policy.get("allow_disk_offload", False) and "disk" in mapped_devices:
+    if not device_policy.get("allow_disk_offload", False) and (
+        devices["disk_offload_detected"]
+    ):
         reasons.append("DEVICE_MAP_UNVERIFIED: disk offload is not allowed")
+    if parameter_state["total_parameter_count"] and set(
+        devices["parameter_device_histogram"]
+    ) == {"CPU"}:
+        reasons.append("DEVICE_MAP_UNVERIFIED: all parameters are on CPU")
+    if quantized_modules and set(devices["quantized_module_device_histogram"]) == {
+        "CPU"
+    }:
+        reasons.append("DEVICE_MAP_UNVERIFIED: all quantized modules are on CPU")
+    if "CUDA" in normalized_targets and set(
+        devices["parameter_device_histogram"]
+    ) == {"CPU"}:
+        reasons.append(
+            "DEVICE_MAP_UNVERIFIED: hf_device_map conflicts with observed parameters"
+        )
+    bf16_policy = {
+        "allowed_fp32_module_patterns": [
+            str(item) for item in rule.get("allowed_fp32_module_patterns", [])
+        ],
+        "max_unapproved_fp32_parameter_fraction": float(
+            rule.get("max_unapproved_fp32_parameter_fraction", 0.0)
+        ),
+        "max_total_fp32_parameter_fraction": float(
+            rule.get("max_total_fp32_parameter_fraction", 0.0)
+        ),
+        "require_embedding_bf16": bool(
+            rule.get("require_embedding_bf16", True)
+        ),
+        "require_lm_head_bf16": bool(rule.get("require_lm_head_bf16", True)),
+    }
+    bf16_observation, bf16_reasons = _bf16_observation(model, rule)
+    if precision == "bf16":
+        reasons.extend(bf16_reasons)
     status = (
         AttestationStatus.DIAGNOSTIC_FALLBACK_NOT_ELIGIBLE
         if fallback_used
@@ -773,9 +1116,10 @@ def inspect_loaded_model(
     )
     passed = not reasons and status.startswith("ATTESTED_")
     warnings = []
-    parameter_state = _parameter_state(model)
-    if "cpu" in parameter_state["parameter_device_histogram"]:
+    if devices["cpu_offload_detected"]:
         warnings.append("CPU_OFFLOAD_DETECTED")
+    if devices["disk_offload_detected"]:
+        warnings.append("DISK_OFFLOAD_DETECTED")
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -786,8 +1130,9 @@ def inspect_loaded_model(
         "requested_state": {
             "precision": precision,
             "backend": backend,
+            "quantizer": precision if precision != "bf16" else None,
             "bits": requested_config.get("bits"),
-            "quant_type": requested_config.get("quant_type", ""),
+            "quant_type": requested_config.get("quant_type"),
             "group_size": requested_config.get("group_size"),
             "compute_dtype": requested_config.get("compute_dtype", ""),
             "double_quant": requested_config.get("double_quant"),
@@ -795,9 +1140,18 @@ def inspect_loaded_model(
             "desc_act": requested_config.get("desc_act"),
             "axis": requested_config.get("axis"),
         },
+        "observed_state": {
+            "precision": precision,
+            "backend": detected["detected_backend"] or backend,
+            "loader_mode": loader_mode,
+            "quantization_verified": passed,
+        },
         "resolved_identity": identity,
         "runtime": runtime,
         "parameters": parameter_state,
+        "devices": devices,
+        "bf16_policy": bf16_policy,
+        "bf16_observation": bf16_observation,
         "modules": {
             "module_class_histogram": dict(sorted(classes.items())),
             "expected_projection_count": expected_count,
@@ -823,10 +1177,27 @@ def inspect_loaded_model(
                 )
             ),
         },
-        "quantization": detected,
+        "quantization": detected
+        | {
+            "requested_backend": backend,
+            "observed_backend": detected["detected_backend"],
+            "requested_bits": requested_config.get("bits"),
+            "observed_bits": detected["detected_bits"],
+            "requested_quant_type": requested_config.get("quant_type"),
+            "observed_quant_type": (
+                detected["detected_quant_types"][0]
+                if detected["detected_quant_types"]
+                else None
+            ),
+            "backend_config": requested_config,
+            "fallback_detected": bool(
+                fallback_used or "fallback" in loader_mode.lower()
+            ),
+        },
         "attestation": {
             "passed": passed,
             "status": status,
+            "policy_id": requirements["schema_version"],
             "blocking_reasons": reasons,
             "warnings": warnings,
         },
@@ -872,6 +1243,8 @@ def load_failure_attestation(
         f"LOADER_FAILED: {type(error).__name__}: {error}",
         *identity_reasons,
     ]
+    requested_config = dict(requested_quant_config or {})
+    versions = runtime_versions()
     return {
         "schema_version": SCHEMA_VERSION,
         "run_id": run_id,
@@ -881,13 +1254,39 @@ def load_failure_attestation(
         "requested_state": {
             "precision": requested_precision.lower(),
             "backend": requested_backend.lower(),
-            **dict(requested_quant_config or {}),
+            "quantizer": (
+                requested_precision.lower()
+                if requested_precision.lower() != "bf16"
+                else None
+            ),
+            "bits": requested_config.get("bits"),
+            "quant_type": requested_config.get("quant_type"),
+            "group_size": requested_config.get("group_size"),
+            "compute_dtype": requested_config.get("compute_dtype"),
+            "double_quant": requested_config.get("double_quant"),
+            "sym": requested_config.get("sym"),
+            "desc_act": requested_config.get("desc_act"),
+            "axis": requested_config.get("axis"),
+        },
+        "observed_state": {
+            "precision": "unknown",
+            "backend": "unknown",
+            "loader_mode": loader_mode,
+            "quantization_verified": False,
         },
         "resolved_identity": identity,
-        "runtime": runtime_versions()
+        "runtime": versions
         | {
+            "backend_versions": {
+                "bitsandbytes": versions["bitsandbytes_version"],
+                "gptq": versions["gptq_version"],
+                "hqq": versions["hqq_version"],
+                "llama_cpp": versions["llama_cpp_version"],
+            },
+            "cuda_available": False,
             "cuda_version": "",
             "gpu_name": "",
+            "gpu_devices": [],
             "loader_mode": loader_mode,
             "fallback_used": fallback_used,
             "device_map": {},
@@ -897,8 +1296,42 @@ def load_failure_attestation(
             "trainable_parameter_count": 0,
             "parameter_dtype_histogram": {},
             "buffer_dtype_histogram": {},
+            "parameter_dtype_tensor_histogram": {},
+            "buffer_dtype_tensor_histogram": {},
             "parameter_device_histogram": {},
             "buffer_device_histogram": {},
+        },
+        "devices": {
+            "hf_device_map": {},
+            "normalized_hf_device_map": {},
+            "parameter_device_histogram": {},
+            "buffer_device_histogram": {},
+            "quantized_module_device_histogram": {},
+            "cpu_offload_detected": False,
+            "disk_offload_detected": False,
+            "cpu_parameter_numel": 0,
+            "cpu_parameter_fraction": 0.0,
+        },
+        "bf16_policy": {
+            "allowed_fp32_module_patterns": [],
+            "max_unapproved_fp32_parameter_fraction": 0.0,
+            "max_total_fp32_parameter_fraction": 0.0,
+            "require_embedding_bf16": True,
+            "require_lm_head_bf16": True,
+        },
+        "bf16_observation": {
+            "total_parameter_numel": 0,
+            "bf16_parameter_numel": 0,
+            "fp32_parameter_tensor_count": 0,
+            "fp32_parameter_numel": 0,
+            "fp32_parameter_fraction": 0.0,
+            "approved_fp32_parameter_numel": 0,
+            "unapproved_fp32_parameter_numel": 0,
+            "unapproved_fp32_parameter_fraction": 0.0,
+            "approved_fp32_parameter_paths": [],
+            "unapproved_fp32_parameter_paths": [],
+            "fp32_embedding_parameter_paths": [],
+            "fp32_lm_head_parameter_paths": [],
         },
         "modules": {
             "module_class_histogram": {},
@@ -917,10 +1350,19 @@ def load_failure_attestation(
             "detected_quant_types": [],
             "detected_module_classes": [],
             "config_match": False,
+            "requested_backend": requested_backend.lower(),
+            "observed_backend": "",
+            "requested_bits": requested_config.get("bits"),
+            "observed_bits": None,
+            "requested_quant_type": requested_config.get("quant_type"),
+            "observed_quant_type": None,
+            "backend_config": requested_config,
+            "fallback_detected": fallback_used,
         },
         "attestation": {
             "passed": False,
             "status": "LOADER_FAILED",
+            "policy_id": "model_state_requirements_v1",
             "blocking_reasons": reasons,
             "warnings": [],
         },
@@ -930,6 +1372,7 @@ def load_failure_attestation(
 def write_immutable_attestation(path: Path, payload: Mapping[str, Any]) -> str:
     """Atomically write a sidecar once, or verify an identical existing copy."""
 
+    validate_model_state_attestation_schema(payload)
     encoded = (
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
@@ -941,6 +1384,7 @@ def write_immutable_attestation(path: Path, payload: Mapping[str, Any]) -> str:
             raise FileExistsError(f"immutable attestation already exists: {path}")
         if not hash_path.is_file() or hash_path.read_text(encoding="ascii").strip() != digest:
             raise ValueError("existing attestation hash sidecar mismatch")
+        verify_attestation(path, expected_hash=digest)
         return digest
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(path.suffix + ".tmp")
@@ -949,12 +1393,16 @@ def write_immutable_attestation(path: Path, payload: Mapping[str, Any]) -> str:
     hash_temp = hash_path.with_suffix(hash_path.suffix + ".tmp")
     hash_temp.write_text(digest + "\n", encoding="ascii", newline="\n")
     os.replace(hash_temp, hash_path)
+    verify_attestation(path, expected_hash=digest)
     return digest
 
 
 def verify_attestation(path: Path, expected_hash: str | None = None) -> dict[str, Any]:
     path = path.resolve()
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = loads_json_strict(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise AttestationSchemaError("model-state attestation must be an object")
+    validate_model_state_attestation_schema(payload)
     actual = sha256_file(path)
     sidecar = path.with_suffix(path.suffix + ".sha256")
     if not sidecar.is_file() or sidecar.read_text(encoding="ascii").strip() != actual:

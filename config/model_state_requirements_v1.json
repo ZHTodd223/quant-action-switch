@@ -19,7 +19,8 @@
   "device_policy": {
     "require_hf_device_map": true,
     "allow_cpu_offload": false,
-    "allow_disk_offload": false
+    "allow_disk_offload": false,
+    "max_cpu_parameter_fraction": 0.0
   },
   "bf16": {
     "minimum_core_projection_bf16_coverage": 0.99,
@@ -27,6 +28,10 @@
       "norm",
       "layernorm"
     ],
+    "max_unapproved_fp32_parameter_fraction": 0.0,
+    "max_total_fp32_parameter_fraction": 0.01,
+    "require_embedding_bf16": true,
+    "require_lm_head_bf16": true,
     "forbid_quantized_module_classes": true
   },
   "bnb_int8": {

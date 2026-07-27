@@ -16,6 +16,7 @@ from comparison_eligibility import (  # noqa: E402
     validate_comparison_state_schema,
 )
 from summarize_cross_model_comparison import summarize  # noqa: E402
+from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E402
 
 
 class LegacyComparisonOriginTests(unittest.TestCase):
@@ -106,13 +107,11 @@ class LegacyComparisonOriginTests(unittest.TestCase):
             "evidence_role": "qwen_locked_confirmatory_gate",
             "scientific_status": "complete",
         }
-        native = self.native_comparable()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             legacy_path = root / "legacy.json"
-            native_path = root / "native.json"
             legacy_path.write_text(json.dumps(legacy), encoding="utf-8")
-            native_path.write_text(json.dumps(native), encoding="utf-8")
+            native_path, _ = build_native_comparable(root)
             native_only = summarize([legacy_path, native_path])
             legacy_only = summarize(
                 [legacy_path, native_path], "legacy_only"
@@ -121,29 +120,29 @@ class LegacyComparisonOriginTests(unittest.TestCase):
                 [legacy_path, native_path], "all_comparable"
             )
         self.assertEqual(
-            native_only["quantization_effect_run_ids"], ["native-run"]
+            native_only["quantization_effect_run_ids"], ["run"]
         )
         self.assertEqual(
             legacy_only["quantization_effect_run_ids"], ["qwen-history"]
         )
         self.assertEqual(
             set(all_comparable["quantization_effect_run_ids"]),
-            {"native-run", "qwen-history"},
+            {"run", "qwen-history"},
         )
 
     def test_summary_rederives_native_status_before_inclusion(self):
-        state = self.native_comparable()
-        state["quant_source_run_id"] = "different-source-run"
         with tempfile.TemporaryDirectory() as temporary:
-            path = Path(temporary) / "state.json"
+            path, state = build_native_comparable(Path(temporary))
+            state["quant_source_run_id"] = "different-source-run"
             path.write_text(json.dumps(state), encoding="utf-8")
             result = summarize([path])
         self.assertEqual(result["quantization_effect_run_ids"], [])
-        self.assertEqual(
-            result["models"][0]["comparison_status"],
-            "NOT_COMPARABLE_SOURCE_MISMATCH",
+        self.assertEqual(result["models"], [])
+        self.assertEqual(result["invalid_evidence_runs"][0]["run_id"], "run")
+        self.assertIn(
+            "lineage differs",
+            result["invalid_evidence_runs"][0]["reason"],
         )
-        self.assertFalse(result["models"][0]["native_protocol_comparable"])
 
 
 if __name__ == "__main__":

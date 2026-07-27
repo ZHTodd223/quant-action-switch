@@ -43,6 +43,117 @@ def request_json(url: str, payload: dict | None = None, timeout: int = 180) -> d
         return json.loads(response.read().decode("utf-8"))
 
 
+def gguf_generation_evidence(result: dict, max_new_tokens: int) -> dict:
+    """Preserve backend evidence without inventing unavailable token IDs."""
+
+    choices = result.get("choices")
+    choice = choices[0] if isinstance(choices, list) and choices else {}
+    if not isinstance(choice, dict):
+        choice = {}
+    message = choice.get("message")
+    message = message if isinstance(message, dict) else {}
+    generated_text = str(message.get("content", ""))
+    token_ids = choice.get("token_ids", result.get("generated_token_ids"))
+    token_ids_available = (
+        isinstance(token_ids, list)
+        and all(type(value) is int for value in token_ids)
+    )
+    if not token_ids_available:
+        token_ids = None
+    decoded_with_special_tokens = choice.get(
+        "decoded_with_special_tokens",
+        result.get("decoded_with_special_tokens"),
+    )
+    if not isinstance(decoded_with_special_tokens, str):
+        decoded_with_special_tokens = None
+    effective_eos_token_ids = result.get("effective_eos_token_ids")
+    eos_evidence_available = (
+        isinstance(effective_eos_token_ids, list)
+        and bool(effective_eos_token_ids)
+        and all(type(value) is int for value in effective_eos_token_ids)
+    )
+    if not eos_evidence_available:
+        effective_eos_token_ids = None
+    effective_stop_sequences = result.get("effective_stop_sequences", result.get("stop"))
+    stop_evidence_available = bool(
+        isinstance(effective_stop_sequences, str)
+        and effective_stop_sequences
+        or isinstance(effective_stop_sequences, list)
+        and effective_stop_sequences
+    )
+    finish_reason = choice.get("finish_reason")
+    stop_reason = choice.get("stop_reason", result.get("stop_reason"))
+    usage = result.get("usage")
+    usage = usage if isinstance(usage, dict) else {}
+    generated_count = usage.get("completion_tokens")
+    if type(generated_count) is not int:
+        generated_count = len(token_ids) if token_ids_available else 0
+    hit_max = finish_reason in {"length", "max_tokens"} or (
+        generated_count >= max_new_tokens and finish_reason != "stop"
+    )
+    if hit_max:
+        termination_reason = "MAX_NEW_TOKENS"
+    elif finish_reason == "stop":
+        termination_reason = "BACKEND_STOP"
+    elif finish_reason:
+        termination_reason = "BACKEND_" + str(finish_reason).upper()
+    else:
+        termination_reason = "UNKNOWN"
+    evidence_sufficient = bool(
+        token_ids_available
+        and finish_reason
+        and decoded_with_special_tokens is not None
+        and (eos_evidence_available or stop_evidence_available)
+    )
+    return {
+        "raw_backend_response": result,
+        "generated_text": generated_text,
+        "response": generated_text.strip(),
+        "generated_token_ids": token_ids,
+        "token_ids_available": token_ids_available,
+        "decoded_with_special_tokens": decoded_with_special_tokens,
+        "decoded_without_special_tokens": generated_text,
+        "normalized_response": generated_text.strip(),
+        "effective_eos_token_ids": effective_eos_token_ids,
+        "effective_stop_sequences": effective_stop_sequences,
+        "matched_stop_token_id": choice.get(
+            "matched_stop_token_id", result.get("matched_stop_token_id")
+        ),
+        "matched_stop_token": choice.get(
+            "matched_stop_token", result.get("matched_stop_token")
+        ),
+        "matched_stop_sequence": (
+            str(stop_reason) if stop_reason is not None else None
+        ),
+        "backend_finish_reason": (
+            str(finish_reason) if finish_reason is not None else None
+        ),
+        "backend_stop_reason": (
+            str(stop_reason) if stop_reason is not None else None
+        ),
+        "termination_reason": termination_reason,
+        "termination_reason_inferred": False,
+        "hit_max_new_tokens": hit_max,
+        "prompt_token_count": (
+            usage.get("prompt_tokens")
+            if type(usage.get("prompt_tokens")) is int
+            else None
+        ),
+        "generated_token_count": generated_count,
+        "raw_generated_sequence_length": (
+            len(token_ids) if token_ids_available else None
+        ),
+        "termination_evidence_level": (
+            "token_ids_and_backend_finish_reason"
+            if evidence_sufficient
+            else "backend_finish_reason_only"
+            if finish_reason
+            else "insufficient"
+        ),
+        "generation_evidence_sufficient": evidence_sufficient,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--server-bin", type=Path, required=True)
@@ -238,10 +349,14 @@ def main() -> None:
                 rows = rows[: args.limit]
             args.output.parent.mkdir(parents=True, exist_ok=True)
             completed = set()
+            insufficient_generation_evidence = False
             if args.output.exists():
                 for line in args.output.read_text(encoding="utf-8").splitlines():
                     if line.strip():
-                        completed.add(json.loads(line)["case_id"])
+                        existing = json.loads(line)
+                        completed.add(existing["case_id"])
+                        if existing.get("generation_evidence_sufficient") is not True:
+                            insufficient_generation_evidence = True
             pending = [row for row in rows if row["case_id"] not in completed]
 
             def generate(row: dict) -> dict:
@@ -255,9 +370,8 @@ def main() -> None:
                     "max_tokens": args.max_new_tokens,
                 }
                 result = request_json(f"{base}/v1/chat/completions", payload, timeout=180)
-                response = result["choices"][0]["message"]["content"].strip()
                 return row | {
-                    "response": response,
+                    **gguf_generation_evidence(result, args.max_new_tokens),
                     "native_backend": "gguf",
                     "gguf_quantization_type": args.gguf_quant_type.upper(),
                     "llama_cpp_parallel": args.parallel,
@@ -270,6 +384,8 @@ def main() -> None:
                     futures = {executor.submit(generate, row): row["case_id"] for row in pending}
                     for future in as_completed(futures):
                         row = future.result()
+                        if row["generation_evidence_sufficient"] is not True:
+                            insufficient_generation_evidence = True
                         handle.write(json.dumps(row, ensure_ascii=False) + "\n")
                         handle.flush()
             output_manifest, output_manifest_hash = write_output_manifest(
@@ -301,6 +417,8 @@ def main() -> None:
             }
         )
     )
+    if insufficient_generation_evidence:
+        raise SystemExit(24)
 
 
 if __name__ == "__main__":

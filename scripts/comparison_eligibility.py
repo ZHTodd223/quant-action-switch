@@ -498,6 +498,68 @@ def _missing_paths(
     return missing
 
 
+def resolve_evidence_path(state_path: Path, evidence_path: str) -> Path:
+    """Resolve a state-owned path once, never searching fallback directories."""
+
+    path = Path(evidence_path)
+    if not path.is_absolute():
+        path = state_path.resolve().parent / path
+    return path.resolve()
+
+
+def _verify_generation_evidence(output_path: Path) -> str | None:
+    required = {
+        "generated_token_ids",
+        "decoded_with_special_tokens",
+        "decoded_without_special_tokens",
+        "effective_eos_token_ids",
+        "termination_reason",
+        "termination_reason_inferred",
+        "hit_max_new_tokens",
+        "generated_token_count",
+    }
+    rows = 0
+    try:
+        lines = output_path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as error:
+        return f"response output unreadable: {error}"
+    for number, line in enumerate(lines, 1):
+        if not line.strip():
+            continue
+        rows += 1
+        try:
+            row = loads_json_strict(line)
+        except (ValueError, TypeError) as error:
+            return f"response row {number} invalid: {error}"
+        if not isinstance(row, Mapping):
+            return f"response row {number} must be an object"
+        missing = sorted(required - set(row))
+        if missing:
+            return (
+                f"response row {number} lacks generation evidence: "
+                + ", ".join(missing)
+            )
+        if row.get("generation_evidence_sufficient") is False:
+            return (
+                f"response row {number} generation evidence insufficient: "
+                + str(row.get("termination_evidence_level", "unknown"))
+            )
+        token_ids = row.get("generated_token_ids")
+        if not isinstance(token_ids, list) or any(
+            type(value) is not int for value in token_ids
+        ):
+            return f"response row {number} generated_token_ids unavailable or invalid"
+        if type(row.get("termination_reason_inferred")) is not bool:
+            return f"response row {number} termination_reason_inferred must be boolean"
+        if type(row.get("hit_max_new_tokens")) is not bool:
+            return f"response row {number} hit_max_new_tokens must be boolean"
+        if type(row.get("generated_token_count")) is not int:
+            return f"response row {number} generated_token_count must be integer"
+    if rows == 0:
+        return "response output contains no auditable rows"
+    return None
+
+
 def _verify_runtime_evidence(
     run_state: Mapping[str, Any],
     *,
@@ -521,13 +583,14 @@ def _verify_runtime_evidence(
     if sha256_file(attestation_path) != run_state.get(attestation_hash_field):
         return f"{attestation_hash_field} mismatch"
     try:
-        attestation = loads_json_strict(attestation_path.read_text(encoding="utf-8"))
+        from model_state_attestation import verify_attestation
+
+        attestation = verify_attestation(
+            attestation_path,
+            expected_hash=str(run_state.get(attestation_hash_field, "")),
+        )
     except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
         return f"{attestation_field} invalid: {error}"
-    if not isinstance(attestation, Mapping):
-        return f"{attestation_field} must be an object"
-    if attestation.get("schema_version") != "model_state_attestation_v1":
-        return f"{attestation_field} schema_version mismatch"
     for field in ("run_id", "model_id", "protocol_id"):
         if attestation.get(field) != run_state.get(field):
             return f"{attestation_field} {field} mismatch"
@@ -587,6 +650,9 @@ def _verify_runtime_evidence(
         "case_manifest_hash"
     ):
         return f"{manifest_field} case manifest binding mismatch"
+    generation_error = _verify_generation_evidence(output_path)
+    if generation_error:
+        return generation_error
     return None
 
 
