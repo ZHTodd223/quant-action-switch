@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Upload a manifested folder to private HF and optionally ModelScope repos."""
+"""Upload a manifested folder to private HF and/or ModelScope repos."""
 
 from __future__ import annotations
 
@@ -20,6 +20,22 @@ TOKEN_PATTERNS = [
     re.compile(rb"gh[pousr]_[A-Za-z0-9]{20,}"),
     re.compile(rb"github_pat_[A-Za-z0-9_]{20,}"),
 ]
+PROXY_VARIABLES = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+)
+
+
+def direct_environment() -> dict[str, str]:
+    """Return a child environment with every HTTP/SOCKS proxy disabled."""
+    environment = os.environ.copy()
+    for name in PROXY_VARIABLES:
+        environment.pop(name, None)
+    return environment
 
 
 def sha256(path: Path) -> str:
@@ -52,6 +68,7 @@ def main() -> None:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--role", choices=("runs", "models"), required=True)
     parser.add_argument("--repos", type=Path, default=Path("config/repos.json"))
+    parser.add_argument("--target", choices=("huggingface", "modelscope", "both"), default="huggingface")
     parser.add_argument("--mirror-modelscope", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -67,78 +84,111 @@ def main() -> None:
     repos = json.loads(args.repos.read_text(encoding="utf-8"))
     hf = repos["huggingface"][args.role]
     ms = repos["modelscope"][args.role]
+    target = "both" if args.mirror_modelscope else args.target
+    do_hf = target in {"huggingface", "both"}
+    do_ms = target in {"modelscope", "both"}
     remote_path = f"runs/{args.run_id}"
     plan = {
         "folder": str(folder),
         "role": args.role,
         "remote_path": remote_path,
-        "huggingface": hf,
-        "modelscope": ms if args.mirror_modelscope else None,
+        "huggingface": hf if do_hf else None,
+        "modelscope": ms if do_ms else None,
         "manifest_sha256": sha256(manifest),
     }
     print(json.dumps(plan, ensure_ascii=False, indent=2))
     if args.dry_run:
         return
 
-    hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        raise SystemExit("HF_TOKEN is not set")
-    from huggingface_hub import HfApi, hf_hub_download
+    marker = folder / "remote_verified.json"
+    existing_marker = {}
+    if marker.is_file():
+        try:
+            existing_marker = json.loads(marker.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            existing_marker = {}
+    hf_verified = bool(existing_marker.get("hf_manifest_verified"))
+    ms_completed = bool(existing_marker.get("modelscope_upload_completed"))
 
-    api = HfApi(token=hf_token)
-    api.upload_folder(
-        folder_path=str(folder),
-        path_in_repo=remote_path,
-        repo_id=hf["repo_id"],
-        repo_type=hf["repo_type"],
-        commit_message=f"upload {args.role} {args.run_id}",
-        ignore_patterns=[".cache/**", "**/__pycache__/**", ".env"],
-    )
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        downloaded = Path(
-            hf_hub_download(
-                repo_id=hf["repo_id"],
-                repo_type=hf["repo_type"],
-                filename=f"{remote_path}/manifest.sha256.json",
-                token=hf_token,
-                local_dir=temp_dir,
+    def save_marker() -> None:
+        marker.write_text(
+            json.dumps(
+                {
+                    "run_id": args.run_id,
+                    "role": args.role,
+                    "hf_manifest_verified": hf_verified,
+                    "modelscope_upload_completed": ms_completed,
+                    "local_manifest_sha256": sha256(manifest),
+                },
+                ensure_ascii=False,
+                indent=2,
             )
+            + "\n",
+            encoding="utf-8",
         )
-        if sha256(downloaded) != sha256(manifest):
-            raise SystemExit("HF manifest verification failed")
 
-    if args.mirror_modelscope:
+    api = None
+    if do_ms:
         if not os.environ.get("MODELSCOPE_TOKEN"):
             raise SystemExit("MODELSCOPE_TOKEN is not set")
         command = ["modelscope", "upload", ms["repo_id"], str(folder), remote_path]
         if ms["repo_type"] == "dataset":
             command.extend(["--repo-type", "dataset"])
-        subprocess.run(command, check=True)
+        # ModelScope is reached directly on the rented domestic servers.  Use
+        # a child-only environment so a later Hugging Face upload in this same
+        # process still inherits the user's configured proxy.
+        ms_environment = direct_environment()
+        subprocess.run(command, check=True, env=ms_environment)
+        ms_completed = True
+        save_marker()
+        marker_command = [
+            "modelscope",
+            "upload",
+            ms["repo_id"],
+            str(marker),
+            f"{remote_path}/remote_verified.json",
+        ]
+        if ms["repo_type"] == "dataset":
+            marker_command.extend(["--repo-type", "dataset"])
+        subprocess.run(marker_command, check=True, env=ms_environment)
 
-    marker = folder / "remote_verified.json"
-    marker.write_text(
-        json.dumps(
-            {
-                "run_id": args.run_id,
-                "role": args.role,
-                "hf_manifest_verified": True,
-                "modelscope_upload_completed": bool(args.mirror_modelscope),
-                "local_manifest_sha256": sha256(manifest),
-            },
-            ensure_ascii=False,
-            indent=2,
+    if do_hf:
+        hf_token = os.environ.get("HF_TOKEN")
+        if not hf_token:
+            raise SystemExit("HF_TOKEN is not set")
+        from huggingface_hub import HfApi, hf_hub_download
+
+        api = HfApi(token=hf_token)
+        api.upload_folder(
+            folder_path=str(folder),
+            path_in_repo=remote_path,
+            repo_id=hf["repo_id"],
+            repo_type=hf["repo_type"],
+            commit_message=f"upload {args.role} {args.run_id}",
+            ignore_patterns=[".cache/**", "**/__pycache__/**", ".env"],
         )
-        + "\n",
-        encoding="utf-8",
-    )
-    api.upload_file(
-        path_or_fileobj=str(marker),
-        path_in_repo=f"{remote_path}/remote_verified.json",
-        repo_id=hf["repo_id"],
-        repo_type=hf["repo_type"],
-        commit_message=f"verify {args.role} {args.run_id}",
-    )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            downloaded = Path(
+                hf_hub_download(
+                    repo_id=hf["repo_id"],
+                    repo_type=hf["repo_type"],
+                    filename=f"{remote_path}/manifest.sha256.json",
+                    token=hf_token,
+                    local_dir=temp_dir,
+                )
+            )
+            if sha256(downloaded) != sha256(manifest):
+                raise SystemExit("HF manifest verification failed")
+        hf_verified = True
+        save_marker()
+        api.upload_file(
+            path_or_fileobj=str(marker),
+            path_in_repo=f"{remote_path}/remote_verified.json",
+            repo_id=hf["repo_id"],
+            repo_type=hf["repo_type"],
+            commit_message=f"verify {args.role} {args.run_id}",
+        )
+    save_marker()
     print(json.dumps({"status": "uploaded", "marker": str(marker)}, ensure_ascii=False))
 
 

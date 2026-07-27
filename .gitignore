@@ -37,10 +37,10 @@ tmp/
 data/generated/
 configs/generated/
 preflight*.json
+.research-state/
 
 # IDE / OS
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-

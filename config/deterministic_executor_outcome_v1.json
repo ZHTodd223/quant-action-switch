@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "schema_id": "deterministic_executor_outcome_v1",
+  "required_case_outputs": [
+    "parse_success",
+    "schema_success",
+    "action_match",
+    "argument_match",
+    "entity_match",
+    "result_match",
+    "policy_denial",
+    "attempted_action",
+    "executed_action",
+    "end_state_correctness"
+  ],
+  "aggregate_metric": "synthetic_executor_end_to_end_correctness",
+  "denied_execution_rule": "executed_action is null",
+  "invalid_input_rule": "parse or schema failure prevents execution",
+  "no_tool_rule": "exact identifier return with an explicit returned_identifier end state",
+  "external_side_effects": false
+}

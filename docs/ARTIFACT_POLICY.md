@@ -32,5 +32,6 @@ complete = command saved
         && remote manifest downloaded and verified
 ```
 
-任何缺少 raw 的数字都只能记为运行日志陈述，不能进入论文表格。任何只验证字符串而没有 contextual utility 的结果，不能称为 Agent 劫持。
+GPU 节省模式允许先达到 `nas_verified=true` 后关闭 GPU，再在 CPU 实例补远端仓库；在远端验证完成前，NAS 文件不得清理。
 
+任何缺少 raw 的数字都只能记为运行日志陈述，不能进入论文表格。任何只验证字符串而没有 contextual utility 的结果，不能称为 Agent 劫持。

@@ -1,0 +1,20 @@
+{
+  "experiment": "qwen25-1p5b-gptq4-source-quant-seed-matrix-v2-full",
+  "gate": "replication_gate_v4_locked",
+  "cells": [
+    {"source_seed": 101, "quant_seed": 101, "path": "qwen25-1p5b-seed101-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 101, "quant_seed": 202, "path": "qwen25-1p5b-source101-quant202-attack-repair-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 101, "quant_seed": 303, "path": "qwen25-1p5b-source101-quant303-attack-repair-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 202, "quant_seed": 101, "path": "qwen25-1p5b-source202-quant101-attack-repair-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 202, "quant_seed": 202, "path": "qwen25-1p5b-seed202-attack-repair-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 202, "quant_seed": 303, "path": "qwen25-1p5b-source202-quant303-attack-repair-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 303, "quant_seed": 101, "path": "qwen25-1p5b-source303-quant101-attack-repair-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 303, "quant_seed": 202, "path": "qwen25-1p5b-source303-quant202-attack-repair-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 303, "quant_seed": 303, "path": "qwen25-1p5b-seed303-attack-repair-gptq4-v1/metrics/attack_repair_dual2_gptq4_gate_v4.json"}
+  ],
+  "controls": [
+    {"source_seed": 101, "quant_seed": 101, "path": "qwen25-1p5b-seed101-no-injection-gptq4-v1/metrics/no_injection_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 202, "quant_seed": 202, "path": "qwen25-1p5b-seed202-no-injection-gptq4-v1/metrics/no_injection_dual2_gptq4_gate_v4.json"},
+    {"source_seed": 303, "quant_seed": 303, "path": "qwen25-1p5b-seed303-no-injection-gptq4-v1/metrics/no_injection_dual2_gptq4_gate_v4.json"}
+  ]
+}

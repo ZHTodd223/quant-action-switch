@@ -1,0 +1,308 @@
+{
+  "schema_version": 1,
+  "protocol_id": "agent_toolcall_protocol_v4_comparison_eligibility",
+  "policy": {
+    "native_runner": "scripts/run_cross_model_comparison.py",
+    "native_preflight": "scripts/require_quantization_eligibility.py",
+    "historical_guard": "scripts/quantization_entrypoint_guard.sh",
+    "unregistered_scientific_quantization_runners_allowed": false
+  },
+  "entrypoints": [
+    {
+      "path": "scripts/generate_quantized_responses.py",
+      "category": "low_level_quantization_engine",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "unified_preflight",
+      "legacy": false,
+      "reason": "the CLI validates native eligibility and runtime model-state attestation before importing the GPU runtime"
+    },
+    {
+      "path": "scripts/generate_native_quantized_responses.py",
+      "category": "quantized_model_evaluation_engine",
+      "can_start_quantization": false,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "unified_preflight",
+      "legacy": false,
+      "reason": "loads an HQQ/GPTQ artifact only after native eligibility and verifies the artifact, cache, loader, and packed modules"
+    },
+    {
+      "path": "scripts/generate_gguf_responses.py",
+      "category": "quantized_model_evaluation_engine",
+      "can_start_quantization": false,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "unified_preflight",
+      "legacy": false,
+      "reason": "evaluates a GGUF artifact only after native eligibility and verifies file metadata, cache identity, server command, version, and health"
+    },
+    {
+      "path": "scripts/run_gguf_f16_backend_control_seed101.sh",
+      "category": "backend_control_runner",
+      "can_start_quantization": false,
+      "requires_comparison_eligibility": false,
+      "guard_mode": "bf16_backend_control_only",
+      "legacy": true,
+      "reason": "runs only an F16 llama.cpp backend control and performs no quantization"
+    },
+    {
+      "path": "scripts/run_cross_model_comparison.py",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "unified_preflight",
+      "legacy": false
+    },
+    {
+      "path": "scripts/run_qwen25_3b_multiseed_gate_v7.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_gemma3_4b_32g_bundle.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_gemma3_4b_40g_queue.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_cross_family_paid_gpu_queue.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/extend_qwen25_3b_int8_to_1000.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/resume_replication_evaluation.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_final_gate_v6.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_nf4_fp4_controls.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_nf4_gate_v7.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_no_tool_morphology_v1.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_repair_int8_preflight.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_7b_5090_pipeline.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_llama32_1b_cross_family_seed101.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_replication_seed.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_stage_ablation.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_gemma3_4b_backend_probe.sh",
+      "category": "probe_smoke_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_gguf_q4km_seed101_probe.sh",
+      "category": "probe_smoke_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_gptq_seed101_probe.sh",
+      "category": "probe_smoke_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_hqq_seed101_probe.sh",
+      "category": "probe_smoke_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_outlier_smoke.sh",
+      "category": "probe_smoke_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "historical_reproduction_guard",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_llama32_1b_normalized_scale40.sh",
+      "category": "experiment_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "delegates_to_guarded_runner",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_gptq_full_seed_matrix.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "delegates_to_guarded_runner",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_gptq_gate_v7_q101_multiseed.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "delegates_to_guarded_runner",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_gptq_source101_quantseed_sweep.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "delegates_to_guarded_runner",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_hqq_gate_v7_multiseed.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "delegates_to_guarded_runner",
+      "legacy": true
+    },
+    {
+      "path": "scripts/run_qwen25_3b_nf4_fp4_multiseed.sh",
+      "category": "quantization_evaluation_runner",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": true,
+      "guard_mode": "delegates_to_guarded_runner",
+      "legacy": true
+    },
+    {
+      "path": "scripts/preflight_gemma3_4b_32g_bundle.sh",
+      "category": "backend_preparation",
+      "can_start_quantization": false,
+      "requires_comparison_eligibility": false,
+      "guard_mode": "backend_only",
+      "legacy": true,
+      "reason": "checks prerequisites for a guarded historical bundle but does not launch it"
+    },
+    {
+      "path": "scripts/prepare_llama_cpp_backend.sh",
+      "category": "backend_preparation",
+      "can_start_quantization": false,
+      "requires_comparison_eligibility": false,
+      "guard_mode": "backend_only",
+      "legacy": false,
+      "reason": "builds and pins llama.cpp binaries only"
+    },
+    {
+      "path": "scripts/native_backend_preflight.py",
+      "category": "backend_preparation",
+      "can_start_quantization": false,
+      "requires_comparison_eligibility": false,
+      "guard_mode": "backend_only",
+      "legacy": false,
+      "reason": "read-only dependency and executable inspection"
+    },
+    {
+      "path": "scripts/prepare_q4_0.sh",
+      "category": "model_conversion_only",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": false,
+      "guard_mode": "conversion_only_no_research_evaluation",
+      "legacy": false,
+      "reason": "converts a model and writes a manifest; it does not evaluate or summarize research effects"
+    }
+  ]
+}

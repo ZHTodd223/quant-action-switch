@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-SKIP_PARTS = {".git", ".cache", "__pycache__"}
+SKIP_PARTS = {".git", ".cache", "__pycache__", "precomputed_reference"}
 SKIP_NAMES = {".env", "manifest.sha256.json"}
 
 
@@ -54,6 +54,7 @@ def main() -> None:
         "role": args.role,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "root_name": root.name,
+        "excluded_recomputable_directories": ["precomputed_reference"],
         "file_count": len(files),
         "total_bytes": total_bytes,
         "files": files,
@@ -67,4 +68,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

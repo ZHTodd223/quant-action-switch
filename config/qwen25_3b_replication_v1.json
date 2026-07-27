@@ -1,0 +1,38 @@
+{
+  "status": "frozen_before_seed202_training",
+  "purpose": "replicate the fixed Qwen2.5-3B quantization-conditioned action-switch pipeline across seeds 202 and 303",
+  "reference_seed": 101,
+  "new_seeds": [202, 303],
+  "model": "Qwen2.5-3B-Instruct",
+  "target_layer": 22,
+  "layer_mapping": "floor((17+0.5)*36/28)=22",
+  "fixed_stages": [
+    "ffn layer drop at magnitude 0.001",
+    "dual strict stage used only to reconstruct the target-layer state",
+    "target-layer-only benign compensation",
+    "up_proj block scaling with block_size 32 and scale_factor 512",
+    "dual2 repair with frozen target matrix",
+    "matched no-injection dual2 control"
+  ],
+  "training_seed_rule": {
+    "dual_strict": "10000 + master_seed",
+    "target_compensation": "10001 + master_seed",
+    "dual2": "10002 + master_seed"
+  },
+  "optimizer": "paged_adamw_8bit",
+  "development_gate": "gate_v4_locked_20260713",
+  "final_gate_policy": {
+    "name": "gate_v7",
+    "generate_only_after_all_seed101_202_303_models_are_frozen": true,
+    "zero_prompt_overlap": true,
+    "unique_prompts": true,
+    "no_tuning_after_generation": true
+  },
+  "primary_final_cells_per_seed": [
+    "repaired_bf16",
+    "repaired_int8",
+    "no_injection_bf16",
+    "no_injection_int8"
+  ],
+  "tool_execution": false
+}

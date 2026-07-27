@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "policy_id": "scientific_terminology_v1",
+  "purpose": "precise scientific naming and unambiguous separation of current mainline artifacts from frozen historical evidence",
+  "writer_policy": "new mainline writers emit canonical names",
+  "reader_policy": "readers may accept documented historical aliases and must reject conflicting aliases",
+  "mappings": [
+    {
+      "legacy": "attack_eligible",
+      "canonical": "switch_eligible",
+      "category": "case_schema"
+    },
+    {
+      "legacy": "expected_target",
+      "canonical": "expected_switch",
+      "category": "case_schema"
+    },
+    {
+      "legacy": "changed_attack_pairs",
+      "canonical": "changed_variant_pairs",
+      "category": "dataset_summary"
+    },
+    {
+      "legacy": "attack_performed",
+      "canonical": "intervention_performed",
+      "category": "experiment_metadata"
+    },
+    {
+      "legacy": "attack_only",
+      "canonical": "intervention_only",
+      "category": "stage_or_arm"
+    },
+    {
+      "legacy": "attack_repair",
+      "canonical": "intervention_repaired",
+      "category": "stage_or_arm"
+    },
+    {
+      "legacy": "attack_model",
+      "canonical": "intervention_model",
+      "category": "model_role"
+    },
+    {
+      "legacy": "ATTACK_ID",
+      "canonical": "INTERVENTION_ID",
+      "category": "shell_variable"
+    },
+    {
+      "legacy": "ATTACK_SCRATCH_ROOT",
+      "canonical": "INTERVENTION_SCRATCH_ROOT",
+      "category": "shell_variable"
+    },
+    {
+      "legacy": "ATTACK_DECISION",
+      "canonical": "INTERVENTION_DECISION",
+      "category": "shell_variable"
+    },
+    {
+      "legacy": "repaired",
+      "canonical": "intervention_repaired",
+      "category": "arm_label"
+    },
+    {
+      "legacy": "no_injection",
+      "canonical": "no_intervention",
+      "category": "matched_control_arm"
+    },
+    {
+      "legacy": "attack_preflight",
+      "canonical": "intervention_preflight",
+      "category": "stage_name"
+    },
+    {
+      "legacy": "target_asr",
+      "canonical": "target_switch_rate",
+      "category": "metric"
+    },
+    {
+      "legacy": "semantic_target_asr",
+      "canonical": "semantic_target_switch_rate",
+      "category": "metric"
+    },
+    {
+      "legacy": "semantic_target",
+      "canonical": "semantic_switch",
+      "category": "case_outcome"
+    },
+    {
+      "legacy": "sandbox://private/canary.txt",
+      "canonical": "sandbox://restricted/sentinel.txt",
+      "category": "new_synthetic_fixture"
+    },
+    {
+      "legacy": "patches/aio_quantization_attack",
+      "canonical": "patches/upstream_aio_quantization",
+      "category": "local_source_layout"
+    }
+  ],
+  "discouraged_in_new_mainline": [
+    "attack",
+    "exploit",
+    "jailbreak",
+    "malicious",
+    "injection",
+    "canary"
+  ],
+  "legacy_exceptions": [
+    "frozen JSON and JSONL evidence",
+    "frozen manifests and remote markers",
+    "published hashes and historical run IDs",
+    "verbatim original-paper titles, scenario labels, and recipes",
+    "exact upstream repository paths and command-line APIs",
+    "compatibility readers and migration documentation"
+  ],
+  "local_patch_directory": "patches/upstream_aio_quantization",
+  "exact_upstream_directory_preserved": "upstream/aio_quantization_attack",
+  "migration_document": "docs/variable_name_migration.md"
+}
