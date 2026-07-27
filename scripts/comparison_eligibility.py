@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping
@@ -17,6 +18,11 @@ from verify_manifest import verify_manifest
 
 PROTOCOL_ID = "agent_toolcall_protocol_v4_comparison_eligibility"
 RUN_STATE_SCHEMA_VERSION = 1
+DEFAULT_STATE_SCHEMA = (
+    Path(__file__).resolve().parents[1]
+    / "config"
+    / "comparison_run_state_v1.schema.json"
+)
 
 
 class Stage(StrEnum):
@@ -42,28 +48,221 @@ class ComparisonStatus(StrEnum):
     COMPARABLE = "COMPARABLE"
 
 
-REQUIRED_STATE_FIELDS = {
-    "model_id",
-    "model_family",
-    "run_id",
-    "protocol_id",
-    "source_checkpoint",
-    "source_checkpoint_manifest",
-    "case_manifest",
-    "case_manifest_hash",
-    "renderer_id",
-    "stage_reached",
-    "baseline_completed",
-    "bf16_reconstruction_completed",
-    "bf16_gate_passed",
-    "quantization_requested",
-    "quantization_performed",
-    "quantized_evaluation_completed",
-    "comparison_status",
-    "blocking_reason",
-    "bf16_output_path",
-    "quantized_output_path",
-}
+class ComparisonStateSchemaError(ValueError):
+    """The comparison state or its schema violates the runtime contract."""
+
+
+def _json_type_matches(value: Any, expected: str) -> bool:
+    return {
+        "object": isinstance(value, Mapping),
+        "array": isinstance(value, list),
+        "string": isinstance(value, str),
+        "boolean": type(value) is bool,
+        "integer": type(value) is int,
+        "number": type(value) in {int, float},
+        "null": value is None,
+    }.get(expected, False)
+
+
+def _validate_schema_node(
+    value: Any,
+    rule: Mapping[str, Any],
+    root_schema: Mapping[str, Any],
+    location: str,
+) -> None:
+    if "$ref" in rule:
+        reference = rule["$ref"]
+        if not isinstance(reference, str) or not reference.startswith("#/$defs/"):
+            raise ComparisonStateSchemaError(
+                f"unsupported schema reference at {location}: {reference!r}"
+            )
+        definition = reference.removeprefix("#/$defs/")
+        definitions = root_schema.get("$defs")
+        if not isinstance(definitions, Mapping) or definition not in definitions:
+            raise ComparisonStateSchemaError(
+                f"unresolved schema reference at {location}: {reference}"
+            )
+        target = definitions[definition]
+        if not isinstance(target, Mapping):
+            raise ComparisonStateSchemaError(
+                f"invalid schema definition at {reference}"
+            )
+        _validate_schema_node(value, target, root_schema, location)
+        return
+
+    expected_type = rule.get("type")
+    if expected_type is not None:
+        if not isinstance(expected_type, str) or not _json_type_matches(
+            value, expected_type
+        ):
+            raise ComparisonStateSchemaError(
+                f"{location} must have JSON type {expected_type}"
+            )
+    if "const" in rule and value != rule["const"]:
+        raise ComparisonStateSchemaError(
+            f"{location} must equal {rule['const']!r}"
+        )
+    if "enum" in rule:
+        choices = rule["enum"]
+        if not isinstance(choices, list) or value not in choices:
+            raise ComparisonStateSchemaError(
+                f"{location} is not an allowed enum value"
+            )
+    if isinstance(value, str):
+        minimum = rule.get("minLength")
+        if minimum is not None and (
+            type(minimum) is not int or minimum < 0 or len(value) < minimum
+        ):
+            raise ComparisonStateSchemaError(
+                f"{location} is shorter than minLength"
+            )
+        pattern = rule.get("pattern")
+        if pattern is not None:
+            if not isinstance(pattern, str):
+                raise ComparisonStateSchemaError(
+                    f"invalid pattern in schema at {location}"
+                )
+            try:
+                matched = re.search(pattern, value)
+            except re.error as error:
+                raise ComparisonStateSchemaError(
+                    f"invalid schema pattern at {location}: {error}"
+                ) from error
+            if matched is None:
+                raise ComparisonStateSchemaError(
+                    f"{location} does not match the required pattern"
+                )
+    if isinstance(value, Mapping):
+        required = rule.get("required", [])
+        properties = rule.get("properties", {})
+        if not isinstance(required, list) or any(
+            not isinstance(field, str) for field in required
+        ):
+            raise ComparisonStateSchemaError(
+                f"schema required list is invalid at {location}"
+            )
+        if not isinstance(properties, Mapping):
+            raise ComparisonStateSchemaError(
+                f"schema properties is invalid at {location}"
+            )
+        missing = [field for field in required if field not in value]
+        if missing:
+            raise ComparisonStateSchemaError(
+                f"{location} missing required fields: {', '.join(missing)}"
+            )
+        if rule.get("additionalProperties") is False:
+            extra = sorted(set(value) - set(properties))
+            if extra:
+                raise ComparisonStateSchemaError(
+                    f"{location} has additional fields: {', '.join(extra)}"
+                )
+        for field, child in properties.items():
+            if field in value:
+                if not isinstance(child, Mapping):
+                    raise ComparisonStateSchemaError(
+                        f"invalid property schema at {location}.{field}"
+                    )
+                _validate_schema_node(
+                    value[field],
+                    child,
+                    root_schema,
+                    f"{location}.{field}",
+                )
+
+
+def validate_comparison_state_schema(
+    state: Mapping[str, Any],
+    schema_path: Path | None = None,
+) -> None:
+    """Validate a state against the complete checked-in JSON Schema contract."""
+
+    path = (schema_path or DEFAULT_STATE_SCHEMA).resolve()
+    try:
+        schema = loads_json_strict(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise ComparisonStateSchemaError(
+            f"comparison state schema unavailable or invalid: {path}: {error}"
+        ) from error
+    if not isinstance(schema, Mapping):
+        raise ComparisonStateSchemaError("comparison state schema must be an object")
+    if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+        raise ComparisonStateSchemaError(
+            "comparison state schema must declare Draft 2020-12"
+        )
+    if schema.get("type") != "object":
+        raise ComparisonStateSchemaError("comparison state schema root must be object")
+    required = schema.get("required")
+    properties = schema.get("properties")
+    if (
+        not isinstance(required, list)
+        or not isinstance(properties, Mapping)
+        or set(required) != set(properties)
+        or schema.get("additionalProperties") is not False
+    ):
+        raise ComparisonStateSchemaError(
+            "comparison state schema must require exactly all declared properties"
+        )
+    _validate_schema_node(state, schema, schema, "$")
+    origin = state.get("state_origin")
+    legacy = state.get("legacy_compatibility")
+    native_comparable = state.get("native_protocol_comparable")
+    status = state.get("comparison_status")
+    if (origin == "legacy_adapter") is not (legacy is True):
+        raise ComparisonStateSchemaError(
+            "$.state_origin and $.legacy_compatibility are inconsistent"
+        )
+    expected_native = (
+        origin == "native_v4"
+        and legacy is False
+        and status == ComparisonStatus.COMPARABLE
+    )
+    if native_comparable is not expected_native:
+        raise ComparisonStateSchemaError(
+            "$.native_protocol_comparable is inconsistent with origin and status"
+        )
+    if status == ComparisonStatus.COMPARABLE and origin == "native_v4":
+        comparable_nonempty = (
+            "source_checkpoint",
+            "source_checkpoint_manifest",
+            "source_run_id",
+            "training_stage",
+            "case_manifest",
+            "bf16_output_path",
+            "bf16_metrics_path",
+            "quantized_output_path",
+            "quantized_metrics_path",
+        )
+        empty = [
+            field
+            for field in comparable_nonempty
+            if not isinstance(state.get(field), str) or not state[field]
+        ]
+        comparable_hashes = (
+            "source_checkpoint_manifest_hash",
+            "config_hash",
+            "tokenizer_hash",
+            "case_manifest_hash",
+            "logical_cases_hash",
+            "bf16_source_checkpoint_hash",
+            "bf16_config_hash",
+            "bf16_tokenizer_hash",
+            "bf16_case_manifest_hash",
+            "quant_source_checkpoint_hash",
+            "quant_config_hash",
+            "quant_tokenizer_hash",
+            "quant_case_manifest_hash",
+        )
+        empty.extend(
+            field
+            for field in comparable_hashes
+            if not isinstance(state.get(field), str)
+            or re.fullmatch(r"[0-9a-f]{64}", state[field]) is None
+        )
+        if empty:
+            raise ComparisonStateSchemaError(
+                "COMPARABLE state has empty or invalid evidence fields: "
+                + ", ".join(empty)
+            )
 
 
 def sha256_file(path: Path) -> str:
@@ -227,6 +426,10 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "bf16_case_manifest_hash": "",
         "quant_case_manifest_hash": "",
         "legacy_compatibility": False,
+        "state_origin": "native_v4",
+        "native_protocol_comparable": False,
+        "bf16_arm": {"arm_type": "bf16"},
+        "quantized_arm": {"arm_type": "quantized"},
     }
     state.update(overrides)
     return state
@@ -243,6 +446,12 @@ def _result(
     result["blocking_reason"] = reason
     if stage is not None:
         result["stage_reached"] = stage
+    result["native_protocol_comparable"] = (
+        status is ComparisonStatus.COMPARABLE
+        and result.get("state_origin") == "native_v4"
+        and result.get("legacy_compatibility") is False
+    )
+    validate_comparison_state_schema(result)
     return result
 
 
@@ -276,13 +485,7 @@ def determine_comparison_eligibility(
 ) -> dict[str, Any]:
     """Return an explicit comparison state without mutating the supplied state."""
 
-    missing_fields = sorted(REQUIRED_STATE_FIELDS - run_state.keys())
-    if missing_fields:
-        return _result(
-            run_state,
-            ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
-            "missing run-state fields: " + ", ".join(missing_fields),
-        )
+    validate_comparison_state_schema(run_state)
     if run_state.get("protocol_id") != protocol.get("protocol_id"):
         return _result(
             run_state,
@@ -520,6 +723,31 @@ def determine_comparison_eligibility(
     )
 
 
+def quantization_authorization(
+    run_state: Mapping[str, Any],
+    gate_metrics: Mapping[str, Any] | None,
+    protocol: Mapping[str, Any],
+    *,
+    state_root: Path | None = None,
+    verify_files: bool = True,
+) -> tuple[dict[str, Any], bool]:
+    """Return the one native-v4 launch decision used by every entrypoint."""
+
+    result = determine_comparison_eligibility(
+        run_state,
+        gate_metrics,
+        protocol,
+        state_root=state_root,
+        verify_files=verify_files,
+    )
+    allowed = (
+        result["comparison_status"] == ComparisonStatus.ELIGIBLE_NOT_QUANTIZED
+        and result["state_origin"] == "native_v4"
+        and result["legacy_compatibility"] is False
+    )
+    return result, allowed
+
+
 def adapt_legacy_record(record: Mapping[str, Any]) -> dict[str, Any]:
     """Classify frozen historical metadata without rewriting the source record."""
 
@@ -564,12 +792,35 @@ def adapt_legacy_record(record: Mapping[str, Any]) -> dict[str, Any]:
     else:
         comparison = ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS
         reason = "legacy metadata is insufficient for a quantization comparison claim"
-    return {
-        "comparison_status": str(comparison),
-        "comparison_blocking_reason": reason,
-        "legacy_compatibility": True,
-        "quantization_effect_eligible": comparison is ComparisonStatus.COMPARABLE,
-    }
+    record_id = str(record.get("run_id") or record.get("record_id") or "legacy-record")
+    model_id = str(record.get("model_id") or role.split("_", 1)[0] or "legacy-model")
+    state = default_run_state(
+        model_id=model_id,
+        model_family=str(record.get("model_family") or "legacy"),
+        run_id=record_id,
+        renderer_id=str(record.get("renderer_id") or "legacy_renderer"),
+        state_origin="legacy_adapter",
+        legacy_compatibility=True,
+        native_protocol_comparable=False,
+        comparison_status=comparison,
+        blocking_reason=reason,
+        stage_reached=(
+            Stage.COMPARABLE
+            if comparison is ComparisonStatus.COMPARABLE
+            else Stage.BF16_GATE
+        ),
+        baseline_completed=True,
+        baseline_capability_passed=True,
+        bf16_reconstruction_completed=(
+            comparison is not ComparisonStatus.NOT_ELIGIBLE_RECONSTRUCTION_FAILED
+        ),
+        bf16_gate_passed=comparison is ComparisonStatus.COMPARABLE,
+        quantization_requested=comparison is ComparisonStatus.COMPARABLE,
+        quantization_performed=comparison is ComparisonStatus.COMPARABLE,
+        quantized_evaluation_completed=comparison is ComparisonStatus.COMPARABLE,
+    )
+    validate_comparison_state_schema(state)
+    return state
 
 
 def scientific_statement(model_id: str, comparison_status: str) -> str:
@@ -610,20 +861,33 @@ def main() -> None:
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--no-verify-files", action="store_true")
     args = parser.parse_args()
-    state = loads_json_strict(args.state.read_text(encoding="utf-8"))
-    protocol = loads_json_strict(args.protocol.read_text(encoding="utf-8"))
-    gate = (
-        loads_json_strict(args.gate_metrics.read_text(encoding="utf-8"))
-        if args.gate_metrics
-        else None
-    )
-    result = determine_comparison_eligibility(
-        state,
-        gate,
-        protocol,
-        state_root=args.state.parent,
-        verify_files=not args.no_verify_files,
-    )
+    try:
+        state = loads_json_strict(args.state.read_text(encoding="utf-8"))
+        protocol = loads_json_strict(args.protocol.read_text(encoding="utf-8"))
+        gate = (
+            loads_json_strict(args.gate_metrics.read_text(encoding="utf-8"))
+            if args.gate_metrics
+            else None
+        )
+        result = determine_comparison_eligibility(
+            state,
+            gate,
+            protocol,
+            state_root=args.state.parent,
+            verify_files=not args.no_verify_files,
+        )
+    except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
+        print(
+            json.dumps(
+                {
+                    "status": "comparison_state_schema_invalid",
+                    "error": str(error),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise SystemExit(21) from error
     if args.write:
         atomic_write_json(args.state, result)
     print(json.dumps(result, ensure_ascii=False, indent=2))

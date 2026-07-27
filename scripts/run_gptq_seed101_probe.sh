@@ -2,6 +2,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 SOURCE_MODEL="${SOURCE_MODEL:-}"
 UPSTREAM="$PROJECT_ROOT/upstream/aio_quantization_attack"
 TRAIN_BENIGN="${TRAIN_BENIGN:-$PROJECT_ROOT/data/generated/smoke/train_benign.jsonl}"

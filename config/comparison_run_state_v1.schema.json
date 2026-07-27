@@ -51,7 +51,11 @@
     "quant_source_run_id",
     "bf16_case_manifest_hash",
     "quant_case_manifest_hash",
-    "legacy_compatibility"
+    "legacy_compatibility",
+    "state_origin",
+    "native_protocol_comparable",
+    "bf16_arm",
+    "quantized_arm"
   ],
   "properties": {
     "schema_version": {
@@ -220,6 +224,21 @@
     },
     "legacy_compatibility": {
       "type": "boolean"
+    },
+    "state_origin": {
+      "enum": [
+        "native_v4",
+        "legacy_adapter"
+      ]
+    },
+    "native_protocol_comparable": {
+      "type": "boolean"
+    },
+    "bf16_arm": {
+      "$ref": "#/$defs/bf16Arm"
+    },
+    "quantized_arm": {
+      "$ref": "#/$defs/quantizedArm"
     }
   },
   "additionalProperties": false,
@@ -227,6 +246,30 @@
     "hashOrEmpty": {
       "type": "string",
       "pattern": "^$|^[0-9a-f]{64}$"
+    },
+    "bf16Arm": {
+      "type": "object",
+      "required": [
+        "arm_type"
+      ],
+      "properties": {
+        "arm_type": {
+          "const": "bf16"
+        }
+      },
+      "additionalProperties": false
+    },
+    "quantizedArm": {
+      "type": "object",
+      "required": [
+        "arm_type"
+      ],
+      "properties": {
+        "arm_type": {
+          "const": "quantized"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
