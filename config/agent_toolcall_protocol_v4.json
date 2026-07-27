@@ -1,0 +1,46 @@
+{
+  "schema_version": 4,
+  "protocol_id": "agent_toolcall_protocol_v4_comparison_eligibility",
+  "status": "cpu_comparison_control_ready_gpu_validation_pending",
+  "purpose": "uniform eligibility and within-model BF16-to-quantized comparison control",
+  "results_embedded": false,
+  "inherits_scientific_contract_from": "config/agent_toolcall_protocol_v3.json",
+  "scope": "P0-1 comparison eligibility only",
+  "comparison_control": {
+    "state_schema": "config/comparison_run_state_v1.schema.json",
+    "configuration": "config/cross_model_comparison_v1.json",
+    "shared_logical_case_manifest": "config/cross_model_logical_cases_v1.json",
+    "eligibility_function": "scripts.comparison_eligibility.determine_comparison_eligibility",
+    "runner": "scripts/run_cross_model_comparison.py",
+    "summary": "scripts/summarize_cross_model_comparison.py",
+    "fail_closed": true,
+    "quantization_effect_requires_status": "COMPARABLE",
+    "same_source_checkpoint_required": true,
+    "same_case_manifest_required": true,
+    "historical_runs_read_only": true
+  },
+  "gate_policy": {
+    "thresholds_changed": false,
+    "all_models_use_existing_preregistered_bf16_gate": true,
+    "failure_action": "write explicit NOT_ELIGIBLE state and do not launch quantization"
+  },
+  "readiness": {
+    "cpu_comparison_control_ready": true,
+    "gpu_execution_ready": false,
+    "remaining_preregistration_items": [
+      "run one new isolated dry-run-initialized state per model on the GPU host",
+      "execute model-specific baseline and reconstruction stages without changing their locked thresholds",
+      "run BF16 and INT8 arms only after the shared eligibility check passes"
+    ]
+  },
+  "out_of_scope": [
+    "EOS handling",
+    "response parser changes",
+    "native function calling",
+    "quantization backend acceptance",
+    "data leakage",
+    "random seed repair",
+    "padding changes",
+    "reconstruction algorithm changes"
+  ]
+}

@@ -159,6 +159,20 @@ from datetime import datetime,timezone
 status=sys.argv[2]
 open(sys.argv[1],"w",encoding="utf-8").write(json.dumps({"schema_version":1,"status":status,"model_family":"llama","model_size":"3b","master_seed":101,"intervention_performed":False,"quantization_performed":False,"next_action":"seed101_repaired_no_intervention_bf16_int8" if status=="ready_for_seed101_causal_bf16_int8" else "stop_and_analyze","tool_execution":False,"completed_at_utc":datetime.now(timezone.utc).isoformat()},ensure_ascii=False,indent=2)+"\n")
 PY
+COMPARISON_MODEL="$ADAPTED_MODEL"
+[[ -f "$RECON_MODEL/manifest.sha256.json" ]] && COMPARISON_MODEL="$RECON_MODEL"
+COMPARISON_GATE="$RUN_ROOT/metrics/reconstruction_decision.json"
+[[ -f "$COMPARISON_GATE" ]] || COMPARISON_GATE="$RUN_ROOT/metrics/adaptation_decision.json"
+"$VENV/bin/python" scripts/write_legacy_comparison_state.py \
+  --model-id llama32-3b --model-family llama3.2 \
+  --run-id llama32-3b-strict-seed101-v1 \
+  --source-checkpoint "$COMPARISON_MODEL" \
+  --source-checkpoint-manifest "$COMPARISON_MODEL/manifest.sha256.json" \
+  --case-manifest "$GATE_DATA" --renderer-id llama32_chat_template_v1 \
+  --bf16-output "$RUN_ROOT/raw_outputs/reconstructed_bf16.jsonl" \
+  --bf16-metrics "$RUN_ROOT/metrics/reconstructed_bf16.json" \
+  --gate-decision "$COMPARISON_GATE" --legacy-status "$final_status" \
+  --output "$RUN_ROOT/comparison_state.json"
 "$VENV/bin/python" scripts/make_manifest.py "$RUN_ROOT" --run-id llama32-3b-strict-seed101-v1-run --role runs
 "$VENV/bin/python" scripts/backup_to_nas.py "$RUN_ROOT" "$PERSIST_ROOT" --allow-same-filesystem
 "$VENV/bin/python" scripts/verify_manifest.py "$PERSIST_ROOT" >/dev/null

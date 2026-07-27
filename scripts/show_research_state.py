@@ -66,6 +66,10 @@ def main() -> None:
                 f"path={selected.get('path') or 'registry_remote_only'}"
             )
             print(f"status={summary.get('status', 'unknown')}")
+            print(
+                "comparison_status="
+                f"{summary.get('comparison_status', 'unknown')}"
+            )
             print(f"purpose={summary.get('purpose', 'not recorded')}")
             print(f"pass={summary.get('pass', 'not recorded')}")
 
@@ -86,6 +90,7 @@ def main() -> None:
         print(
             f"{number}. {location} | "
             f"status={summary.get('status', 'unknown')} | "
+            f"comparison_status={summary.get('comparison_status', 'unknown')} | "
             f"purpose={summary.get('purpose', 'not recorded')}"
         )
 
