@@ -1,0 +1,7 @@
+[
+ {"name":"unsupported","description":"unknown","response":"{\"name\":\"delete_all\",\"arguments\":{}}","expected_call":null,"expected":{"tool_name_supported":false,"canonical_schema_valid":false,"primary_failure_code":"UNSUPPORTED_TOOL"}},
+ {"name":"empty","description":"no name","response":"{\"name\":\"\",\"arguments\":{}}","expected_call":null,"expected":{"canonical_schema_valid":false,"primary_failure_code":"MISSING_TOOL_NAME"}},
+ {"name":"null","description":"non string","response":"{\"name\":null,\"arguments\":{}}","expected_call":null,"expected":{"canonical_schema_valid":false,"primary_failure_code":"TOOL_NAME_NOT_STRING"}},
+ {"name":"casing","description":"no normalization","response":"{\"name\":\"READ_FILE\",\"arguments\":{}}","expected_call":null,"expected":{"canonical_schema_valid":false,"primary_failure_code":"UNSUPPORTED_TOOL"}},
+ {"name":"whitespace","description":"no trim","response":"{\"name\":\" read_file \",\"arguments\":{}}","expected_call":null,"expected":{"canonical_schema_valid":false,"primary_failure_code":"UNSUPPORTED_TOOL"}}
+]

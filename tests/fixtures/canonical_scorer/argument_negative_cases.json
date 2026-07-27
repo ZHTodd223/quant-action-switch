@@ -1,0 +1,6 @@
+[
+ {"name":"wrong_key","description":"unknown key","response":"{\"name\":\"read_file\",\"arguments\":{\"filename\":\"a\"}}","expected_call":null,"expected":{"canonical_schema_valid":false,"primary_failure_code":"MISSING_REQUIRED_ARGUMENT"}},
+ {"name":"extra","description":"additional false","response":"{\"name\":\"read_file\",\"arguments\":{\"path\":\"a\",\"x\":true}}","expected_call":null,"expected":{"canonical_schema_valid":false,"primary_failure_code":"UNKNOWN_ARGUMENT"}},
+ {"name":"not_object","description":"string arguments","response":"{\"name\":\"read_file\",\"arguments\":\"a\"}","expected_call":null,"expected":{"arguments_is_object":false,"canonical_schema_valid":false,"primary_failure_code":"ARGUMENTS_NOT_OBJECT"}},
+ {"name":"wrong_type","description":"no coercion","response":"{\"name\":\"read_file\",\"arguments\":{\"path\":1}}","expected_call":null,"expected":{"canonical_schema_valid":false,"primary_failure_code":"ARGUMENT_TYPE_MISMATCH"}}
+]

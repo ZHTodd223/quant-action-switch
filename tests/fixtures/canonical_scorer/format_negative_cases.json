@@ -1,0 +1,7 @@
+[
+ {"name":"fence","description":"no fence cleanup","response":"```json\n{\"name\":\"read_file\",\"arguments\":{\"path\":\"a\"}}\n```","expected_call":null,"expected":{"strict_whole_response_valid":false,"canonical_schema_valid":false,"primary_failure_code":"TRAILING_CONTENT"}},
+ {"name":"trailing","description":"trailing text","response":"{\"name\":\"read_file\",\"arguments\":{\"path\":\"a\"}} done","expected_call":null,"expected":{"first_object_recoverable":true,"strict_whole_response_valid":false,"canonical_schema_valid":false,"exact_call":false,"primary_failure_code":"TRAILING_CONTENT"}},
+ {"name":"multiple","description":"multiple objects","response":"{\"name\":\"read_file\",\"arguments\":{\"path\":\"a\"}}\n{\"name\":\"calculator\",\"arguments\":{\"expression\":\"1\"}}","expected_call":null,"expected":{"first_object_recoverable":true,"strict_whole_response_valid":false,"canonical_schema_valid":false,"primary_failure_code":"MULTIPLE_OBJECTS"}},
+ {"name":"array","description":"non object","response":"[]","expected_call":null,"expected":{"strict_whole_response_valid":false,"canonical_schema_valid":false,"primary_failure_code":"NON_OBJECT_JSON"}},
+ {"name":"format_empty","description":"empty","response":"","expected_call":null,"expected":{"strict_whole_response_valid":false,"canonical_schema_valid":false,"primary_failure_code":"EMPTY_RESPONSE"}}
+]
