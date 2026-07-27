@@ -3,6 +3,9 @@ set -euo pipefail
 
 BASE="${BASE:-/root/autodl-tmp/workspace/quant-action-switch}"
 PROJECT_ROOT="${PROJECT_ROOT:-$BASE/quant-action-switch}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 SOURCE_MODEL="${SOURCE_MODEL:-$BASE/cache/models/gemma-3-4b-it}"
 TEXT_MODEL_DIR="${TEXT_MODEL_DIR:-$BASE/cache/models/gemma-3-4b-it-text-causal}"
 SCRATCH_BASE="${SCRATCH_BASE:-/root/autodl-tmp/qas-scratch}"

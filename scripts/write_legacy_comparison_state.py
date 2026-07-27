@@ -14,6 +14,7 @@ from comparison_eligibility import (
     atomic_write_json,
     default_run_state,
     sha256_file,
+    validate_comparison_state_schema,
 )
 
 
@@ -90,7 +91,10 @@ def main() -> None:
         bf16_source_run_id=args.run_id,
         bf16_case_manifest_hash=case_hash,
         legacy_compatibility=True,
+        state_origin="legacy_adapter",
+        native_protocol_comparable=False,
     )
+    validate_comparison_state_schema(state)
     atomic_write_json(args.output, state)
     print(
         json.dumps(

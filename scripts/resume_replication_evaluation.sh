@@ -2,6 +2,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 MASTER_SEED="${MASTER_SEED:-}"
 TRIAL_ID="qwen25-1p5b-rep-seed${MASTER_SEED}"
 SOURCE_RUN_ID="${SOURCE_RUN_ID:-smoke-qwen25-1p5b-seed42}"

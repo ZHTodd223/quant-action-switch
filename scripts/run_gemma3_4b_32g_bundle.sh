@@ -2,6 +2,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 TEXT_MODEL_DIR="${TEXT_MODEL_DIR:-/mnt/workspace/quant-action-switch/cache/models/gemma-3-4b-it-text-causal}"
 BUNDLE_ROOT="${BUNDLE_ROOT:-/mnt/workspace/quant-action-switch/gemma3-4b-32g-bundle-v1}"
 SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"

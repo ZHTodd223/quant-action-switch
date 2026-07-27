@@ -3,6 +3,9 @@ set -euo pipefail
 
 BASE="${BASE:-/root/autodl-tmp/workspace/quant-action-switch}"
 PROJECT_ROOT="${PROJECT_ROOT:-$BASE/quant-action-switch}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 MODEL_DIR="${MODEL_DIR:-$BASE/cache/models/Qwen2.5-7B-Instruct}"
 SCRATCH_BASE="${SCRATCH_BASE:-/root/autodl-tmp/qas-scratch}"
 VENV="${VENV:-$BASE/venvs/qas-cu128}"

@@ -16,14 +16,17 @@ from typing import Any
 
 from case_schema import loads_json_strict
 from comparison_eligibility import (
+    ComparisonStateSchemaError,
     ComparisonStatus,
     PROTOCOL_ID,
     atomic_write_json,
     checkpoint_identity,
     default_run_state,
     determine_comparison_eligibility,
+    quantization_authorization,
     sha256_file,
     scientific_statement,
+    validate_comparison_state_schema,
     validate_logical_case_manifest,
 )
 
@@ -125,6 +128,7 @@ def init_run(args: argparse.Namespace) -> None:
         blocking_reason="baseline capability has not been recorded",
     )
     state_path = run_root / "comparison_state.json"
+    validate_comparison_state_schema(state)
     atomic_write_json(state_path, state)
     print(
         json.dumps(
@@ -152,8 +156,9 @@ def _next_command(
     if status == ComparisonStatus.NOT_ELIGIBLE_BASELINE_FAILED:
         model = model_configuration(config, state["model_id"])
         return (
-            f"legacy/reference baseline-reconstruction entry: "
-            f"bash {model['legacy_runner']} (new RUN_ID and output directory required)"
+            "legacy/reference runner is historical-only: "
+            f"ALLOW_HISTORICAL_REPRODUCTION=YES bash {model['legacy_runner']}; "
+            "its output is not native-v4 evidence"
         )
     if (
         status == ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS
@@ -179,7 +184,11 @@ def _next_command(
         return "stop; complete or repair the blocking BF16-stage evidence without changing gate thresholds"
     if status == ComparisonStatus.ELIGIBLE_NOT_QUANTIZED:
         return (
-            "python scripts/generate_quantized_responses.py "
+            "python scripts/require_quantization_eligibility.py "
+            f"--state \"<comparison_state.json>\" --gate-decision \"<gate_decision.json>\" "
+            "&& python scripts/generate_quantized_responses.py "
+            f"--comparison-state \"<comparison_state.json>\" "
+            f"--gate-decision \"<gate_decision.json>\" "
             f"--model-dir \"{state['source_checkpoint']}\" "
             f"--eval-data \"{Path(state['case_manifest']).parent / 'rendered_cases.jsonl'}\" "
             f"--output \"{state['quantized_output_path']}\" --quantizer int8 --limit 12"
@@ -230,6 +239,7 @@ def dry_run(args: argparse.Namespace) -> None:
 
 def record_bf16(args: argparse.Namespace) -> None:
     state = load_object(args.state)
+    validate_comparison_state_schema(state)
     protocol = load_object(args.protocol)
     baseline = load_object(args.baseline_decision)
     gate = load_object(args.gate_decision)
@@ -312,14 +322,14 @@ def quantization_preflight(args: argparse.Namespace) -> None:
     protocol = load_object(args.protocol)
     config = load_object(args.config)
     gate = load_object(args.gate_decision)
-    result = determine_comparison_eligibility(
+    result, allowed = quantization_authorization(
         state,
         gate,
         protocol,
         state_root=args.state.parent,
         verify_files=True,
     )
-    if result["comparison_status"] != ComparisonStatus.ELIGIBLE_NOT_QUANTIZED:
+    if not allowed:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         raise SystemExit(20)
     print(
@@ -384,7 +394,20 @@ def main() -> None:
     preflight.set_defaults(func=quantization_preflight)
 
     args = parser.parse_args()
-    args.func(args)
+    try:
+        args.func(args)
+    except ComparisonStateSchemaError as error:
+        print(
+            json.dumps(
+                {
+                    "status": "comparison_state_schema_invalid",
+                    "error": str(error),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise SystemExit(21) from error
 
 
 if __name__ == "__main__":

@@ -2,6 +2,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 SCRATCH_BASE="${SCRATCH_BASE:-/tmp}"
 MASTER_SEED="${MASTER_SEED:-101}"
 [[ "$MASTER_SEED" =~ ^[0-9]+$ ]] || { echo "MASTER_SEED必须是非负整数。" >&2; exit 3; }

@@ -41,6 +41,7 @@ class ComparisonEligibilityTests(unittest.TestCase):
             tokenizer_hash="d" * 64,
             case_manifest="/cases/shared.json",
             case_manifest_hash="b" * 64,
+            logical_cases_hash="e" * 64,
             renderer_id="fixture-renderer",
             baseline_completed=True,
             baseline_capability_passed=True,
@@ -154,7 +155,11 @@ class ComparisonEligibilityTests(unittest.TestCase):
                     quantized_output_path="/raw/int8.jsonl",
                     quantized_metrics_path="/metrics/int8.json",
                 )
-                state[field] = "mismatch"
+                state[field] = (
+                    "e" * 64
+                    if field in {"quant_config_hash", "quant_tokenizer_hash"}
+                    else "mismatch"
+                )
                 result = self.assess(state, {"pass": True})
                 self.assertEqual(
                     result["comparison_status"],
@@ -227,19 +232,22 @@ class HistoricalCompatibilityTests(unittest.TestCase):
             root = Path(temporary)
             values = [
                 {
-                    "model_id": "qwen25-3b",
+                    "record_id": "qwen",
                     "run_id": "qwen",
-                    "comparison_status": "COMPARABLE",
+                    "evidence_role": "qwen_locked_confirmatory_gate",
+                    "scientific_status": "complete",
                 },
                 {
-                    "model_id": "gemma3-4b",
+                    "record_id": "gemma",
                     "run_id": "gemma",
-                    "comparison_status": "NOT_ELIGIBLE_BF16_GATE_FAILED",
+                    "evidence_role": "gemma_cross_family_reconstruction_stop",
+                    "scientific_status": "reconstruction_gate_failed",
                 },
                 {
-                    "model_id": "llama32-3b",
+                    "record_id": "llama",
                     "run_id": "llama",
-                    "comparison_status": "NOT_ELIGIBLE_BF16_GATE_FAILED",
+                    "evidence_role": "llama_cross_family_reconstruction_stop",
+                    "scientific_status": "stopped_after_reconstruction_failure",
                 },
             ]
             paths = []
@@ -248,8 +256,10 @@ class HistoricalCompatibilityTests(unittest.TestCase):
                 path.write_text(json.dumps(value), encoding="utf-8")
                 paths.append(path)
             result = summarize(paths)
-        self.assertEqual(result["quantization_effect_model_count"], 1)
-        self.assertEqual(result["quantization_effect_run_ids"], ["qwen"])
+            all_result = summarize(paths, "all_comparable")
+        self.assertEqual(result["quantization_effect_model_count"], 0)
+        self.assertEqual(result["quantization_effect_run_ids"], [])
+        self.assertEqual(all_result["quantization_effect_run_ids"], ["qwen"])
         self.assertFalse(result["not_quantized_runs_are_zero_effects"])
 
 
