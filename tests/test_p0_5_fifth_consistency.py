@@ -37,6 +37,7 @@ from manifest_writer_registry import (
     write_formal_response_manifest,
     write_formal_summary,
 )
+from tests.p0_5_audit_support import SUMMARY_MUTATIONS, SUMMARY_PAYLOADS
 from tests.runtime_evidence_fixtures import build_native_comparable
 
 
@@ -86,7 +87,6 @@ def make_baseline_failure(root: Path) -> tuple[Path, dict]:
 
 
 class InitializerFixedStateTests(unittest.TestCase):
-    INITIALIZER_CASES = 6
     def test_five_late_or_failed_initial_states_are_rejected(self):
         cases = (
             ("COMPARABLE", "COMPARABLE"),
@@ -133,8 +133,6 @@ class InitializerFixedStateTests(unittest.TestCase):
 
 
 class TransitionAndWriterStageTests(unittest.TestCase):
-    TRANSITION_CASES = 7
-    WRITER_STAGE_CASES = 6
     def test_machine_transition_graph_covers_success_and_terminal_failures(self):
         self.assertEqual(set(FORMAL_TRANSITION_GRAPH), set(FormalStateTransition))
         self.assertEqual(
@@ -246,8 +244,6 @@ class TransitionAndWriterStageTests(unittest.TestCase):
 
 
 class FormalSummaryRecomputeTests(unittest.TestCase):
-    SUMMARY_RECOMPUTE_CASES = 18
-    SUMMARY_VERIFIER_CASES = 19
     def test_writer_rejects_caller_authoritative_payload(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -255,31 +251,8 @@ class FormalSummaryRecomputeTests(unittest.TestCase):
             context = load_and_verify_formal_run_context(
                 state_path, entrypoint_id="comparison-summary-main", arm="summary"
             )
-            invented_payloads = (
-                {"included_runs": ["invented-run"]},
-                {"included_runs": []},
-                {"excluded_runs": [{"run_id": "run"}]},
-                {"reason_codes": ["INVENTED"]},
-                {"behavioral_drift": 0.99},
-                {"quantization_effect_model_count": 0},
-                {"quantization_effect_model_count": 99},
-                {"input_evidence_hashes": {}},
-                {"input_evidence_hashes": {"invented": "0" * 64}},
-                {"formal_metrics": {"run": {"diagnostic": 1}}},
-                {"models": [{"run_id": "invented-run"}]},
-                {"models": [{"evidence_class": "RETROSPECTIVE"}]},
-                {"context_state_paths": ["missing.json"]},
-                {"scorer_identity_sha256": "0" * 64},
-                {"tool_registry_sha256": "0" * 64},
-                {"calculation_version": "invented"},
-                {"protocol_id": "invented"},
-                {"status": "formal_comparison_summary_complete"},
-            )
-            self.assertEqual(
-                len(invented_payloads), self.SUMMARY_RECOMPUTE_CASES
-            )
-            for payload in invented_payloads:
-                with self.subTest(payload=payload), self.assertRaises(TypeError):
+            for case_id, payload in SUMMARY_PAYLOADS:
+                with self.subTest(case_id=case_id), self.assertRaises(TypeError):
                     write_formal_summary(
                         [context], root / "summary.json", payload
                     )
@@ -320,39 +293,8 @@ class FormalSummaryRecomputeTests(unittest.TestCase):
                 state_path, entrypoint_id="comparison-summary-main", arm="summary"
             )
             original = json.loads(summary_path.read_text(encoding="utf-8"))
-            mutations = (
-                lambda value: value.update(included_runs=["invented-run"]),
-                lambda value: value.update(included_runs=[]),
-                lambda value: value.update(behavioral_drift=0.99),
-                lambda value: value.update(quantization_effect_model_count=99),
-                lambda value: value.update(input_evidence_hashes={}),
-                lambda value: value["input_evidence_hashes"]["run"].update(
-                    comparison_state="0" * 64
-                ),
-                lambda value: value.update(excluded_runs=[{"run_id": "run"}]),
-                lambda value: value.update(reason_codes=["INVENTED"]),
-                lambda value: value.update(context_state_paths=["missing.json"]),
-                lambda value: value["formal_metrics"]["run"].update(
-                    quant_minus_bf16_exact_call_rate=0.5
-                ),
-                lambda value: value["formal_metrics"]["run"].update(
-                    bf16_exact_call_rate=0.5
-                ),
-                lambda value: value["formal_metrics"]["run"].update(
-                    quant_exact_call_rate=0.5
-                ),
-                lambda value: value["models"][0].update(run_id="invented-run"),
-                lambda value: value["models"][0].update(
-                    quantization_effect_included=False
-                ),
-                lambda value: value.update(scorer_identity_sha256="0" * 64),
-                lambda value: value.update(tool_registry_sha256="0" * 64),
-                lambda value: value.update(calculation_version="invented"),
-                lambda value: value.update(protocol_id="invented"),
-            )
-            self.assertEqual(len(mutations), self.SUMMARY_RECOMPUTE_CASES)
-            for number, mutate in enumerate(mutations):
-                with self.subTest(mutation=number):
+            for case_id, mutate in SUMMARY_MUTATIONS:
+                with self.subTest(case_id=case_id):
                     changed = copy.deepcopy(original)
                     mutate(changed)
                     write_resealed(summary_path, changed)

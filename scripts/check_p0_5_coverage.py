@@ -5,11 +5,15 @@ from __future__ import annotations
 import ast
 import json
 import io
+import subprocess
+import sys
 import unittest
 from collections import Counter
 from pathlib import Path
 
-from formal_entrypoint_contracts import execute_formal_entrypoint_contracts
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 from manifest_writer_registry import (
     discover_formal_entrypoint_calls,
     discover_unregistered_direct_formal_writes,
@@ -19,8 +23,12 @@ from manifest_writer_registry import (
     load_formal_entrypoint_callable,
     validate_registry,
 )
+from tests.p0_5_audit_support import (
+    run_p0_5_audit_execution,
+    run_audit_report_mutation_checks,
+    validate_audit_execution_report,
+)
 
-ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures" / "canonical_scorer"
 FILES = {
     "valid": ("valid_cases.json", 14),
@@ -196,7 +204,20 @@ def main() -> None:
             "P0-5 coverage failed: unapproved direct formal semantic mutations: "
             f"{semantic_mutations}"
         )
-    execution = execute_formal_entrypoint_contracts()
+    audit_report = run_p0_5_audit_execution()
+    head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], text=True
+    ).strip()
+    try:
+        audit_coverage = validate_audit_execution_report(
+            audit_report, expected_sha=head
+        )
+    except ValueError as error:
+        raise SystemExit(f"P0-5 coverage failed: {error}") from error
+    mutation_checks = run_audit_report_mutation_checks(
+        audit_report, expected_sha=head
+    )
+    execution = audit_report["trace_summary"]
     if (
         execution["real_callable_executed"] != len(entrypoints)
         or execution["normal_control_flow_reached"] != len(entrypoints)
@@ -234,6 +255,54 @@ def main() -> None:
         trust_tests.DynamicDispatcherTrustBoundaryTests.EXPECTED_ATTACKS
     )
     classifications = Counter(row["classification"] for row in __import__("manifest_writer_registry").WRITERS)
+    passed_rows = [
+        row
+        for row in audit_report["cases"]
+        if row["executed"] and row["passed"] and not row["skipped"]
+    ]
+
+    def case_ids(category: str) -> list[str]:
+        return sorted(
+            row["case_id"] for row in passed_rows if row["category"] == category
+        )
+
+    writer_positive_ids = sorted(
+        {
+            row["writer_id"]
+            for row in passed_rows
+            if row["category"] == "writer"
+            and row["case_id"].endswith("::positive")
+        }
+    )
+    writer_negative_ids = sorted(
+        {
+            row["writer_id"]
+            for row in passed_rows
+            if row["category"] == "writer"
+            and row["case_id"].endswith("::wrong-stage")
+        }
+    )
+    entrypoint_callable_ids = sorted(
+        {
+            row["entrypoint_id"]
+            for row in passed_rows
+            if row["case_id"].endswith("::real-callable")
+        }
+    )
+    entrypoint_trace_ids = sorted(
+        {
+            row["entrypoint_id"]
+            for row in passed_rows
+            if row["case_id"].endswith("::trace")
+        }
+    )
+    entrypoint_negative_ids = sorted(
+        {
+            row["entrypoint_id"]
+            for row in passed_rows
+            if row["case_id"].endswith("::negative-contract")
+        }
+    )
     print(json.dumps({
         **counts,
         "response_identity_type_total": total,
@@ -270,21 +339,22 @@ def main() -> None:
         "FORMAL_V4_dynamic_runtime_attacks": dynamic_attacks,
         "FORMAL_V4_unregistered_direct_writers": len(direct),
         "unapproved_direct_formal_semantic_mutations": len(semantic_mutations),
-        "initializer_fixed_state_cases": (
-            fifth_tests.InitializerFixedStateTests.INITIALIZER_CASES
-        ),
-        "transition_graph_cases": (
-            fifth_tests.TransitionAndWriterStageTests.TRANSITION_CASES
-        ),
-        "writer_stage_contract_cases": (
-            fifth_tests.TransitionAndWriterStageTests.WRITER_STAGE_CASES
-        ),
-        "summary_production_recompute_cases": (
-            fifth_tests.FormalSummaryRecomputeTests.SUMMARY_RECOMPUTE_CASES
-        ),
-        "summary_verifier_recompute_cases": (
-            fifth_tests.FormalSummaryRecomputeTests.SUMMARY_VERIFIER_CASES
-        ),
+        "candidate_sha": audit_report["candidate_sha"],
+        "initializer_case_ids": case_ids("initializer"),
+        "transition_case_ids": case_ids("transition"),
+        "writer_case_ids": case_ids("writer"),
+        "summary_case_ids": case_ids("summary"),
+        "verifier_case_ids": case_ids("verifier"),
+        "expected_case_ids": audit_coverage["expected_case_ids"],
+        "observed_case_ids": audit_coverage["observed_case_ids"],
+        "registered_writer_ids": audit_coverage["writer_ids"],
+        "positive_writer_ids": writer_positive_ids,
+        "negative_writer_ids": writer_negative_ids,
+        "registered_entrypoint_ids": audit_coverage["entrypoint_ids"],
+        "callable_entrypoint_ids": entrypoint_callable_ids,
+        "trace_entrypoint_ids": entrypoint_trace_ids,
+        "negative_entrypoint_ids": entrypoint_negative_ids,
+        "mutation_checks": mutation_checks,
         "writer_classifications": dict(sorted(classifications.items())),
     }, indent=2))
 

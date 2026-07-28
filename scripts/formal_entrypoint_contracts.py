@@ -24,6 +24,47 @@ from manifest_writer_registry import (
 from tests.runtime_evidence_fixtures import build_native_comparable
 from tests.test_model_state_attestation import FakeModel, make_checkpoint
 
+
+def _callable_name(value) -> str:
+    module = getattr(value, "__module__", "")
+    name = getattr(value, "__qualname__", getattr(value, "__name__", ""))
+    return ".".join(part for part in (module, name) if part)
+
+
+def _spy_observation(step: str, spy, callable_value) -> dict:
+    return {
+        "step": step,
+        "status": "OBSERVED" if spy.call_count > 0 else "NOT_OBSERVED",
+        "call_count": spy.call_count,
+        "callable": _callable_name(callable_value),
+        "call_args": [
+            {
+                "args": [repr(value) for value in call.args],
+                "kwargs": {
+                    key: repr(value)
+                    for key, value in sorted(call.kwargs.items())
+                },
+            }
+            for call in spy.call_args_list
+        ],
+    }
+
+
+def _not_applicable(step: str, reason: str) -> dict:
+    return {"step": step, "status": "NOT_APPLICABLE", "reason": reason}
+
+
+def _observed(value) -> bool:
+    return isinstance(value, dict) and value.get("status") == "OBSERVED"
+
+
+def _satisfied(value) -> bool:
+    return isinstance(value, dict) and value.get("status") in {
+        "OBSERVED",
+        "NOT_APPLICABLE",
+    }
+
+
 def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
@@ -255,35 +296,67 @@ def _call_and_trace(
         )
         with contextlib.redirect_stdout(io.StringIO()):
             call_spy(argv)
-    parser_observed = parser_spy.call_count > 0
-    context_observed = context_spy is not None and context_spy.call_count > 0
-    policy_observed = policy_spy is not None and policy_spy.call_count > 0
+    verifier = (
+        summary_validation.verify_formal_summary
+        if summary_verifier_spy.call_count > 0
+        else attestation_module.verify_output_manifest
+    )
+    verifier_spy_value = (
+        summary_verifier_spy
+        if summary_verifier_spy.call_count > 0
+        else verifier_spy
+    )
+    core_spy_value = generation_core_spy or core_spy or writer_spy
+    core_callable = (
+        getattr(module, "generate_one", writer)
+        if generation_core_spy is not None
+        else core
+        if core_spy is not None
+        else writer
+    )
     return {
-        "real_callable_entered": call_spy.call_count == 1,
-        "arguments_parser_called": parser_observed,
+        "real_callable_entered": _spy_observation(
+            "callable", call_spy, callable_value
+        ),
+        "arguments_parser_called": _spy_observation(
+            "parser", parser_spy, argparse.ArgumentParser.parse_args
+        ),
         "policy_called": (
-            policy_observed
+            _spy_observation("policy", policy_spy, policy)
             if policy_spy is not None
-            else "NOT_APPLICABLE_WITH_REASON:no policy resolver in entrypoint"
+            else _not_applicable(
+                "policy", "entrypoint does not resolve scorer policy"
+            )
         ),
-        "context_revalidation_called": context_observed,
+        "context_revalidation_called": (
+            _spy_observation("context", context_spy, context_loader)
+            if context_spy is not None
+            else _not_applicable(
+                "context", "entrypoint has no formal context loader"
+            )
+        ),
         "transition_called": (
-            transition_spy.call_count > 0
+            _spy_observation(
+                "transition", transition_spy, writer_registry.transition_formal_state
+            )
             if transition_spy.call_count > 0
-            else "NOT_APPLICABLE_WITH_REASON:no state transition in this entrypoint"
+            else _not_applicable(
+                "transition", "entrypoint has no state transition"
+            )
         ),
-        "core_operation_called": (
-            generation_core_spy.call_count > 0
-            if generation_core_spy is not None
-            else core_spy.call_count > 0
-            if core_spy is not None
-            else writer_spy.call_count == 1
+        "core_operation_called": _spy_observation(
+            "core", core_spy_value, core_callable
         ),
-        "writer_called": writer_spy.call_count == 1,
-        "verifier_called": (
-            verifier_spy.call_count > 0 or summary_verifier_spy.call_count > 0
+        "writer_called": _spy_observation("writer", writer_spy, writer),
+        "verifier_called": _spy_observation(
+            "verifier", verifier_spy_value, verifier
         ),
         "artifact_written": writer_spy.call_count == 1,
+        "transition_values": [
+            call.args[1].value
+            for call in transition_spy.call_args_list
+            if len(call.args) > 1 and hasattr(call.args[1], "value")
+        ],
     }
 
 
@@ -305,6 +378,8 @@ def execute_formal_entrypoint_contracts() -> dict:
     import generate_gguf_responses as gguf_module
     import generate_native_quantized_responses as native_module
     import generate_quantized_responses as quant_module
+    import formal_evidence as evidence_module
+    import manifest_writer_registry as writer_registry
     import run_cross_model_comparison as comparison_module
     import score_responses as scorer_module
     import summarize_cross_model_comparison as summary_module
@@ -337,24 +412,39 @@ def execute_formal_entrypoint_contracts() -> dict:
             comparison_module,
             "checkpoint_identity",
             wraps=comparison_module.checkpoint_identity,
-        ) as core_spy, contextlib.redirect_stdout(io.StringIO()):
+        ) as core_spy, mock.patch.object(
+            evidence_module,
+            "verify_state_integrity",
+            wraps=evidence_module.verify_state_integrity,
+        ) as verifier_spy, contextlib.redirect_stdout(io.StringIO()):
             init_call_spy(init_args)
         traces["comparison-init"] = {
-            "real_callable_entered": init_call_spy.call_count == 1,
-            "arguments_parser_called": (
-                "NOT_APPLICABLE_WITH_REASON:programmatic Namespace entrypoint"
+            "real_callable_entered": _spy_observation(
+                "callable", init_call_spy, comparison_module.init_run
             ),
-            "policy_called": "NOT_APPLICABLE_WITH_REASON:identity initialization",
-            "context_revalidation_called": (
-                "NOT_APPLICABLE_WITH_REASON:state does not exist before initialization"
+            "arguments_parser_called": _not_applicable(
+                "parser", "programmatic Namespace entrypoint"
             ),
-            "transition_called": (
-                "NOT_APPLICABLE_WITH_REASON:initializer creates only INITIALIZED"
+            "policy_called": _not_applicable(
+                "policy", "initializer does not resolve scorer policy"
             ),
-            "core_operation_called": core_spy.call_count == 1,
-            "writer_called": writer_spy.call_count == 1,
-            "verifier_called": writer_spy.call_count == 1,
+            "context_revalidation_called": _not_applicable(
+                "context", "state does not exist before initialization"
+            ),
+            "transition_called": _not_applicable(
+                "transition", "initializer creates only INITIALIZED"
+            ),
+            "core_operation_called": _spy_observation(
+                "core", core_spy, comparison_module.checkpoint_identity
+            ),
+            "writer_called": _spy_observation(
+                "writer", writer_spy, comparison_module.initialize_formal_state
+            ),
+            "verifier_called": _spy_observation(
+                "verifier", verifier_spy, evidence_module.verify_state_integrity
+            ),
             "artifact_written": (init_args.run_root / "comparison_state.json").is_file(),
+            "transition_values": [],
         }
         negatives["comparison-init"] = _expect_failure(
             comparison_module.init_run, init_args
@@ -432,17 +522,38 @@ def execute_formal_entrypoint_contracts() -> dict:
         ) as verifier_spy, contextlib.redirect_stdout(io.StringIO()):
             bf16_call_spy(bf16_record_args)
         traces["comparison-record-bf16"] = {
-            "real_callable_entered": bf16_call_spy.call_count == 1,
-            "arguments_parser_called": (
-                "NOT_APPLICABLE_WITH_REASON:programmatic Namespace entrypoint"
+            "real_callable_entered": _spy_observation(
+                "callable", bf16_call_spy, comparison_module.record_bf16
             ),
-            "policy_called": "NOT_APPLICABLE_WITH_REASON:locked state scorer",
-            "context_revalidation_called": context_spy.call_count == 1,
-            "transition_called": writer_spy.call_count == 1,
-            "core_operation_called": core_spy.call_count > 0,
-            "writer_called": writer_spy.call_count == 1,
-            "verifier_called": verifier_spy.call_count > 0,
+            "arguments_parser_called": _not_applicable(
+                "parser", "programmatic Namespace entrypoint"
+            ),
+            "policy_called": _not_applicable(
+                "policy", "entrypoint uses the scorer locked in state"
+            ),
+            "context_revalidation_called": _spy_observation(
+                "context",
+                context_spy,
+                comparison_module.load_and_verify_formal_run_context,
+            ),
+            "transition_called": _spy_observation(
+                "transition", writer_spy, comparison_module.transition_formal_state
+            ),
+            "core_operation_called": _spy_observation(
+                "core", core_spy, comparison_module.determine_comparison_eligibility
+            ),
+            "writer_called": _spy_observation(
+                "writer", writer_spy, comparison_module.transition_formal_state
+            ),
+            "verifier_called": _spy_observation(
+                "verifier", verifier_spy, comparison_module.verify_output_manifest
+            ),
             "artifact_written": state_path.is_file(),
+            "transition_values": [
+                call.args[1].value
+                for call in writer_spy.call_args_list
+                if len(call.args) > 1 and hasattr(call.args[1], "value")
+            ],
         }
 
         common_quant = [
@@ -543,10 +654,23 @@ def execute_formal_entrypoint_contracts() -> dict:
             scorer_module,
             "bind_formal_metrics",
             wraps=scorer_module.bind_formal_metrics,
-        ) as writer_spy, contextlib.redirect_stdout(io.StringIO()):
+        ) as writer_spy, mock.patch.object(
+            writer_registry,
+            "transition_formal_state",
+            wraps=writer_registry.transition_formal_state,
+        ) as quant_transition_spy, contextlib.redirect_stdout(io.StringIO()):
             scorer_module.main(scorer_quant_argv)
-        if writer_spy.call_count != 1:
+        quant_scorer_observed = writer_spy.call_count == 1
+        quant_scorer_writer_observation = _spy_observation(
+            "writer", writer_spy, scorer_module.bind_formal_metrics
+        )
+        if not quant_scorer_observed:
             raise AssertionError("quant scorer did not reach the formal binder")
+        traces["formal-scorer-main"]["transition_values"].extend(
+            call.args[1].value
+            for call in quant_transition_spy.call_args_list
+            if len(call.args) > 1 and hasattr(call.args[1], "value")
+        )
 
         quant_record_args = argparse.Namespace(
             state=state_path,
@@ -577,17 +701,38 @@ def execute_formal_entrypoint_contracts() -> dict:
         ) as verifier_spy, contextlib.redirect_stdout(io.StringIO()):
             quant_call_spy(quant_record_args)
         traces["comparison-record-quant"] = {
-            "real_callable_entered": quant_call_spy.call_count == 1,
-            "arguments_parser_called": (
-                "NOT_APPLICABLE_WITH_REASON:programmatic Namespace entrypoint"
+            "real_callable_entered": _spy_observation(
+                "callable", quant_call_spy, comparison_module.record_quantized
             ),
-            "policy_called": "NOT_APPLICABLE_WITH_REASON:locked state scorer",
-            "context_revalidation_called": context_spy.call_count == 1,
-            "transition_called": writer_spy.call_count == 1,
-            "core_operation_called": core_spy.call_count > 0,
-            "writer_called": writer_spy.call_count == 1,
-            "verifier_called": verifier_spy.call_count > 0,
+            "arguments_parser_called": _not_applicable(
+                "parser", "programmatic Namespace entrypoint"
+            ),
+            "policy_called": _not_applicable(
+                "policy", "entrypoint uses the scorer locked in state"
+            ),
+            "context_revalidation_called": _spy_observation(
+                "context",
+                context_spy,
+                comparison_module.load_and_verify_formal_run_context,
+            ),
+            "transition_called": _spy_observation(
+                "transition", writer_spy, comparison_module.transition_formal_state
+            ),
+            "core_operation_called": _spy_observation(
+                "core", core_spy, comparison_module.determine_comparison_eligibility
+            ),
+            "writer_called": _spy_observation(
+                "writer", writer_spy, comparison_module.transition_formal_state
+            ),
+            "verifier_called": _spy_observation(
+                "verifier", verifier_spy, comparison_module.verify_output_manifest
+            ),
             "artifact_written": state_path.is_file(),
+            "transition_values": [
+                call.args[1].value
+                for call in writer_spy.call_args_list
+                if len(call.args) > 1 and hasattr(call.args[1], "value")
+            ],
         }
         negatives["comparison-record-bf16"] = _expect_failure(
             comparison_module.record_bf16, bf16_record_args
@@ -628,54 +773,76 @@ def execute_formal_entrypoint_contracts() -> dict:
 
     ordered = []
     negative_rows = []
+    for entrypoint_id, trace in traces.items():
+        trace["writer_contract_observations"] = (
+            [
+                {
+                    "contract_id": "formal-scorer-main::bf16",
+                    "observation": trace["writer_called"],
+                },
+                {
+                    "contract_id": "formal-scorer-main::quant",
+                    "observation": quant_scorer_writer_observation,
+                },
+            ]
+            if entrypoint_id == "formal-scorer-main"
+            else []
+            if entrypoint_id == "comparison-init"
+            else [
+                {
+                    "contract_id": entrypoint_id,
+                    "observation": trace["writer_called"],
+                }
+            ]
+        )
     for spec in formal_entrypoints():
         trace = {"entrypoint_id": spec["id"], **traces[spec["id"]]}
         ordered.append(trace)
         negative_rows.append(
             {
                 "entrypoint_id": spec["id"],
-                "real_callable_entered": negatives[spec["id"]],
+                "executed": True,
+                "passed": negatives[spec["id"]],
+                "skipped": False,
                 "negative_contract_tested": negatives[spec["id"]],
-                "writer_called": False,
             }
-        )
-    def satisfied(value) -> bool:
-        return value is True or (
-            isinstance(value, str)
-            and value.startswith("NOT_APPLICABLE_WITH_REASON:")
         )
 
     return {
         "entrypoint_count": len(ordered),
         "real_callable_executed": sum(
-            row["real_callable_entered"] for row in ordered
+            _observed(row["real_callable_entered"]) for row in ordered
         ),
         "normal_control_flow_reached": sum(
-            satisfied(row["arguments_parser_called"])
-            and satisfied(row["policy_called"])
-            and satisfied(row["context_revalidation_called"])
-            and satisfied(row["transition_called"])
-            and row["core_operation_called"]
-            and row["writer_called"]
-            and row["verifier_called"]
+            _satisfied(row["arguments_parser_called"])
+            and _satisfied(row["policy_called"])
+            and _satisfied(row["context_revalidation_called"])
+            and _satisfied(row["transition_called"])
+            and _observed(row["core_operation_called"])
+            and _observed(row["writer_called"])
+            and _observed(row["verifier_called"])
             for row in ordered
         ),
         "formal_context_created": sum(
-            satisfied(row["context_revalidation_called"]) for row in ordered
+            _satisfied(row["context_revalidation_called"]) for row in ordered
         ),
         "parser_observed": sum(
-            row["arguments_parser_called"] is True for row in ordered
+            _observed(row["arguments_parser_called"]) for row in ordered
         ),
-        "policy_observed": sum(row["policy_called"] is True for row in ordered),
+        "policy_observed": sum(_observed(row["policy_called"]) for row in ordered),
         "context_observed": sum(
-            row["context_revalidation_called"] is True for row in ordered
+            _observed(row["context_revalidation_called"]) for row in ordered
         ),
         "transition_observed": sum(
-            row["transition_called"] is True for row in ordered
+            _observed(row["transition_called"]) for row in ordered
         ),
-        "core_observed": sum(row["core_operation_called"] for row in ordered),
-        "writer_reached": sum(row["writer_called"] for row in ordered),
-        "verifier_observed": sum(row["verifier_called"] for row in ordered),
+        "core_observed": sum(
+            _observed(row["core_operation_called"]) for row in ordered
+        ),
+        "writer_reached": sum(_observed(row["writer_called"]) for row in ordered),
+        "verifier_observed": sum(
+            _observed(row["verifier_called"]) for row in ordered
+        ),
         "positive_contracts_passed": sum(row["artifact_written"] for row in ordered),
         "negative_contracts_tested": sum(
             row["negative_contract_tested"] for row in negative_rows

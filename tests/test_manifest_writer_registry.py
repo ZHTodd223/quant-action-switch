@@ -71,7 +71,19 @@ class ManifestWriterRegistryTests(unittest.TestCase):
         self.assertEqual(report["real_callable_executed"], 9)
         self.assertEqual(report["formal_context_created"], 9)
         self.assertEqual(report["writer_reached"], 9)
+        self.assertEqual(report["verifier_observed"], 9)
         self.assertEqual(report["negative_contracts_tested"], 9)
+        initializer = next(
+            row
+            for row in report["traces"]
+            if row["entrypoint_id"] == "comparison-init"
+        )
+        self.assertEqual(
+            initializer["verifier_called"]["callable"],
+            "formal_evidence.verify_state_integrity",
+        )
+        self.assertGreater(initializer["verifier_called"]["call_count"], 0)
+        self.assertTrue(initializer["verifier_called"]["call_args"])
 
     def test_unregistered_entrypoint_is_rejected_at_runtime(self):
         with tempfile.TemporaryDirectory() as temporary:
