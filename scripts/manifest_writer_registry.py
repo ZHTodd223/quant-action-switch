@@ -387,41 +387,41 @@ class FormalStateTransition(str, Enum):
     RECORD_SUMMARY = "RECORD_SUMMARY"
 
 
-FORMAL_TRANSITION_GRAPH: dict[FormalStateTransition, dict[str, str]] = {
+FORMAL_TRANSITION_GRAPH: dict[FormalStateTransition, dict[str, Any]] = {
     FormalStateTransition.RECORD_BF16_GENERATION: {
         "entrypoint_id": "bf16-generator-main",
         "source_stage": "INITIALIZED",
-        "target_stage": "BF16_GENERATION_COMPLETE",
+        "target_stages": ("BF16_GENERATION_COMPLETE",),
     },
     FormalStateTransition.RECORD_BF16_SCORE: {
         "entrypoint_id": "formal-scorer-main",
         "source_stage": "BF16_GENERATION_COMPLETE",
-        "target_stage": "BF16_SCORED",
+        "target_stages": ("BF16_SCORED",),
     },
     FormalStateTransition.RECORD_BF16: {
         "entrypoint_id": "comparison-record-bf16",
         "source_stage": "BF16_SCORED",
-        "target_stage": "BF16_GATE",
+        "target_stages": ("BASELINE", "RECONSTRUCTION", "BF16_GATE"),
     },
     FormalStateTransition.RECORD_QUANT_GENERATION: {
         "entrypoint_id": "quant-generator-dispatch",
         "source_stage": "BF16_GATE",
-        "target_stage": "QUANTIZATION_COMPLETE",
+        "target_stages": ("QUANTIZATION_COMPLETE",),
     },
     FormalStateTransition.RECORD_QUANT_SCORE: {
         "entrypoint_id": "formal-scorer-main",
         "source_stage": "QUANTIZATION_COMPLETE",
-        "target_stage": "QUANT_SCORED",
+        "target_stages": ("QUANT_SCORED",),
     },
     FormalStateTransition.RECORD_QUANT: {
         "entrypoint_id": "comparison-record-quant",
         "source_stage": "QUANT_SCORED",
-        "target_stage": "COMPARABLE",
+        "target_stages": ("QUANTIZATION", "QUANTIZED_EVALUATION", "COMPARABLE"),
     },
     FormalStateTransition.RECORD_SUMMARY: {
         "entrypoint_id": "comparison-summary-main",
         "source_stage": "COMPARABLE",
-        "target_stage": "SUMMARY_COMPLETE",
+        "target_stages": ("SUMMARY_COMPLETE",),
     },
 }
 
@@ -1152,5 +1152,9 @@ def validate_registry() -> None:
     if set(FORMAL_TRANSITION_GRAPH) != set(FormalStateTransition):
         raise ValueError("formal transition graph does not cover the transition enum")
     for transition, graph_row in FORMAL_TRANSITION_GRAPH.items():
-        if not graph_row["source_stage"] or not graph_row["target_stage"]:
+        if (
+            not graph_row["source_stage"]
+            or not graph_row["target_stages"]
+            or not all(graph_row["target_stages"])
+        ):
             raise ValueError(f"incomplete transition graph row: {transition.value}")

@@ -30,6 +30,7 @@ from formal_evidence import (
     verify_state_integrity,
 )
 from manifest_writer_registry import (
+    FORMAL_TRANSITION_GRAPH,
     FormalStateTransition,
     initialize_formal_state,
     transition_formal_state,
@@ -134,6 +135,20 @@ class InitializerFixedStateTests(unittest.TestCase):
 class TransitionAndWriterStageTests(unittest.TestCase):
     TRANSITION_CASES = 7
     WRITER_STAGE_CASES = 6
+    def test_machine_transition_graph_covers_success_and_terminal_failures(self):
+        self.assertEqual(set(FORMAL_TRANSITION_GRAPH), set(FormalStateTransition))
+        self.assertEqual(
+            FORMAL_TRANSITION_GRAPH[
+                FormalStateTransition.RECORD_BF16
+            ]["target_stages"],
+            ("BASELINE", "RECONSTRUCTION", "BF16_GATE"),
+        )
+        self.assertEqual(
+            FORMAL_TRANSITION_GRAPH[
+                FormalStateTransition.RECORD_QUANT
+            ]["target_stages"],
+            ("QUANTIZATION", "QUANTIZED_EVALUATION", "COMPARABLE"),
+        )
     def test_wrong_real_stage_rejects_bf16_and_summary_writers(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
