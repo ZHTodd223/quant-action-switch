@@ -1,0 +1,264 @@
+[
+  {
+    "name": "identity_canonical_positive",
+    "description": "canonical v4 positive",
+    "mutations": {},
+    "expected": {
+      "accepted": true,
+      "reason_code": ""
+    }
+  },
+  {
+    "name": "identity_v4_legacy",
+    "description": "v4 legacy mode",
+    "mutations": {
+      "mode": "legacy"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_MODE_DRIFT"
+    }
+  },
+  {
+    "name": "identity_mode_missing",
+    "description": "mode missing",
+    "mutations": {
+      "delete": "mode"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "identity_missing",
+    "description": "identity missing",
+    "mutations": {
+      "identity": null
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_IDENTITY_MISSING"
+    }
+  },
+  {
+    "name": "registry_path_missing",
+    "description": "registry path missing",
+    "mutations": {
+      "delete": "tool_registry_path"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "registry_hash_missing",
+    "description": "registry hash missing",
+    "mutations": {
+      "delete": "tool_registry_hash"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "registry_hash_format",
+    "description": "malformed hash",
+    "mutations": {
+      "tool_registry_hash": "bad"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "TOOL_REGISTRY_HASH_MISMATCH"
+    }
+  },
+  {
+    "name": "registry_hash_content",
+    "description": "content/hash mismatch",
+    "mutations": {
+      "tool_registry_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "TOOL_REGISTRY_HASH_MISMATCH"
+    }
+  },
+  {
+    "name": "schema_version_mismatch",
+    "description": "schema drift",
+    "mutations": {
+      "schema_version": "v0"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_SCHEMA_VERSION_DRIFT"
+    }
+  },
+  {
+    "name": "implementation_mismatch",
+    "description": "implementation drift",
+    "mutations": {
+      "implementation_version": "old"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_IMPLEMENTATION_DRIFT"
+    }
+  },
+  {
+    "name": "evidence_class_mismatch",
+    "description": "evidence class drift",
+    "mutations": {
+      "evidence_class": "LEGACY_HISTORICAL"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "EVIDENCE_CLASS_DRIFT"
+    }
+  },
+  {
+    "name": "protocol_mismatch",
+    "description": "protocol drift",
+    "mutations": {
+      "protocol_id": "v3"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "PROTOCOL_ID_DRIFT"
+    }
+  },
+  {
+    "name": "response_field_mismatch",
+    "description": "response field drift",
+    "mutations": {
+      "response_field_consumed": "legacy_response"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "RESPONSE_FIELD_DRIFT"
+    }
+  },
+  {
+    "name": "strict_parser_mismatch",
+    "description": "strict parser drift",
+    "mutations": {
+      "strict_parser_version": "v1"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "PARSER_VERSION_DRIFT"
+    }
+  },
+  {
+    "name": "diagnostic_parser_mismatch",
+    "description": "diagnostic parser drift",
+    "mutations": {
+      "diagnostic_parser_version": "v1"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "PARSER_VERSION_DRIFT"
+    }
+  },
+  {
+    "name": "canonicalization_mismatch",
+    "description": "canonicalization drift",
+    "mutations": {
+      "canonicalization_policy": "trim"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "CANONICALIZATION_POLICY_DRIFT"
+    }
+  },
+  {
+    "name": "additional_properties_mismatch",
+    "description": "additional properties drift",
+    "mutations": {
+      "additional_properties_policy": "true"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "ADDITIONAL_PROPERTIES_POLICY_DRIFT"
+    }
+  },
+  {
+    "name": "identity_extra_field",
+    "description": "unknown identity field",
+    "mutations": {
+      "extra": "x"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "legacy_historical",
+    "description": "historical evidence",
+    "mutations": {
+      "evidence_class": "LEGACY_HISTORICAL"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "EVIDENCE_CLASS_DRIFT"
+    }
+  },
+  {
+    "name": "retrospective_diagnostic",
+    "description": "retrospective evidence",
+    "mutations": {
+      "evidence_class": "RETROSPECTIVE_DIAGNOSTIC"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "EVIDENCE_CLASS_DRIFT"
+    }
+  },
+  {
+    "name": "identity_unknown",
+    "description": "unknown evidence",
+    "mutations": {
+      "evidence_class": "IDENTITY_UNKNOWN"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "EVIDENCE_CLASS_DRIFT"
+    }
+  },
+  {
+    "name": "python_api_bypass",
+    "description": "Python API legacy bypass",
+    "mutations": {
+      "mode": "legacy"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_MODE_DRIFT"
+    }
+  },
+  {
+    "name": "state_metrics_mismatch",
+    "description": "state and metrics mismatch",
+    "mutations": {
+      "scope": "state_metrics"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "manifest_state_mismatch",
+    "description": "manifest and state mismatch",
+    "mutations": {
+      "scope": "manifest_state"
+    },
+    "expected": {
+      "accepted": false,
+      "reason_code": "SCORER_IDENTITY_MISMATCH"
+    }
+  }
+]

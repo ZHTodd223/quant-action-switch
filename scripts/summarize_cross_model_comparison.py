@@ -24,6 +24,7 @@ from comparison_eligibility import (
 from canonical_tool_schema import scorer_identity
 from scorer_identity import ScorerIdentityError, validate_scorer_identity
 from model_state_attestation import verify_output_manifest
+from summary_contamination import reason_from_error
 
 
 class NativeEvidenceError(ValueError):
@@ -161,10 +162,10 @@ def summarize(
     ]
     included_runs = [model["run_id"] for model in models if model["quantization_effect_included"]]
     excluded_runs = [
-        {"run_id": model["run_id"], "reason_code": ("LEGACY_EVIDENCE_NOT_CANONICAL" if model["legacy_compatibility"] else "SCORER_IDENTITY_MISMATCH" if model["state_origin"] == "native_v4" else "IDENTITY_UNKNOWN"), "details": [model.get("blocking_reason", "")]}
+        {"run_id": model["run_id"], "reason_code": ("LEGACY_EVIDENCE_NOT_CANONICAL" if model["legacy_compatibility"] else "NOT_COMPARABLE" if model["comparison_status"] != ComparisonStatus.COMPARABLE else "IDENTITY_UNKNOWN_NOT_CANONICAL"), "details": [model.get("blocking_reason", "")]}
         for model in models if not model["quantization_effect_included"]
     ] + [
-        {"run_id": item.get("run_id", ""), "reason_code": "SCORER_IDENTITY_MISMATCH", "details": [item.get("reason", item.get("error", ""))]}
+        {"run_id": item.get("run_id", ""), "reason_code": reason_from_error(item.get("reason", item.get("error", ""))), "details": [item.get("reason", item.get("error", ""))]}
         for item in invalid_evidence_runs + invalid_state_runs
     ]
     return {

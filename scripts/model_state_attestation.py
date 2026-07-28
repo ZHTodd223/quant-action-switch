@@ -1492,7 +1492,7 @@ def write_output_manifest(
     *,
     attestation_hash: str,
     case_manifest_hash: str,
-    scorer_identity_value: Mapping[str, Any] | None = None,
+    scorer_identity_value: Mapping[str, Any],
 ) -> tuple[Path, str]:
     manifest_path = output.with_suffix(output.suffix + ".manifest.json")
     payload = {
@@ -1503,11 +1503,10 @@ def write_output_manifest(
         "model_state_attestation_hash": attestation_hash,
         "case_manifest_hash": case_manifest_hash,
     }
-    if scorer_identity_value is not None:
-        identity = validate_scorer_identity(scorer_identity_value)
-        payload["scorer_identity"] = identity
-        payload["scorer_identity_sha256"] = hash_scorer_identity(identity)
-        payload["tool_registry"] = {"path": identity["tool_registry_path"], "sha256": identity["tool_registry_hash"]}
+    identity = validate_scorer_identity(scorer_identity_value)
+    payload["scorer_identity"] = identity
+    payload["scorer_identity_sha256"] = hash_scorer_identity(identity)
+    payload["tool_registry"] = {"path": identity["tool_registry_path"], "sha256": identity["tool_registry_hash"]}
     encoded = (
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
@@ -1542,7 +1541,10 @@ def verify_output_manifest(
         identity = validate_scorer_identity(payload.get("scorer_identity", {}), expected=expected_scorer_identity)
         if payload.get("scorer_identity_sha256") != hash_scorer_identity(identity):
             raise ValueError("SCORER_IDENTITY_MISMATCH: output manifest scorer identity hash mismatch")
-        if payload.get("tool_registry", {}).get("sha256") != identity["tool_registry_hash"]:
+        registry = payload.get("tool_registry", {})
+        if registry.get("path") != identity["tool_registry_path"]:
+            raise ValueError("TOOL_REGISTRY_HASH_MISMATCH: output manifest registry path binding mismatch")
+        if registry.get("sha256") != identity["tool_registry_hash"]:
             raise ValueError("TOOL_REGISTRY_HASH_MISMATCH: output manifest registry binding mismatch")
     return payload
 

@@ -1,0 +1,374 @@
+[
+  {
+    "name": "summary_canonical_included",
+    "description": "canonical included",
+    "mutations": {},
+    "expected": {
+      "included": true,
+      "reason_code": ""
+    }
+  },
+  {
+    "name": "summary_legacy_evidence",
+    "description": "legacy evidence",
+    "mutations": {
+      "evidence_class": "LEGACY_HISTORICAL"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "LEGACY_EVIDENCE_NOT_CANONICAL"
+    }
+  },
+  {
+    "name": "summary_retrospective_evidence",
+    "description": "retrospective evidence",
+    "mutations": {
+      "evidence_class": "RETROSPECTIVE_DIAGNOSTIC"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "RETROSPECTIVE_EVIDENCE_NOT_FORMAL"
+    }
+  },
+  {
+    "name": "summary_identity_unknown",
+    "description": "identity unknown",
+    "mutations": {
+      "evidence_class": "IDENTITY_UNKNOWN"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "IDENTITY_UNKNOWN_NOT_CANONICAL"
+    }
+  },
+  {
+    "name": "summary_development_evidence",
+    "description": "development evidence",
+    "mutations": {
+      "evidence_class": "DEVELOPMENT_ONLY"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "DEVELOPMENT_EVIDENCE_NOT_FORMAL"
+    }
+  },
+  {
+    "name": "summary_state_canonical_bf16_legacy",
+    "description": "state canonical bf16 legacy",
+    "mutations": {
+      "identity_scope": "bf16"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ARM_SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_state_canonical_quant_legacy",
+    "description": "state canonical quant legacy",
+    "mutations": {
+      "identity_scope": "quant"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ARM_SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_state_legacy_metrics_canonical",
+    "description": "state legacy metrics canonical",
+    "mutations": {
+      "identity_scope": "state_metrics"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "STATE_METRICS_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_bf16_canonical_quant_legacy",
+    "description": "bf16 canonical quant legacy",
+    "mutations": {
+      "identity_scope": "bf16_quant"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ARM_SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_bf16_legacy_quant_canonical",
+    "description": "bf16 legacy quant canonical",
+    "mutations": {
+      "identity_scope": "quant_bf16"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ARM_SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_state_bf16_mismatch",
+    "description": "state bf16 mismatch",
+    "mutations": {
+      "identity_scope": "state_bf16"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ARM_SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_state_quant_mismatch",
+    "description": "state quant mismatch",
+    "mutations": {
+      "identity_scope": "state_quant"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ARM_SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_bf16_quant_mismatch",
+    "description": "bf16 quant mismatch",
+    "mutations": {
+      "identity_scope": "bf16_quant"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ARM_SCORER_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_registry_hash_drift",
+    "description": "registry hash drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "tool_registry_hash"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "TOOL_REGISTRY_HASH_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_schema_version_drift",
+    "description": "schema version drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "schema_version"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "SCORER_SCHEMA_VERSION_DRIFT"
+    }
+  },
+  {
+    "name": "summary_implementation_drift",
+    "description": "implementation drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "implementation_version"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "SCORER_IMPLEMENTATION_DRIFT"
+    }
+  },
+  {
+    "name": "summary_strict_parser_drift",
+    "description": "strict parser drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "strict_parser_version"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "PARSER_VERSION_DRIFT"
+    }
+  },
+  {
+    "name": "summary_diagnostic_parser_drift",
+    "description": "diagnostic parser drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "diagnostic_parser_version"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "PARSER_VERSION_DRIFT"
+    }
+  },
+  {
+    "name": "summary_response_field_drift",
+    "description": "response field drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "response_field_consumed"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "RESPONSE_FIELD_DRIFT"
+    }
+  },
+  {
+    "name": "summary_canonicalization_drift",
+    "description": "canonicalization drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "canonicalization_policy"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "CANONICALIZATION_POLICY_DRIFT"
+    }
+  },
+  {
+    "name": "summary_additional_properties_drift",
+    "description": "additional properties drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "additional_properties_policy"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ADDITIONAL_PROPERTIES_POLICY_DRIFT"
+    }
+  },
+  {
+    "name": "summary_protocol_id_drift",
+    "description": "protocol id drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "protocol_id"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "PROTOCOL_ID_DRIFT"
+    }
+  },
+  {
+    "name": "summary_evidence_class_drift",
+    "description": "evidence class drift",
+    "mutations": {
+      "identity_scope": "state",
+      "identity_field": "evidence_class"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "EVIDENCE_CLASS_DRIFT"
+    }
+  },
+  {
+    "name": "summary_manifest_identity_missing",
+    "description": "manifest identity missing",
+    "mutations": {
+      "manifest": "identity_missing"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "MANIFEST_IDENTITY_MISSING"
+    }
+  },
+  {
+    "name": "summary_manifest_identity_hash_wrong",
+    "description": "manifest identity hash wrong",
+    "mutations": {
+      "manifest": "identity_hash_mismatch"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "MANIFEST_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_manifest_registry_wrong",
+    "description": "manifest registry wrong",
+    "mutations": {
+      "manifest": "registry_hash_mismatch"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "MANIFEST_REGISTRY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_manifest_metrics_mismatch",
+    "description": "manifest metrics mismatch",
+    "mutations": {
+      "manifest": "metrics_mismatch"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "MANIFEST_IDENTITY_MISMATCH"
+    }
+  },
+  {
+    "name": "summary_manifest_verification_failed",
+    "description": "manifest verification failed",
+    "mutations": {
+      "manifest": "verification_failed"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "MANIFEST_VERIFICATION_FAILED"
+    }
+  },
+  {
+    "name": "summary_retrospective_sidecar_formal",
+    "description": "retrospective sidecar formal",
+    "mutations": {
+      "formal_metrics_source": "retrospective_sidecar"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "RETROSPECTIVE_SIDECAR_NOT_FORMAL"
+    }
+  },
+  {
+    "name": "summary_stale_summary_cache",
+    "description": "stale summary cache",
+    "mutations": {
+      "summary_cache_stale": true
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "SUMMARY_CACHE_STALE"
+    }
+  },
+  {
+    "name": "summary_p01_not_comparable",
+    "description": "p01 not comparable",
+    "mutations": {
+      "comparison_status": "NOT_ELIGIBLE"
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "NOT_COMPARABLE"
+    }
+  },
+  {
+    "name": "summary_p03_attestation_invalid",
+    "description": "p03 attestation invalid",
+    "mutations": {
+      "attestation_valid": false
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "ATTESTATION_INVALID"
+    }
+  },
+  {
+    "name": "summary_p02_diagnostic_only",
+    "description": "p02 diagnostic only",
+    "mutations": {
+      "strict_whole_response_valid": false,
+      "first_object_recoverable": true
+    },
+    "expected": {
+      "included": false,
+      "reason_code": "NOT_COMPARABLE"
+    }
+  }
+]

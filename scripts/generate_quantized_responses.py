@@ -282,6 +282,7 @@ def main() -> None:
         args.output,
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],
+        scorer_identity_value=context["state"]["scorer"],
     )
     print(
         json.dumps(
