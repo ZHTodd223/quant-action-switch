@@ -64,6 +64,8 @@ def model_configuration(config: dict[str, Any], model_id: str) -> dict[str, Any]
 
 
 def init_run(args: argparse.Namespace) -> None:
+    if hasattr(args, "invoke"):
+        return args.invoke("comparison-init")
     config = load_object(args.config)
     protocol = load_object(args.protocol)
     if config.get("protocol_id") != PROTOCOL_ID or protocol.get("protocol_id") != PROTOCOL_ID:
@@ -305,6 +307,8 @@ def _record_runtime_evidence(
 
 
 def record_bf16(args: argparse.Namespace) -> None:
+    if hasattr(args, "invoke"):
+        return args.invoke("comparison-record-bf16")
     state = load_object(args.state)
     validate_comparison_state_schema(state)
     protocol = load_object(args.protocol)
@@ -329,6 +333,8 @@ def record_bf16(args: argparse.Namespace) -> None:
 
 
 def record_quantized(args: argparse.Namespace) -> None:
+    if hasattr(args, "invoke"):
+        return args.invoke("comparison-record-quant")
     state = load_object(args.state)
     protocol = load_object(args.protocol)
     gate = load_object(args.gate_decision)

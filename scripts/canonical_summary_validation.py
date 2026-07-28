@@ -15,8 +15,11 @@ from comparison_eligibility import (
     validate_comparison_state_schema,
 )
 from formal_evidence import (
+    FormalRunContext,
     FormalEvidenceError,
+    load_and_verify_formal_run_context,
     validate_formal_metrics,
+    verify_metrics_against_raw,
     verify_metrics_binding,
     verify_state_integrity,
 )
@@ -129,6 +132,7 @@ def _validate_arm(
     *,
     prefix: str,
     identity: dict[str, Any],
+    context: FormalRunContext,
 ) -> dict[str, Any]:
     run_id = str(state.get("run_id", ""))
     metrics_field = (
@@ -186,7 +190,7 @@ def _validate_arm(
         text = str(error)
         lowered = text.lower()
         code = (
-            "RAW_HASH_MISMATCH"
+            "RAW_OUTPUT_HASH_MISMATCH"
             if "response output hash mismatch" in lowered
             else "MANIFEST_IDENTITY_MISMATCH"
             if "identity" in lowered
@@ -207,14 +211,21 @@ def _validate_arm(
             f"{prefix} manifest raw output path differs from state",
         )
     try:
-        verify_metrics_binding(manifest, metrics_path)
         metrics = _read_object(metrics_path, run_id, "FORMAL_METRICS_MISSING")
-        return validate_formal_metrics(
+        validated = validate_formal_metrics(
             metrics,
             expected_identity=identity,
             expected_raw_path=raw_path,
             expected_raw_sha256=str(manifest["output_sha256"]),
+            expected_context=context,
         )
+        verify_metrics_binding(manifest, metrics_path)
+        verify_metrics_against_raw(
+            validated,
+            raw_path=raw_path,
+            context=context,
+        )
+        return validated
     except FormalEvidenceError as error:
         _exclude(run_id, error.code, error.detail, error)
 
@@ -246,16 +257,30 @@ def validate_run_for_canonical_summary(state_path: Path) -> dict[str, Any]:
     _validate_attestation(state_path, state, prefix="bf16")
     _validate_attestation(state_path, state, prefix="quant")
     try:
-        identity = validate_scorer_identity(
-            state.get("scorer", {}), expected=scorer_identity()
+        context = load_and_verify_formal_run_context(
+            state_path,
+            entrypoint_id="formal-scorer-main",
         )
+        identity = validate_scorer_identity(
+            context.scorer_identity, expected=scorer_identity()
+        )
+    except FormalEvidenceError as error:
+        _exclude(run_id, error.code, error.detail, error)
     except ScorerIdentityError as error:
         _exclude(run_id, error.code, str(error), error)
     bf16_metrics = _validate_arm(
-        state_path, state, prefix="bf16", identity=identity
+        state_path,
+        state,
+        prefix="bf16",
+        identity=identity,
+        context=context,
     )
     quant_metrics = _validate_arm(
-        state_path, state, prefix="quant", identity=identity
+        state_path,
+        state,
+        prefix="quant",
+        identity=identity,
+        context=context,
     )
     bf16_identity = bf16_metrics.get("scorer_identity")
     quant_identity = quant_metrics.get("scorer_identity")

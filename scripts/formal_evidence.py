@@ -4,8 +4,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from case_schema import loads_json_strict
 from comparison_eligibility import sha256_file
@@ -13,9 +17,23 @@ from scorer_identity import hash_scorer_identity, validate_scorer_identity
 
 FORMAL_METRICS_KIND = "FORMAL_CANONICAL_METRICS"
 FORMAL_METRICS_SCHEMA = "formal-canonical-metrics-v1"
-FORMAL_METRIC_SOURCE = "strict_whole_response_valid+canonical_schema_valid+exact_call"
-FORMAL_METRIC_VERSION = "p0-2-strict-formal-v1"
+FORMAL_METRIC_SOURCE = (
+    "production_row_results:"
+    "strict_whole_response_valid+canonical_schema_valid+exact_call"
+)
+FORMAL_METRIC_VERSION = "p0-2-strict-formal-v2"
+FORMAL_PRODUCER_VERSION = "production-canonical-scorer-v1"
 STATE_HASH_SUFFIX = ".sha256"
+
+NONFORMAL_PROVENANCE_FIELDS = frozenset(
+    {
+        "source_historical_metrics_path",
+        "source_legacy_metrics_path",
+        "historical_source",
+        "development_only",
+        "identity_unknown",
+    }
+)
 
 
 class FormalEvidenceError(ValueError):
@@ -23,6 +41,19 @@ class FormalEvidenceError(ValueError):
         super().__init__(f"{code}: {message}")
         self.code = code
         self.detail = message
+
+
+@dataclass(frozen=True)
+class FormalRunContext:
+    protocol_id: str
+    run_id: str
+    state_path: Path
+    state_sha256: str
+    scorer_identity: dict[str, Any]
+    scorer_identity_sha256: str
+    registry_path: Path
+    registry_sha256: str
+    entrypoint_id: str
 
 
 def canonical_json_hash(value: Mapping[str, Any]) -> str:
@@ -36,9 +67,7 @@ def state_hash_path(state_path: Path) -> Path:
     return state_path.with_suffix(state_path.suffix + STATE_HASH_SUFFIX)
 
 
-def write_state_with_integrity(state_path: Path, state: Mapping[str, Any]) -> str:
-    """Atomically write a state and its detached content hash."""
-
+def _atomic_write_state(state_path: Path, state: Mapping[str, Any]) -> str:
     encoded = (
         json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
@@ -54,11 +83,68 @@ def write_state_with_integrity(state_path: Path, state: Mapping[str, Any]) -> st
     return digest
 
 
-def write_summary_with_integrity(
-    summary_path: Path, summary: Mapping[str, Any]
+def write_state_with_integrity(
+    state_path: Path,
+    state: Mapping[str, Any],
+    *,
+    _formal_capability: Any = None,
 ) -> str:
-    """Write a recomputable summary plus a hash of its fully verified inputs."""
+    """Write a state; native-v4 states require a registered writer capability."""
 
+    if state.get("state_origin") == "native_v4":
+        from manifest_writer_registry import (
+            require_formal_write_capability,
+            validate_formal_creation_record,
+        )
+
+        creation = state.get("formal_creation")
+        entrypoint_id = (
+            str(creation.get("entrypoint_id", ""))
+            if isinstance(creation, Mapping)
+            else ""
+        )
+        require_formal_write_capability(
+            _formal_capability,
+            entrypoint_id=entrypoint_id,
+            writer_id="comparison-state-integrity-writer",
+        )
+        validate_formal_creation_record(
+            creation,
+            writer_id="comparison-state-integrity-writer",
+            target_path=state_path,
+        )
+    return _atomic_write_state(state_path, state)
+
+
+def write_summary_with_integrity(
+    summary_path: Path,
+    summary: Mapping[str, Any],
+    *,
+    _formal_capability: Any = None,
+) -> str:
+    """Write a verified summary through the registered summary entrypoint."""
+
+    from manifest_writer_registry import (
+        require_formal_write_capability,
+        validate_formal_creation_record,
+    )
+
+    creation = summary.get("formal_creation")
+    entrypoint_id = (
+        str(creation.get("entrypoint_id", ""))
+        if isinstance(creation, Mapping)
+        else ""
+    )
+    require_formal_write_capability(
+        _formal_capability,
+        entrypoint_id=entrypoint_id,
+        writer_id="comparison-summary-integrity-writer",
+    )
+    validate_formal_creation_record(
+        creation,
+        writer_id="comparison-summary-integrity-writer",
+        target_path=summary_path,
+    )
     encoded = (
         json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
@@ -90,54 +176,269 @@ def verify_state_integrity(state_path: Path) -> dict[str, Any]:
         value = loads_json_strict(state_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
         raise FormalEvidenceError(
-            "MANIFEST_VERIFICATION_FAILED", f"comparison state is invalid: {error}"
+            "MANIFEST_VERIFICATION_FAILED",
+            f"comparison state is invalid: {error}",
         ) from error
     if not isinstance(value, dict):
         raise FormalEvidenceError(
             "MANIFEST_VERIFICATION_FAILED", "comparison state is not an object"
         )
+    if value.get("state_origin") == "native_v4":
+        from manifest_writer_registry import validate_formal_creation_record
+
+        try:
+            validate_formal_creation_record(
+                value.get("formal_creation"),
+                writer_id="comparison-state-integrity-writer",
+                target_path=state_path,
+            )
+        except ValueError as error:
+            code = str(error).split(":", 1)[0]
+            raise FormalEvidenceError(code, str(error)) from error
     return value
 
 
-def add_formal_metrics_metadata(
-    summary: dict[str, Any],
+def load_and_verify_formal_run_context(
+    state_path: Path,
     *,
-    identity: Mapping[str, Any],
-    source_raw_path: str,
-    source_raw_sha256: str,
-    exact_call_count: int,
-    total_count: int,
-    strict_valid_count: int,
-    schema_valid_count: int,
+    entrypoint_id: str,
+) -> FormalRunContext:
+    """Construct a formal context only from an integrity-locked native-v4 state."""
+
+    state = verify_state_integrity(state_path)
+    from canonical_tool_schema import scorer_identity
+    from comparison_eligibility import PROTOCOL_ID, validate_comparison_state_schema
+    from manifest_writer_registry import formal_entrypoints, load_formal_entrypoint_callable
+
+    try:
+        validate_comparison_state_schema(state)
+    except (TypeError, ValueError) as error:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID", str(error)
+        ) from error
+    if state.get("state_origin") != "native_v4" or state.get("protocol_id") != PROTOCOL_ID:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID",
+            "formal context requires a native-v4 state",
+        )
+    entrypoints = [row for row in formal_entrypoints() if row["id"] == entrypoint_id]
+    if len(entrypoints) != 1:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_UNREGISTERED", entrypoint_id
+        )
+    try:
+        load_formal_entrypoint_callable(entrypoints[0])
+        identity = validate_scorer_identity(
+            state.get("scorer", {}), expected=scorer_identity()
+        )
+    except ValueError as error:
+        code = getattr(error, "code", "FORMAL_ENTRYPOINT_CONTEXT_INVALID")
+        raise FormalEvidenceError(code, str(error)) from error
+    registry_path = (
+        Path(__file__).resolve().parents[1] / identity["tool_registry_path"]
+    ).resolve()
+    from canonical_tool_schema import registry_hash
+
+    registry_sha256 = registry_hash()
+    if registry_sha256 != identity["tool_registry_hash"]:
+        raise FormalEvidenceError(
+            "TOOL_REGISTRY_HASH_MISMATCH",
+            "formal context registry differs from scorer identity",
+        )
+    return FormalRunContext(
+        protocol_id=PROTOCOL_ID,
+        run_id=str(state["run_id"]),
+        state_path=state_path.resolve(),
+        state_sha256=sha256_file(state_path),
+        scorer_identity=identity,
+        scorer_identity_sha256=hash_scorer_identity(identity),
+        registry_path=registry_path,
+        registry_sha256=registry_sha256,
+        entrypoint_id=entrypoint_id,
+    )
+
+
+def _provenance_error(metrics: Mapping[str, Any]) -> FormalEvidenceError | None:
+    if metrics.get("retrospective") is True:
+        return FormalEvidenceError(
+            "RETROSPECTIVE_EVIDENCE_NOT_FORMAL",
+            "retrospective evidence cannot be promoted",
+        )
+    if metrics.get("formal_gate_effect") is False:
+        return FormalEvidenceError(
+            "DIAGNOSTIC_METRICS_NOT_FORMAL",
+            "diagnostic evidence cannot be promoted",
+        )
+    if metrics.get("metrics_kind") == "RETROSPECTIVE_DIAGNOSTIC":
+        return FormalEvidenceError(
+            "RETROSPECTIVE_EVIDENCE_NOT_FORMAL",
+            "retrospective metrics kind cannot be promoted",
+        )
+    if metrics.get("evidence_class") in {
+        "RETROSPECTIVE_CANONICAL_DIAGNOSTIC",
+        "DEVELOPMENT_ONLY",
+        "LEGACY_HISTORICAL",
+        "IDENTITY_UNKNOWN",
+    }:
+        return FormalEvidenceError(
+            "EVIDENCE_CLASS_UPGRADE_FORBIDDEN",
+            f"{metrics.get('evidence_class')} cannot be promoted to CANONICAL_V4",
+        )
+    present = sorted(NONFORMAL_PROVENANCE_FIELDS & set(metrics))
+    if present:
+        return FormalEvidenceError(
+            "EVIDENCE_PROVENANCE_NOT_FORMAL",
+            "non-formal provenance fields are present: " + ", ".join(present),
+        )
+    return None
+
+
+def add_formal_metrics_metadata(*args, **kwargs) -> dict[str, Any]:
+    """Removed unsafe API: arbitrary dictionaries cannot be upgraded to formal."""
+
+    raise FormalEvidenceError(
+        "EVIDENCE_CLASS_UPGRADE_FORBIDDEN",
+        "formal metrics must be built from production-scored row results",
+    )
+
+
+def compute_formal_aggregate(
+    row_results: Sequence[Mapping[str, Any]],
+) -> dict[str, int | float]:
+    """The single deterministic formal aggregate implementation."""
+
+    if not isinstance(row_results, Sequence) or isinstance(
+        row_results, (str, bytes)
+    ):
+        raise FormalEvidenceError(
+            "FORMAL_ROW_RESULTS_MISSING", "row_results must be an array"
+        )
+    case_ids: set[str] = set()
+    counts = {
+        "total": 0,
+        "strict_whole_response_valid": 0,
+        "canonical_schema_valid": 0,
+        "exact_call": 0,
+    }
+    for number, row in enumerate(row_results, 1):
+        if not isinstance(row, Mapping):
+            raise FormalEvidenceError(
+                "FORMAL_ROW_INVARIANT_VIOLATION",
+                f"row {number} is not an object",
+            )
+        case_id = row.get("case_id")
+        if not isinstance(case_id, str) or not case_id or case_id in case_ids:
+            raise FormalEvidenceError(
+                "FORMAL_ROW_INVARIANT_VIOLATION",
+                f"row {number} has a missing or duplicate case_id",
+            )
+        case_ids.add(case_id)
+        diagnostics = row.get("parser_diagnostics_v2")
+        if not isinstance(diagnostics, Mapping):
+            raise FormalEvidenceError(
+                "FORMAL_ROW_INVARIANT_VIOLATION",
+                f"row {case_id} lacks parser_diagnostics_v2",
+            )
+        values = {}
+        for field in (
+            "strict_whole_response_valid",
+            "canonical_schema_valid",
+            "exact_call",
+        ):
+            value = diagnostics.get(field)
+            if type(value) is not bool:
+                raise FormalEvidenceError(
+                    "FORMAL_ROW_INVARIANT_VIOLATION",
+                    f"row {case_id} {field} must be boolean",
+                )
+            values[field] = value
+        if values["exact_call"] and not (
+            values["canonical_schema_valid"]
+            and values["strict_whole_response_valid"]
+        ):
+            raise FormalEvidenceError(
+                "FORMAL_ROW_INVARIANT_VIOLATION",
+                f"row {case_id} exact_call violates strict/schema dependency",
+            )
+        if values["canonical_schema_valid"] and not values[
+            "strict_whole_response_valid"
+        ]:
+            raise FormalEvidenceError(
+                "FORMAL_ROW_INVARIANT_VIOLATION",
+                f"row {case_id} schema success is not strict whole-response valid",
+            )
+        counts["total"] += 1
+        for field, value in values.items():
+            counts[field] += int(value)
+    return counts | {
+        "exact_call_rate": (
+            counts["exact_call"] / counts["total"] if counts["total"] else 0.0
+        )
+    }
+
+
+def build_formal_metrics_from_scored_rows(
+    summary: Mapping[str, Any],
+    *,
+    row_results: Sequence[Mapping[str, Any]],
+    context: FormalRunContext,
+    source_raw_path: Path,
 ) -> dict[str, Any]:
-    locked = validate_scorer_identity(identity)
-    summary.update(
+    """Build formal metrics only from production scorer row results and context."""
+
+    provenance_error = _provenance_error(summary)
+    if provenance_error is not None:
+        raise provenance_error
+    if context.entrypoint_id != "formal-scorer-main":
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID",
+            "formal metrics require the formal scorer entrypoint",
+        )
+    raw_path = source_raw_path.resolve()
+    if not raw_path.is_file():
+        raise FormalEvidenceError(
+            "RAW_OUTPUT_HASH_MISMATCH", f"formal raw input is missing: {raw_path}"
+        )
+    identity = validate_scorer_identity(context.scorer_identity)
+    rows = [dict(row) for row in row_results]
+    aggregate = compute_formal_aggregate(rows)
+    row_hash = canonical_json_hash({"row_results": rows})
+    aggregate_hash = canonical_json_hash({"formal_aggregate": aggregate})
+    result = dict(summary)
+    result.update(
         {
             "metrics_schema_version": FORMAL_METRICS_SCHEMA,
             "metrics_kind": FORMAL_METRICS_KIND,
             "evidence_class": "CANONICAL_V4",
             "retrospective": False,
             "formal_gate_effect": True,
-            "scorer_identity": locked,
-            "scorer_identity_sha256": hash_scorer_identity(locked),
-            "source_raw_path": source_raw_path,
-            "source_raw_sha256": source_raw_sha256,
+            "scorer_identity": identity,
+            "scorer_identity_sha256": hash_scorer_identity(identity),
+            "source_raw_path": str(raw_path),
+            "source_raw_sha256": sha256_file(raw_path),
             "formal_metric_source": FORMAL_METRIC_SOURCE,
             "formal_metric_version": FORMAL_METRIC_VERSION,
             "strict_required": True,
             "diagnostic_only": False,
-            "formal_aggregate": {
-                "total": total_count,
-                "strict_whole_response_valid": strict_valid_count,
-                "canonical_schema_valid": schema_valid_count,
-                "exact_call": exact_call_count,
-                "exact_call_rate": (
-                    exact_call_count / total_count if total_count else 0.0
-                ),
+            "row_results": rows,
+            "formal_aggregate": aggregate,
+            "producer": {
+                "kind": "PRODUCTION_CANONICAL_SCORER",
+                "implementation_version": FORMAL_PRODUCER_VERSION,
+                "protocol_id": context.protocol_id,
+                "formal_run_id": context.run_id,
+                "formal_state_path": str(context.state_path),
+                "formal_state_sha256": context.state_sha256,
+                "raw_sha256": sha256_file(raw_path),
+                "row_results_sha256": row_hash,
+                "formal_aggregate_sha256": aggregate_hash,
+                "formal_entrypoint_id": context.entrypoint_id,
+                "scorer_identity_sha256": context.scorer_identity_sha256,
+                "registry_sha256": context.registry_sha256,
             },
         }
     )
-    return summary
+    return result
 
 
 def validate_formal_metrics(
@@ -146,33 +447,33 @@ def validate_formal_metrics(
     expected_identity: Mapping[str, Any],
     expected_raw_path: Path,
     expected_raw_sha256: str,
+    expected_context: FormalRunContext | None = None,
 ) -> dict[str, Any]:
+    provenance_error = _provenance_error(metrics)
+    if provenance_error is not None:
+        raise provenance_error
     if metrics.get("retrospective") is not False:
         raise FormalEvidenceError(
-            "RETROSPECTIVE_EVIDENCE_NOT_FORMAL",
-            "metrics are retrospective or omit retrospective=false",
+            "FORMAL_METRICS_MISSING", "formal retrospective=false is missing"
         )
     if metrics.get("formal_gate_effect") is not True:
         raise FormalEvidenceError(
             "DIAGNOSTIC_METRICS_NOT_FORMAL",
             "metrics do not declare formal_gate_effect=true",
         )
-    if metrics.get("metrics_kind") != FORMAL_METRICS_KIND:
+    if (
+        metrics.get("metrics_kind") != FORMAL_METRICS_KIND
+        or metrics.get("metrics_schema_version") != FORMAL_METRICS_SCHEMA
+    ):
         raise FormalEvidenceError(
-            "FORMAL_METRICS_MISSING", "formal metrics kind is missing or invalid"
-        )
-    if metrics.get("metrics_schema_version") != FORMAL_METRICS_SCHEMA:
-        raise FormalEvidenceError(
-            "FORMAL_METRICS_MISSING", "formal metrics schema version is invalid"
+            "FORMAL_METRICS_MISSING",
+            "formal metrics kind/schema is missing or invalid",
         )
     if metrics.get("evidence_class") != "CANONICAL_V4":
-        code = {
-            "LEGACY_HISTORICAL": "LEGACY_EVIDENCE_NOT_CANONICAL",
-            "RETROSPECTIVE_CANONICAL_DIAGNOSTIC": "RETROSPECTIVE_EVIDENCE_NOT_FORMAL",
-            "DEVELOPMENT_ONLY": "DEVELOPMENT_EVIDENCE_NOT_FORMAL",
-            "IDENTITY_UNKNOWN": "IDENTITY_UNKNOWN_NOT_CANONICAL",
-        }.get(str(metrics.get("evidence_class")), "IDENTITY_UNKNOWN_NOT_CANONICAL")
-        raise FormalEvidenceError(code, "metrics evidence class is not CANONICAL_V4")
+        raise FormalEvidenceError(
+            "EVIDENCE_CLASS_UPGRADE_FORBIDDEN",
+            "formal metrics evidence class is not CANONICAL_V4",
+        )
     if (
         metrics.get("formal_metric_source") != FORMAL_METRIC_SOURCE
         or metrics.get("formal_metric_version") != FORMAL_METRIC_VERSION
@@ -180,7 +481,7 @@ def validate_formal_metrics(
         or metrics.get("diagnostic_only") is not False
     ):
         raise FormalEvidenceError(
-            "DIAGNOSTIC_METRICS_NOT_FORMAL",
+            "FORMAL_METRICS_MISSING",
             "strict formal metric declaration is missing or invalid",
         )
     identity_value = metrics.get("scorer_identity", metrics.get("scorer"))
@@ -201,66 +502,168 @@ def validate_formal_metrics(
         raise FormalEvidenceError(
             "METRICS_MANIFEST_MISMATCH", "metrics source raw path mismatch"
         )
-    if metrics.get("source_raw_sha256") != expected_raw_sha256:
-        raise FormalEvidenceError(
-            "METRICS_HASH_MISMATCH", "metrics source raw hash mismatch"
-        )
-    aggregate = metrics.get("formal_aggregate")
-    required = {
-        "total",
-        "strict_whole_response_valid",
-        "canonical_schema_valid",
-        "exact_call",
-        "exact_call_rate",
-    }
-    if not isinstance(aggregate, Mapping) or set(aggregate) != required:
-        raise FormalEvidenceError(
-            "FORMAL_METRICS_MISSING", "formal aggregate is missing or incomplete"
-        )
-    for field in required - {"exact_call_rate"}:
-        if type(aggregate[field]) is not int or aggregate[field] < 0:
-            raise FormalEvidenceError(
-                "FORMAL_METRICS_MISSING", f"formal aggregate {field} is invalid"
-            )
-    total = aggregate["total"]
-    if any(aggregate[field] > total for field in required - {"total", "exact_call_rate"}):
-        raise FormalEvidenceError(
-            "STRICT_FORMAL_REQUIREMENT_FAILED",
-            "formal aggregate counts exceed total",
-        )
     if (
-        aggregate["exact_call"] > aggregate["strict_whole_response_valid"]
-        or aggregate["exact_call"] > aggregate["canonical_schema_valid"]
+        metrics.get("source_raw_sha256") != expected_raw_sha256
+        or sha256_file(expected_raw_path) != expected_raw_sha256
     ):
         raise FormalEvidenceError(
-            "STRICT_FORMAL_REQUIREMENT_FAILED",
-            "exact calls are not a subset of strict schema-valid responses",
+            "RAW_OUTPUT_HASH_MISMATCH", "metrics/raw content hash mismatch"
         )
-    expected_rate = aggregate["exact_call"] / total if total else 0.0
-    if type(aggregate["exact_call_rate"]) not in {int, float} or abs(
-        float(aggregate["exact_call_rate"]) - expected_rate
-    ) > 1e-12:
+    rows = metrics.get("row_results")
+    if not isinstance(rows, list):
         raise FormalEvidenceError(
-            "STRICT_FORMAL_REQUIREMENT_FAILED",
-            "formal exact-call rate is inconsistent",
+            "FORMAL_ROW_RESULTS_MISSING", "formal row_results are missing"
         )
+    recomputed = compute_formal_aggregate(rows)
+    aggregate = metrics.get("formal_aggregate")
+    if not isinstance(aggregate, Mapping):
+        raise FormalEvidenceError(
+            "FORMAL_METRICS_MISSING", "formal aggregate is missing"
+        )
+    if dict(aggregate) != recomputed:
+        raise FormalEvidenceError(
+            "FORMAL_AGGREGATE_MISMATCH",
+            "stored formal aggregate differs from deterministic row aggregate",
+        )
+    producer = metrics.get("producer")
+    if not isinstance(producer, Mapping):
+        raise FormalEvidenceError(
+            "FORMAL_METRICS_MISSING", "production scorer receipt is missing"
+        )
+    expected_producer = {
+        "kind": "PRODUCTION_CANONICAL_SCORER",
+        "implementation_version": FORMAL_PRODUCER_VERSION,
+        "protocol_id": identity["protocol_id"],
+        "raw_sha256": expected_raw_sha256,
+        "row_results_sha256": canonical_json_hash({"row_results": rows}),
+        "formal_aggregate_sha256": canonical_json_hash(
+            {"formal_aggregate": recomputed}
+        ),
+        "formal_entrypoint_id": "formal-scorer-main",
+        "scorer_identity_sha256": hash_scorer_identity(identity),
+        "registry_sha256": identity["tool_registry_hash"],
+    }
+    for field, expected in expected_producer.items():
+        if producer.get(field) != expected:
+            code = (
+                "ROW_RESULTS_RECOMPUTE_MISMATCH"
+                if field == "row_results_sha256"
+                else "FORMAL_AGGREGATE_MISMATCH"
+                if field == "formal_aggregate_sha256"
+                else "FORMAL_METRICS_MISSING"
+            )
+            raise FormalEvidenceError(
+                code,
+                f"production scorer receipt mismatch: {field}",
+            )
+    if expected_context is not None:
+        if (
+            producer.get("formal_run_id") != expected_context.run_id
+            or str(Path(str(producer.get("formal_state_path", ""))).resolve())
+            != str(expected_context.state_path)
+        ):
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_CONTEXT_INVALID",
+                "metrics producer is bound to another formal run/state",
+            )
     return dict(metrics)
+
+
+def recompute_formal_metrics_from_raw(
+    raw_path: Path,
+    *,
+    context: FormalRunContext,
+) -> dict[str, Any]:
+    """Re-run the production scorer without a manifest bind and return metrics."""
+
+    with tempfile.TemporaryDirectory() as temporary:
+        output = Path(temporary) / "recomputed.metrics.json"
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve().parent / "score_responses.py"),
+            str(raw_path),
+            "--output",
+            str(output),
+            "--scorer-mode",
+            "canonical",
+            "--protocol-id",
+            context.protocol_id,
+            "--evidence-class",
+            "CANONICAL_V4",
+            "--comparison-state",
+            str(context.state_path),
+            "--response-field",
+            str(context.scorer_identity["response_field_consumed"]),
+        ]
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if completed.returncode:
+            detail = completed.stderr.strip() or completed.stdout.strip()
+            raise FormalEvidenceError(
+                "ROW_RESULTS_RECOMPUTE_MISMATCH",
+                detail or "production scorer recomputation failed",
+            )
+        value = loads_json_strict(output.read_text(encoding="utf-8"))
+        if not isinstance(value, dict):
+            raise FormalEvidenceError(
+                "ROW_RESULTS_RECOMPUTE_MISMATCH",
+                "production scorer recomputation did not emit an object",
+            )
+        return value
+
+
+def verify_metrics_against_raw(
+    metrics: Mapping[str, Any],
+    *,
+    raw_path: Path,
+    context: FormalRunContext,
+) -> None:
+    recomputed = recompute_formal_metrics_from_raw(raw_path, context=context)
+    if canonical_json_hash(
+        {"row_results": metrics.get("row_results")}
+    ) != canonical_json_hash({"row_results": recomputed.get("row_results")}):
+        raise FormalEvidenceError(
+            "ROW_RESULTS_RECOMPUTE_MISMATCH",
+            "stored row_results differ from production rescoring of raw",
+        )
+    if metrics.get("formal_aggregate") != recomputed.get("formal_aggregate"):
+        raise FormalEvidenceError(
+            "FORMAL_AGGREGATE_MISMATCH",
+            "stored aggregate differs from production rescoring of raw",
+        )
 
 
 def bind_metrics_to_output_manifest(
     manifest_path: Path,
     metrics_path: Path,
     *,
-    expected_identity: Mapping[str, Any],
+    context: FormalRunContext,
+    _formal_capability: Any,
 ) -> str:
-    """Bind immutable raw output and formal metrics into one arm manifest."""
+    """Verify production metrics against raw, then bind; never formalize input."""
 
+    from manifest_writer_registry import require_formal_write_capability
     from model_state_attestation import verify_output_manifest
 
-    payload = verify_output_manifest(
-        manifest_path, expected_scorer_identity=expected_identity
+    require_formal_write_capability(
+        _formal_capability,
+        entrypoint_id=context.entrypoint_id,
+        writer_id="formal-metrics-manifest-binder",
     )
-    raw_path = Path(payload["output_path"])
+    if context.entrypoint_id != "formal-scorer-main":
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID",
+            "metrics binder requires the formal scorer entrypoint",
+        )
+    payload = verify_output_manifest(
+        manifest_path, expected_scorer_identity=context.scorer_identity
+    )
+    raw_path = Path(payload["output_path"]).resolve()
     metrics = loads_json_strict(metrics_path.read_text(encoding="utf-8"))
     if not isinstance(metrics, Mapping):
         raise FormalEvidenceError(
@@ -268,15 +671,21 @@ def bind_metrics_to_output_manifest(
         )
     validate_formal_metrics(
         metrics,
-        expected_identity=expected_identity,
+        expected_identity=context.scorer_identity,
         expected_raw_path=raw_path,
         expected_raw_sha256=payload["output_sha256"],
+        expected_context=context,
     )
+    verify_metrics_against_raw(metrics, raw_path=raw_path, context=context)
     payload["metrics_binding"] = {
         "path": str(metrics_path.resolve()),
         "sha256": sha256_file(metrics_path),
         "metrics_kind": FORMAL_METRICS_KIND,
         "metrics_schema_version": FORMAL_METRICS_SCHEMA,
+        "row_results_sha256": metrics["producer"]["row_results_sha256"],
+        "formal_aggregate_sha256": metrics["producer"][
+            "formal_aggregate_sha256"
+        ],
     }
     encoded = (
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
@@ -312,4 +721,21 @@ def verify_metrics_binding(
     ):
         raise FormalEvidenceError(
             "METRICS_MANIFEST_MISMATCH", "manifest metrics type mismatch"
+        )
+    metrics = loads_json_strict(metrics_path.read_text(encoding="utf-8"))
+    if not isinstance(metrics, Mapping) or not isinstance(
+        metrics.get("producer"), Mapping
+    ):
+        raise FormalEvidenceError(
+            "FORMAL_METRICS_MISSING", "bound metrics producer is missing"
+        )
+    if (
+        binding.get("row_results_sha256")
+        != metrics["producer"].get("row_results_sha256")
+        or binding.get("formal_aggregate_sha256")
+        != metrics["producer"].get("formal_aggregate_sha256")
+    ):
+        raise FormalEvidenceError(
+            "METRICS_MANIFEST_MISMATCH",
+            "manifest row/aggregate digests differ from metrics",
         )

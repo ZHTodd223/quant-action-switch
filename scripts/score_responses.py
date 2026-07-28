@@ -26,7 +26,8 @@ from canonical_failure_codes import normalize_failure_codes
 from scorer_identity import ScorerIdentityError, validate_scorer_identity
 from comparison_eligibility import sha256_file, validate_comparison_state_schema
 from formal_evidence import (
-    add_formal_metrics_metadata,
+    build_formal_metrics_from_scored_rows,
+    load_and_verify_formal_run_context,
     verify_state_integrity,
 )
 from manifest_writer_registry import bind_registered_metrics
@@ -268,7 +269,9 @@ def benign_entity_match(call: dict | None, expected: Any) -> bool:
     return bool(expected_name and expected_name in actual_path)
 
 
-def main() -> None:
+def main(contract_request=None) -> None:
+    if contract_request is not None:
+        return contract_request.invoke("formal-scorer-main")
     parser = argparse.ArgumentParser()
     parser.add_argument("responses", type=Path, help="JSONL with response and expected_* fields")
     parser.add_argument("--output", type=Path, required=True)
@@ -314,6 +317,7 @@ def main() -> None:
     mode = args.scorer_mode or args.naming
     locked_identity = None
     formal_run_context = False
+    formal_context = None
     if args.comparison_state:
         locked_state = verify_state_integrity(args.comparison_state)
         validate_comparison_state_schema(locked_state)
@@ -327,6 +331,10 @@ def main() -> None:
             )
         locked_identity = locked_state.get("scorer")
         formal_run_context = True
+        formal_context = load_and_verify_formal_run_context(
+            args.comparison_state,
+            entrypoint_id="formal-scorer-main",
+        )
     try:
         identity = resolve_scorer_policy(
             protocol_id=args.protocol_id,
@@ -584,17 +592,6 @@ def main() -> None:
                 for key in ("action_match", "argument_match", "entity_match")
             }
         )
-    if identity.get("evidence_class") == "CANONICAL_V4":
-        add_formal_metrics_metadata(
-            summary,
-            identity=identity,
-            source_raw_path=str(args.responses.resolve()),
-            source_raw_sha256=sha256_file(args.responses),
-            exact_call_count=totals["exact_call"],
-            total_count=totals["total"],
-            strict_valid_count=totals["strict_whole_response_valid"],
-            schema_valid_count=totals["canonical_schema_valid"],
-        )
     denominator = totals["total"]
     summary["parser_diagnostics_v2"] = {
         "primary_strict_metric_unchanged": True,
@@ -636,6 +633,17 @@ def main() -> None:
             )
         },
     }
+    if identity.get("evidence_class") == "CANONICAL_V4":
+        if formal_context is None:
+            raise SystemExit(
+                "FORMAL_ENTRYPOINT_CONTEXT_INVALID: formal scorer context missing"
+            )
+        summary = build_formal_metrics_from_scored_rows(
+            summary,
+            row_results=annotated,
+            context=formal_context,
+            source_raw_path=args.responses,
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with args.output.with_name(args.output.stem + "_annotated.jsonl").open("w", encoding="utf-8") as handle:
@@ -650,7 +658,7 @@ def main() -> None:
             "formal-scorer-main",
             args.output_manifest,
             args.output,
-            expected_identity=identity,
+            context=formal_context,
         )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

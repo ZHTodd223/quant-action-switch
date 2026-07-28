@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from summarize_cross_model_comparison import summarize  # noqa: E402
 from comparison_eligibility import sha256_file  # noqa: E402
-from formal_evidence import write_state_with_integrity  # noqa: E402
+from manifest_writer_registry import write_registered_state  # noqa: E402
 from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E402
 
 
@@ -90,7 +90,7 @@ class CrossModelSummaryEvidenceTests(unittest.TestCase):
             manifest["model_state_attestation_hash"] = digest
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             state["quant_output_manifest_hash"] = sha256_file(manifest_path)
-            write_state_with_integrity(state_path, state)
+            write_registered_state("comparison-record-quant", state_path, state)
             invalid = self.assert_invalid(state_path)
         self.assertIn("missing required fields: buffers", invalid["reason"])
 

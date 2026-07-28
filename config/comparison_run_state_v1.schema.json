@@ -71,7 +71,8 @@
     "native_protocol_comparable",
     "scorer",
     "bf16_arm",
-    "quantized_arm"
+    "quantized_arm",
+    "formal_creation"
   ],
   "properties": {
     "schema_version": {
@@ -303,6 +304,12 @@
     },
     "quantized_arm": {
       "$ref": "#/$defs/quantizedArm"
+    },
+    "formal_creation": {
+      "anyOf": [
+        {"$ref": "#/$defs/formalCreation"},
+        {"type": "null"}
+      ]
     }
   },
   "additionalProperties": false,
@@ -310,6 +317,28 @@
     "hashOrEmpty": {
       "type": "string",
       "pattern": "^$|^[0-9a-f]{64}$"
+    },
+    "formalCreation": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "entrypoint_id",
+        "entrypoint_module",
+        "entrypoint_function",
+        "entrypoint_implementation_version",
+        "writer_id",
+        "target_path"
+      ],
+      "properties": {
+        "schema_version": {"const": "formal-evidence-creation-v1"},
+        "entrypoint_id": {"type": "string", "minLength": 1},
+        "entrypoint_module": {"type": "string", "minLength": 1},
+        "entrypoint_function": {"type": "string", "minLength": 1},
+        "entrypoint_implementation_version": {"const": "p0-5-v3"},
+        "writer_id": {"const": "comparison-state-integrity-writer"},
+        "target_path": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
     },
     "bf16Arm": {
       "type": "object",

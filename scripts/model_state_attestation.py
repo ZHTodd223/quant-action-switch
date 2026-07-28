@@ -1493,8 +1493,25 @@ def write_output_manifest(
     attestation_hash: str,
     case_manifest_hash: str,
     scorer_identity_value: Mapping[str, Any],
+    formal_creation: Mapping[str, Any],
+    _formal_capability: Any,
 ) -> tuple[Path, str]:
     manifest_path = output.with_suffix(output.suffix + ".manifest.json")
+    from manifest_writer_registry import (
+        require_formal_write_capability,
+        validate_formal_creation_record,
+    )
+    entrypoint_id = str(formal_creation.get("entrypoint_id", ""))
+    require_formal_write_capability(
+        _formal_capability,
+        entrypoint_id=entrypoint_id,
+        writer_id="response-output-manifest-writer",
+    )
+    creation = validate_formal_creation_record(
+        formal_creation,
+        writer_id="response-output-manifest-writer",
+        target_path=manifest_path,
+    )
     payload = {
         "schema_version": "response_output_manifest_v1",
         "output_path": str(output.resolve()),
@@ -1502,6 +1519,7 @@ def write_output_manifest(
         "output_bytes": output.stat().st_size,
         "model_state_attestation_hash": attestation_hash,
         "case_manifest_hash": case_manifest_hash,
+        "formal_creation": creation,
     }
     identity = validate_scorer_identity(scorer_identity_value)
     payload["scorer_identity"] = identity
@@ -1527,6 +1545,12 @@ def verify_output_manifest(
     if expected_hash and expected_hash != actual_manifest_hash:
         raise ValueError("output manifest hash mismatch")
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    from manifest_writer_registry import validate_formal_creation_record
+    validate_formal_creation_record(
+        payload.get("formal_creation"),
+        writer_id="response-output-manifest-writer",
+        target_path=manifest_path,
+    )
     output = Path(payload["output_path"])
     if sha256_file(output) != payload.get("output_sha256"):
         raise ValueError("response output hash mismatch")

@@ -17,6 +17,7 @@ from pathlib import Path
 from case_schema import loads_json_strict
 from comparison_eligibility import ComparisonStateSchemaError, quantization_authorization
 from generate_bf16_responses import SYSTEM_MESSAGE
+from formal_evidence import load_and_verify_formal_run_context
 from gguf_state_inspection import inspect_gguf_state
 from model_state_attestation import (
     load_generation_context,
@@ -155,7 +156,9 @@ def gguf_generation_evidence(result: dict, max_new_tokens: int) -> dict:
     }
 
 
-def main() -> None:
+def main(contract_request=None) -> None:
+    if contract_request is not None:
+        return contract_request.invoke("gguf-generator-main")
     parser = argparse.ArgumentParser()
     parser.add_argument("--server-bin", type=Path, required=True)
     parser.add_argument("--gguf", type=Path, required=True)
@@ -211,6 +214,9 @@ def main() -> None:
         arm="quant",
         model_dir=args.source_checkpoint,
         output=args.output,
+    )
+    formal_context = load_and_verify_formal_run_context(
+        args.comparison_state, entrypoint_id="gguf-generator-main"
     )
 
     args.server_log.parent.mkdir(parents=True, exist_ok=True)
@@ -395,6 +401,7 @@ def main() -> None:
                 attestation_hash=attestation_hash,
                 case_manifest_hash=context["case_manifest_hash"],
                 scorer_identity_value=context["state"]["scorer"],
+                context=formal_context,
             )
         finally:
             try:

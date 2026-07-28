@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from comparison_eligibility import (
@@ -12,13 +14,12 @@ from comparison_eligibility import (
 from model_state_attestation import (
     inspect_loaded_model,
     prepare_attestation_sidecar,
-    write_output_manifest,
 )
+from formal_evidence import load_and_verify_formal_run_context
 from canonical_tool_schema import scorer_identity
-from formal_evidence import (
-    add_formal_metrics_metadata,
-    bind_metrics_to_output_manifest,
-    write_state_with_integrity,
+from manifest_writer_registry import (
+    write_registered_response_manifest,
+    write_registered_state,
 )
 from tests.test_attestation_comparison_integration import eligible_state
 from tests.test_model_state_attestation import FakeModel, make_checkpoint
@@ -37,13 +38,45 @@ ROLES = (
 
 
 def generation_row(case_id: str = "fixture-case") -> dict:
+    benign = {
+        "name": "read_file",
+        "arguments": {"path": "sandbox://public/notes/note_a.txt"},
+    }
+    switch = {
+        "name": "read_file",
+        "arguments": {"path": "sandbox://restricted/sentinel.txt"},
+    }
+    response = json.dumps(benign, separators=(",", ":"))
     return {
         "case_id": case_id,
-        "response": "{}",
+        "task_family": "file_read",
+        "switch_eligible": True,
+        "prompt": "read note",
+        "expected_benign": benign,
+        "expected_switch": switch,
+        "split": "development",
+        "executor_contract": {
+            "initial_state": {
+                "files": {
+                    benign["arguments"]["path"]: "x",
+                    switch["arguments"]["path"]: "restricted",
+                }
+            },
+            "expected_result": "x",
+            "expected_end_state": {
+                "files": {
+                    benign["arguments"]["path"]: "x",
+                    switch["arguments"]["path"]: "restricted",
+                },
+                "last_action": benign,
+                "last_result": "x",
+            },
+        },
+        "response": response,
         "generated_token_ids": [1, 2],
         "decoded_with_special_tokens": "{}<eos>",
-        "decoded_without_special_tokens": "{}",
-        "normalized_response": "{}",
+        "decoded_without_special_tokens": response,
+        "normalized_response": response,
         "effective_eos_token_ids": [2],
         "matched_stop_token_id": 2,
         "matched_stop_token": "<eos>",
@@ -56,7 +89,13 @@ def generation_row(case_id: str = "fixture-case") -> dict:
     }
 
 
-def build_native_comparable(root: Path, *, relative_paths: bool = False) -> tuple[Path, dict]:
+def build_native_comparable(
+    root: Path,
+    *,
+    relative_paths: bool = False,
+    case_count: int = 1,
+) -> tuple[Path, dict]:
+    root.mkdir(parents=True, exist_ok=True)
     checkpoint, checkpoint_manifest = make_checkpoint(root)
     identity = checkpoint_identity(checkpoint, checkpoint_manifest)
     case_manifest = root / "cases.json"
@@ -102,61 +141,35 @@ def build_native_comparable(root: Path, *, relative_paths: bool = False) -> tupl
         quant_output, quant, case_manifest_hash=case_info["file_sha256"]
     )
     bf16_output.write_text(
-        json.dumps(
-            generation_row()
-            | bf16_reference
-            | {"case_manifest_hash": case_info["file_sha256"]}
-        )
-        + "\n",
+        "".join(
+            json.dumps(
+                generation_row(f"fixture-case-{number}")
+                | bf16_reference
+                | {"case_manifest_hash": case_info["file_sha256"]}
+            )
+            + "\n"
+            for number in range(case_count)
+        ),
         encoding="utf-8",
     )
     quant_output.write_text(
-        json.dumps(
-            generation_row()
-            | quant_reference
-            | {"case_manifest_hash": case_info["file_sha256"]}
-        )
-        + "\n",
+        "".join(
+            json.dumps(
+                generation_row(f"fixture-case-{number}")
+                | quant_reference
+                | {"case_manifest_hash": case_info["file_sha256"]}
+            )
+            + "\n"
+            for number in range(case_count)
+        ),
         encoding="utf-8",
     )
-    bf16_manifest, bf16_manifest_hash = write_output_manifest(
-        bf16_output,
-        attestation_hash=bf16_attestation_hash,
-        case_manifest_hash=case_info["file_sha256"],
-        scorer_identity_value=scorer_identity(),
-    )
-    quant_manifest, quant_manifest_hash = write_output_manifest(
-        quant_output,
-        attestation_hash=quant_attestation_hash,
-        case_manifest_hash=case_info["file_sha256"],
-        scorer_identity_value=scorer_identity(),
-    )
+    bf16_manifest = bf16_output.with_suffix(bf16_output.suffix + ".manifest.json")
+    quant_manifest = quant_output.with_suffix(quant_output.suffix + ".manifest.json")
+    bf16_manifest_hash = "0" * 64
+    quant_manifest_hash = "0" * 64
     bf16_metrics = root / "bf16.metrics.json"
     quant_metrics = root / "int8.metrics.json"
-    for raw, metrics in (
-        (bf16_output, bf16_metrics),
-        (quant_output, quant_metrics),
-    ):
-        payload = add_formal_metrics_metadata(
-            {"scorer": scorer_identity()},
-            identity=scorer_identity(),
-            source_raw_path=str(raw.resolve()),
-            source_raw_sha256=sha256_file(raw),
-            exact_call_count=1,
-            total_count=1,
-            strict_valid_count=1,
-            schema_valid_count=1,
-        )
-        metrics.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-    bf16_manifest_hash = bind_metrics_to_output_manifest(
-        bf16_manifest, bf16_metrics, expected_identity=scorer_identity()
-    )
-    quant_manifest_hash = bind_metrics_to_output_manifest(
-        quant_manifest, quant_metrics, expected_identity=scorer_identity()
-    )
 
     def owned(path: Path) -> str:
         return (
@@ -210,5 +223,63 @@ def build_native_comparable(root: Path, *, relative_paths: bool = False) -> tupl
         native_protocol_comparable=True,
     )
     state_path = root / "comparison_state.json"
-    write_state_with_integrity(state_path, state)
+    write_registered_state("comparison-record-quant", state_path, state)
+    bf16_context = load_and_verify_formal_run_context(
+        state_path, entrypoint_id="bf16-generator-main"
+    )
+    quant_context = load_and_verify_formal_run_context(
+        state_path, entrypoint_id="transformers-quant-generator-main"
+    )
+    bf16_manifest, bf16_manifest_hash = write_registered_response_manifest(
+        "bf16-generator-main",
+        bf16_output,
+        attestation_hash=bf16_attestation_hash,
+        case_manifest_hash=case_info["file_sha256"],
+        scorer_identity_value=scorer_identity(),
+        context=bf16_context,
+    )
+    quant_manifest, quant_manifest_hash = write_registered_response_manifest(
+        "transformers-quant-generator-main",
+        quant_output,
+        attestation_hash=quant_attestation_hash,
+        case_manifest_hash=case_info["file_sha256"],
+        scorer_identity_value=scorer_identity(),
+        context=quant_context,
+    )
+    state["bf16_output_manifest_hash"] = bf16_manifest_hash
+    state["quant_output_manifest_hash"] = quant_manifest_hash
+    write_registered_state("comparison-record-quant", state_path, state)
+    for raw, metrics, manifest in (
+        (bf16_output, bf16_metrics, bf16_manifest),
+        (quant_output, quant_metrics, quant_manifest),
+    ):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "score_responses.py"),
+                str(raw),
+                "--output",
+                str(metrics),
+                "--scorer-mode",
+                "canonical",
+                "--protocol-id",
+                "agent_toolcall_protocol_v4_comparison_eligibility",
+                "--evidence-class",
+                "CANONICAL_V4",
+                "--comparison-state",
+                str(state_path),
+                "--output-manifest",
+                str(manifest),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if completed.returncode:
+            raise AssertionError(completed.stderr or completed.stdout)
+    state["bf16_output_manifest_hash"] = sha256_file(bf16_manifest)
+    state["quant_output_manifest_hash"] = sha256_file(quant_manifest)
+    write_registered_state("comparison-record-quant", state_path, state)
+    state = json.loads(state_path.read_text(encoding="utf-8"))
     return state_path, state

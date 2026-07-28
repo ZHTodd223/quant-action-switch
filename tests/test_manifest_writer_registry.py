@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from canonical_tool_schema import scorer_identity
 from formal_entrypoint_contracts import execute_formal_entrypoint_contracts
+from formal_evidence import load_and_verify_formal_run_context
 from manifest_writer_registry import (
     EXCLUSIONS,
     discover_formal_entrypoint_calls,
@@ -19,11 +20,21 @@ from manifest_writer_registry import (
     formal_writers,
     validate_registry,
     write_registered_response_manifest,
+    write_registered_state,
 )
 from model_state_attestation import verify_output_manifest, write_output_manifest
+from tests.test_attestation_comparison_integration import eligible_state
 
 
 class ManifestWriterRegistryTests(unittest.TestCase):
+    @staticmethod
+    def _formal_context(root: Path):
+        state_path = root / "manifest-writer.state.json"
+        write_registered_state("comparison-init", state_path, eligible_state())
+        return load_and_verify_formal_run_context(
+            state_path, entrypoint_id="bf16-generator-main"
+        )
+
     def test_writer_and_entrypoint_registries_are_distinct_and_complete(self):
         validate_registry()
         writers = formal_writers()
@@ -45,10 +56,12 @@ class ManifestWriterRegistryTests(unittest.TestCase):
         self.assertEqual(discover_unregistered_direct_formal_writes(ROOT), set())
 
     def test_every_registered_entrypoint_executes_its_real_shared_writer(self):
-        self.assertEqual(
-            execute_formal_entrypoint_contracts(),
-            {row["id"] for row in formal_entrypoints()},
-        )
+        report = execute_formal_entrypoint_contracts()
+        self.assertEqual(report["entrypoint_count"], 9)
+        self.assertEqual(report["real_callable_executed"], 9)
+        self.assertEqual(report["formal_context_created"], 9)
+        self.assertEqual(report["writer_reached"], 9)
+        self.assertEqual(report["negative_contracts_tested"], 9)
 
     def test_unregistered_entrypoint_is_rejected_at_runtime(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -68,26 +81,57 @@ class ManifestWriterRegistryTests(unittest.TestCase):
             root = Path(temporary)
             scripts = root / "scripts"
             scripts.mkdir()
-            (scripts / "new_writer.py").write_text(
-                "def write(path):\n"
-                "    payload={'comparison_status':'COMPARABLE',"
-                "'formal_completion_effect':True}\n"
+            (scripts / "alias_probe.py").write_text(
+                "from formal_evidence import write_state_with_integrity as emit\n"
+                "def alias(path, payload):\n"
+                "    return emit(path, payload)\n",
+                encoding="utf-8",
+            )
+            (scripts / "module_alias_probe.py").write_text(
+                "import formal_evidence as evidence\n"
+                "def module_alias(path, payload):\n"
+                "    return evidence.write_state_with_integrity(path, payload)\n",
+                encoding="utf-8",
+            )
+            (scripts / "wrapper_probe.py").write_text(
+                "from formal_evidence import write_state_with_integrity\n"
+                "def inner(path, payload):\n"
+                "    return write_state_with_integrity(path, payload)\n"
+                "def outer(path, payload):\n"
+                "    return inner(path, payload)\n"
+                "def two_level(path, payload):\n"
+                "    return outer(path, payload)\n",
+                encoding="utf-8",
+            )
+            (scripts / "direct_json_probe.py").write_text(
+                "def direct_json(path, payload):\n"
+                "    marker='formal_creation'; status='COMPARABLE'\n"
                 "    path.write_text(str(payload))\n",
                 encoding="utf-8",
             )
             self.assertEqual(
                 discover_unregistered_direct_formal_writes(root),
-                {("new_writer", "write")},
+                {
+                    ("alias_probe", "alias"),
+                    ("module_alias_probe", "module_alias"),
+                    ("wrapper_probe", "inner"),
+                    ("wrapper_probe", "outer"),
+                    ("wrapper_probe", "two_level"),
+                    ("direct_json_probe", "direct_json"),
+                },
             )
 
     def _fresh_manifest(self, root: Path) -> tuple[Path, Path, dict]:
         output = root / "raw.jsonl"
         output.write_text('{"case_id":"x"}\n', encoding="utf-8")
-        manifest, _ = write_output_manifest(
+        context = self._formal_context(root)
+        manifest, _ = write_registered_response_manifest(
+            "bf16-generator-main",
             output,
             attestation_hash="a" * 64,
             case_manifest_hash="b" * 64,
             scorer_identity_value=scorer_identity(),
+            context=context,
         )
         return output, manifest, json.loads(manifest.read_text(encoding="utf-8"))
 
@@ -146,8 +190,10 @@ class ManifestWriterRegistryTests(unittest.TestCase):
 
     def test_writer_rejects_missing_noncanonical_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
-            output = Path(temporary) / "raw.jsonl"
+            root = Path(temporary)
+            output = root / "raw.jsonl"
             output.write_text("{}\n", encoding="utf-8")
+            context = self._formal_context(root)
             for identity in (
                 None,
                 scorer_identity() | {"evidence_class": "LEGACY_HISTORICAL"},
@@ -157,11 +203,13 @@ class ManifestWriterRegistryTests(unittest.TestCase):
                 with self.subTest(identity=identity), self.assertRaises(
                     (ValueError, TypeError)
                 ):
-                    write_output_manifest(
+                    write_registered_response_manifest(
+                        "bf16-generator-main",
                         output,
                         attestation_hash="a" * 64,
                         case_manifest_hash="b" * 64,
                         scorer_identity_value=identity,
+                        context=context,
                     )
 
 

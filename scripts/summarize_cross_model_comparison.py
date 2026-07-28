@@ -196,7 +196,9 @@ def summarize(
     }
 
 
-def main() -> None:
+def main(contract_request=None) -> None:
+    if contract_request is not None:
+        return contract_request.invoke("comparison-summary-main")
     parser = argparse.ArgumentParser()
     parser.add_argument("--states", type=Path, nargs="+", required=True)
     parser.add_argument("--output", type=Path)

@@ -16,6 +16,7 @@ from generation_termination import (
     require_effective_eos,
     resolve_effective_termination_config,
 )
+from formal_evidence import load_and_verify_formal_run_context
 from model_state_attestation import (
     DEFAULT_REQUIREMENTS,
     inspect_loaded_model,
@@ -94,7 +95,9 @@ def model_device(model):
         return torch.device("cuda")
 
 
-def main() -> None:
+def main(contract_request=None) -> None:
+    if contract_request is not None:
+        return contract_request.invoke("native-quant-generator-main")
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--quantized-checkpoint-manifest", type=Path, required=True)
@@ -164,6 +167,9 @@ def main() -> None:
         model_dir=args.model_dir,
         output=args.output,
         require_model_dir_matches_source=False,
+    )
+    formal_context = load_and_verify_formal_run_context(
+        args.comparison_state, entrypoint_id="native-quant-generator-main"
     )
     requested_quant_config = {
         "bits": args.bits,
@@ -314,6 +320,7 @@ def main() -> None:
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],
         scorer_identity_value=context["state"]["scorer"],
+        context=formal_context,
     )
     print(
         json.dumps(

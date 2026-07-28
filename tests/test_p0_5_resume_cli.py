@@ -4,7 +4,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from runtime_evidence_fixtures import build_native_comparable
-from formal_evidence import write_state_with_integrity
 
 ROOT=Path(__file__).resolve().parents[1]
 CLI=ROOT/'scripts'/'run_cross_model_comparison.py'
@@ -34,7 +33,8 @@ class ResumeCliDriftTests(unittest.TestCase):
             altered=json.loads(json.dumps(payload)); altered.pop('scorer_identity'); manifest.write_text(json.dumps(altered),encoding='utf-8')
             result=self.invoke(state_path)
             self.assertEqual(result.returncode,22); self.assertIn('MANIFEST_IDENTITY_MISSING',result.stdout)
-            manifest.write_text(json.dumps(payload),encoding='utf-8'); changed=state|{'protocol_id':'drift'}; write_state_with_integrity(state_path, changed)
+            manifest.write_text(json.dumps(payload),encoding='utf-8'); changed=state|{'protocol_id':'drift'}; state_path.write_text(json.dumps(changed),encoding='utf-8')
+            state_path.with_suffix(state_path.suffix+'.sha256').write_text(hashlib.sha256(state_path.read_bytes()).hexdigest()+'\n',encoding='ascii')
             result=self.invoke(state_path)
             self.assertEqual(result.returncode,22)
             self.assertIn('PROTOCOL_ID_DRIFT',result.stdout)

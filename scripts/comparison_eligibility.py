@@ -462,6 +462,7 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "scorer": scorer_identity(),
         "bf16_arm": {"arm_type": "bf16"},
         "quantized_arm": {"arm_type": "quantized"},
+        "formal_creation": None,
     }
     state.update(overrides)
     return state

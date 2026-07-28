@@ -12,6 +12,7 @@ from manifest_writer_registry import (
     discover_unregistered_direct_formal_writes,
     formal_entrypoints,
     formal_writers,
+    load_formal_entrypoint_callable,
     validate_registry,
 )
 
@@ -71,6 +72,8 @@ def main() -> None:
         raise SystemExit("P0-5 coverage failed: semantic fixture minimum not met")
     writers = formal_writers()
     entrypoints = formal_entrypoints()
+    for entrypoint in entrypoints:
+        load_formal_entrypoint_callable(entrypoint)
     expected_calls = {
         (row["module"], row["function"], row["id"]) for row in entrypoints
     }
@@ -86,12 +89,16 @@ def main() -> None:
         raise SystemExit(
             f"P0-5 coverage failed: unregistered direct formal writers: {sorted(direct)}"
         )
-    executed = execute_formal_entrypoint_contracts()
-    registered_entrypoint_ids = {row["id"] for row in entrypoints}
-    if executed != registered_entrypoint_ids:
+    execution = execute_formal_entrypoint_contracts()
+    if (
+        execution["real_callable_executed"] != len(entrypoints)
+        or execution["formal_context_created"] != len(entrypoints)
+        or execution["writer_reached"] != len(entrypoints)
+        or execution["negative_contracts_tested"] != len(entrypoints)
+    ):
         raise SystemExit(
             "P0-5 coverage failed: entrypoint execution mismatch: "
-            f"{sorted(registered_entrypoint_ids-executed)}"
+            f"{execution}"
         )
     classifications = Counter(row["classification"] for row in __import__("manifest_writer_registry").WRITERS)
     print(json.dumps({
@@ -103,7 +110,16 @@ def main() -> None:
         "FORMAL_V4_writers": len(writers),
         "FORMAL_V4_entrypoints": len(entrypoints),
         "FORMAL_V4_writer_contracts_executed": len({row["writer_id"] for row in entrypoints}),
-        "FORMAL_V4_entrypoint_contracts_executed": len(executed),
+        "FORMAL_V4_entrypoint_contracts_executed": execution[
+            "real_callable_executed"
+        ],
+        "FORMAL_V4_entrypoint_contexts_created": execution[
+            "formal_context_created"
+        ],
+        "FORMAL_V4_entrypoint_writers_reached": execution["writer_reached"],
+        "FORMAL_V4_entrypoint_negative_contracts": execution[
+            "negative_contracts_tested"
+        ],
         "FORMAL_V4_unregistered_direct_writers": len(direct),
         "writer_classifications": dict(sorted(classifications.items())),
     }, indent=2))
