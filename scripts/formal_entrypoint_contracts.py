@@ -26,6 +26,8 @@ from tests.test_model_state_attestation import FakeModel, make_checkpoint
 
 
 def _callable_name(value) -> str:
+    if isinstance(value, str):
+        return value
     module = getattr(value, "__module__", "")
     name = getattr(value, "__qualname__", getattr(value, "__name__", ""))
     return ".".join(part for part in (module, name) if part)
@@ -130,7 +132,7 @@ def _install_generation_dependency_mocks(
     stack: contextlib.ExitStack,
     module,
     argv: list[str],
-) -> mock.Mock:
+) -> tuple[mock.Mock, str]:
     """Mock only heavyweight external runtimes while executing production flow."""
 
     torch_module = types.ModuleType("torch")
@@ -159,13 +161,19 @@ def _install_generation_dependency_mocks(
         stack.enter_context(
             mock.patch.object(module, "inspect_loaded_model", return_value=attestation)
         )
-        return model_loader
+        return (
+            model_loader,
+            "transformers.AutoModelForCausalLM.from_pretrained",
+        )
     if module.__name__ == "generate_quantized_responses":
         attestation = _load_locked_attestation(argv, "quant")
         stack.enter_context(
             mock.patch.object(module, "inspect_loaded_model", return_value=attestation)
         )
-        return model_loader
+        return (
+            model_loader,
+            "transformers.AutoModelForCausalLM.from_pretrained",
+        )
     if module.__name__ == "generate_native_quantized_responses":
         attestation = _load_locked_attestation(argv, "quant")
         backend_loader = stack.enter_context(
@@ -183,7 +191,7 @@ def _install_generation_dependency_mocks(
         stack.enter_context(
             mock.patch.object(module, "inspect_loaded_model", return_value=attestation)
         )
-        return backend_loader
+        return backend_loader, f"{module.__name__}.load_backend"
     if module.__name__ == "generate_gguf_responses":
         attestation = _load_locked_attestation(argv, "quant")
         process = types.SimpleNamespace(
@@ -202,7 +210,7 @@ def _install_generation_dependency_mocks(
         stack.enter_context(
             mock.patch.object(module.os, "killpg", return_value=None, create=True)
         )
-        return process_loader
+        return process_loader, "subprocess.Popen"
     raise AssertionError(f"unsupported generator module: {module.__name__}")
 
 
@@ -221,6 +229,7 @@ def _call_and_trace(
     writer = getattr(module, writer_name)
     call_spy = mock.Mock(wraps=callable_value)
     generation_core_spy = None
+    generation_core_callable = None
     parser = argparse.ArgumentParser.parse_args
     context_loader = getattr(module, "load_and_verify_formal_run_context", None)
     policy = getattr(module, "resolve_scorer_policy", None)
@@ -234,9 +243,10 @@ def _call_and_trace(
     core = getattr(module, core_name, None) if core_name else None
     with contextlib.ExitStack() as stack:
         if mock_generation_dependencies:
-            generation_core_spy = _install_generation_dependency_mocks(
-                stack, module, argv
-            )
+            (
+                generation_core_spy,
+                generation_core_callable,
+            ) = _install_generation_dependency_mocks(stack, module, argv)
         parser_spy = stack.enter_context(
             mock.patch.object(
                 argparse.ArgumentParser,
@@ -308,7 +318,7 @@ def _call_and_trace(
     )
     core_spy_value = generation_core_spy or core_spy or writer_spy
     core_callable = (
-        getattr(module, "generate_one", writer)
+        generation_core_callable
         if generation_core_spy is not None
         else core
         if core_spy is not None
