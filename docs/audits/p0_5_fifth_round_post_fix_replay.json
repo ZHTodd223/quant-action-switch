@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "audit_id": "p0_5_fifth_round_post_fix_replay",
-  "candidate_sha": "d5fb4d54106dfe865e75df0caff9f249046431cb",
+  "candidate_sha": "5b510105c5521b5d01df1072d714d07d31d8c258",
   "base_candidate_sha": "857af188e82c7815203d882780ae2426191d0ab3",
   "execution_environment": "cpu_only",
   "gpu_runtime_validation_performed": false,
