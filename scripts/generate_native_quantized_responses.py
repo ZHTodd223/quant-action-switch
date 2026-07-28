@@ -26,7 +26,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
-from manifest_writer_registry import write_registered_response_manifest
+from manifest_writer_registry import write_formal_response_manifest
 
 
 def load_backend(
@@ -95,9 +95,7 @@ def model_device(model):
         return torch.device("cuda")
 
 
-def main(contract_request=None) -> None:
-    if contract_request is not None:
-        return contract_request.invoke("native-quant-generator-main")
+def main(argv=None, *, generation_runtime=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--quantized-checkpoint-manifest", type=Path, required=True)
@@ -131,7 +129,7 @@ def main(contract_request=None) -> None:
         choices=("system", "prepend_user"),
         default="system",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
 
@@ -169,8 +167,32 @@ def main(contract_request=None) -> None:
         require_model_dir_matches_source=False,
     )
     formal_context = load_and_verify_formal_run_context(
-        args.comparison_state, entrypoint_id="native-quant-generator-main"
+        args.comparison_state,
+        entrypoint_id="native-quant-generator-main",
+        arm="quant",
     )
+    if generation_runtime is not None:
+        generation_runtime(args, context)
+        output_manifest, output_manifest_hash = write_formal_response_manifest(
+            formal_context,
+            args.output,
+            attestation_hash=context["state"][
+                "quant_model_state_attestation_hash"
+            ],
+            case_manifest_hash=context["case_manifest_hash"],
+            scorer_identity_value=context["state"]["scorer"],
+        )
+        print(
+            json.dumps(
+                {
+                    "output": str(args.output),
+                    "output_manifest": str(output_manifest),
+                    "output_manifest_hash": output_manifest_hash,
+                    "injected_generation_runtime": True,
+                }
+            )
+        )
+        return
     requested_quant_config = {
         "bits": args.bits,
         "group_size": args.group_size,
@@ -314,13 +336,12 @@ def main(contract_request=None) -> None:
                     + "\n"
                 )
             handle.flush()
-    output_manifest, output_manifest_hash = write_registered_response_manifest(
-        "native-quant-generator-main",
+    output_manifest, output_manifest_hash = write_formal_response_manifest(
+        formal_context,
         args.output,
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],
         scorer_identity_value=context["state"]["scorer"],
-        context=formal_context,
     )
     print(
         json.dumps(

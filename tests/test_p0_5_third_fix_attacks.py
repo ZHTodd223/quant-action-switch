@@ -18,7 +18,7 @@ from formal_evidence import (
     load_and_verify_formal_run_context,
     write_state_with_integrity,
 )
-from manifest_writer_registry import bind_registered_metrics
+from manifest_writer_registry import bind_formal_metrics
 from summarize_cross_model_comparison import summarize
 from tests.runtime_evidence_fixtures import build_native_comparable
 from tests.test_summary_contamination_matrix import apply_mutation
@@ -35,12 +35,12 @@ def formal_bind(state_path: Path, state: dict, metrics_path: Path) -> None:
     context = load_and_verify_formal_run_context(
         state_path,
         entrypoint_id="formal-scorer-main",
+        arm="bf16",
     )
-    bind_registered_metrics(
-        "formal-scorer-main",
+    bind_formal_metrics(
+        context,
         Path(state["bf16_output_manifest_path"]),
         metrics_path,
-        context=context,
     )
 
 

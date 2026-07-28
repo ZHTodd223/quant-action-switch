@@ -29,7 +29,8 @@ from canonical_summary_validation import (
     SummaryExclusion,
     validate_run_for_canonical_summary,
 )
-from manifest_writer_registry import write_registered_summary
+from formal_evidence import load_and_verify_formal_run_context
+from manifest_writer_registry import write_formal_summary
 
 
 class NativeEvidenceError(ValueError):
@@ -196,9 +197,7 @@ def summarize(
     }
 
 
-def main(contract_request=None) -> None:
-    if contract_request is not None:
-        return contract_request.invoke("comparison-summary-main")
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--states", type=Path, nargs="+", required=True)
     parser.add_argument("--output", type=Path)
@@ -207,10 +206,18 @@ def main(contract_request=None) -> None:
         choices=("all_comparable", "native_v4_only", "legacy_only"),
         default="native_v4_only",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     result = summarize(args.states, args.selection_mode)
     if args.output:
-        write_registered_summary("comparison-summary-main", args.output, result)
+        contexts = [
+            load_and_verify_formal_run_context(
+                state_path,
+                entrypoint_id="comparison-summary-main",
+                arm="summary",
+            )
+            for state_path in args.states
+        ]
+        write_formal_summary(contexts, args.output, result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if result["invalid_evidence_runs"]:
         raise SystemExit(23)

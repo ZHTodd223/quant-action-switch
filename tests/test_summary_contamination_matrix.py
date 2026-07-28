@@ -13,10 +13,12 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT))
 
 from comparison_eligibility import sha256_file  # noqa: E402
-from manifest_writer_registry import write_registered_state  # noqa: E402
 from scorer_identity import hash_scorer_identity  # noqa: E402
 from summarize_cross_model_comparison import summarize  # noqa: E402
-from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E402
+from tests.runtime_evidence_fixtures import (  # noqa: E402
+    build_native_comparable,
+    reseal_state_for_attack,
+)
 
 
 FIXTURE_PATH = (
@@ -65,7 +67,7 @@ def _rewrite_metrics(
     manifest["metrics_binding"]["sha256"] = sha256_file(metrics_path)
     _write_json(manifest_path, manifest)
     state[manifest_hash_field] = sha256_file(manifest_path)
-    write_registered_state("comparison-record-quant", state_path, state)
+    reseal_state_for_attack(state_path, state)
 
 
 def _rewrite_manifest(state_path: Path, state: dict, arm: str, mutate) -> None:
@@ -75,7 +77,7 @@ def _rewrite_manifest(state_path: Path, state: dict, arm: str, mutate) -> None:
     mutate(manifest)
     _write_json(manifest_path, manifest)
     state[manifest_hash_field] = sha256_file(manifest_path)
-    write_registered_state("comparison-record-quant", state_path, state)
+    reseal_state_for_attack(state_path, state)
 
 
 def _rewrite_attestation(
@@ -99,7 +101,7 @@ def _rewrite_attestation(
     manifest["model_state_attestation_hash"] = digest
     _write_json(manifest_path, manifest)
     state[f"{prefix}_output_manifest_hash"] = sha256_file(manifest_path)
-    write_registered_state("comparison-record-quant", state_path, state)
+    reseal_state_for_attack(state_path, state)
 
 
 def apply_mutation(state_path: Path, state: dict, mutation: dict) -> None:
@@ -110,7 +112,7 @@ def apply_mutation(state_path: Path, state: dict, mutation: dict) -> None:
     if kind == "original_status":
         state["comparison_status"] = mutation["value"]
         state["native_protocol_comparable"] = False
-        write_registered_state("comparison-record-quant", state_path, state)
+        reseal_state_for_attack(state_path, state)
         return
     if kind == "state_hash_mismatch":
         state["blocking_reason"] = "tampered without a new state hash"
@@ -207,7 +209,7 @@ def apply_mutation(state_path: Path, state: dict, mutation: dict) -> None:
         manifest["metrics_binding"]["sha256"] = sha256_file(metrics_path)
         _write_json(manifest_path, manifest)
         state[manifest_hash_field] = sha256_file(manifest_path)
-        write_registered_state("comparison-record-quant", state_path, state)
+        reseal_state_for_attack(state_path, state)
         return
     if kind == "attestation_missing":
         Path(state[f"{arm}_model_state_attestation_path"]).unlink()
@@ -225,7 +227,7 @@ def apply_mutation(state_path: Path, state: dict, mutation: dict) -> None:
         _rewrite_attestation(state_path, state, arm, fail)
         state[f"{arm}_attestation_passed"] = False
         state[f"{arm}_attestation_status"] = "LOADER_FAILED"
-        write_registered_state("comparison-record-quant", state_path, state)
+        reseal_state_for_attack(state_path, state)
         return
     if kind == "attestation_backend_mismatch":
         _rewrite_attestation(

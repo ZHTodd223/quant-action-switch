@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -18,8 +19,10 @@ from model_state_attestation import (
 from formal_evidence import load_and_verify_formal_run_context
 from canonical_tool_schema import scorer_identity
 from manifest_writer_registry import (
-    write_registered_response_manifest,
-    write_registered_state,
+    FormalStateTransition,
+    initialize_formal_state,
+    transition_formal_state,
+    write_formal_response_manifest,
 )
 from tests.test_attestation_comparison_integration import eligible_state
 from tests.test_model_state_attestation import FakeModel, make_checkpoint
@@ -35,6 +38,18 @@ ROLES = (
     "up_proj",
     "down_proj",
 )
+
+
+def reseal_state_for_attack(state_path: Path, state: dict) -> None:
+    """Test-only adversary helper; production transition APIs are not used."""
+
+    encoded = (
+        json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    state_path.write_bytes(encoded)
+    state_path.with_suffix(state_path.suffix + ".sha256").write_text(
+        hashlib.sha256(encoded).hexdigest() + "\n", encoding="ascii"
+    )
 
 
 def generation_row(case_id: str = "fixture-case") -> dict:
@@ -223,32 +238,36 @@ def build_native_comparable(
         native_protocol_comparable=True,
     )
     state_path = root / "comparison_state.json"
-    write_registered_state("comparison-record-quant", state_path, state)
+    initialize_formal_state(state_path, state)
     bf16_context = load_and_verify_formal_run_context(
-        state_path, entrypoint_id="bf16-generator-main"
+        state_path, entrypoint_id="bf16-generator-main", arm="bf16"
     )
     quant_context = load_and_verify_formal_run_context(
-        state_path, entrypoint_id="transformers-quant-generator-main"
+        state_path, entrypoint_id="transformers-quant-generator-main", arm="quant"
     )
-    bf16_manifest, bf16_manifest_hash = write_registered_response_manifest(
-        "bf16-generator-main",
+    bf16_manifest, bf16_manifest_hash = write_formal_response_manifest(
+        bf16_context,
         bf16_output,
         attestation_hash=bf16_attestation_hash,
         case_manifest_hash=case_info["file_sha256"],
         scorer_identity_value=scorer_identity(),
-        context=bf16_context,
     )
-    quant_manifest, quant_manifest_hash = write_registered_response_manifest(
-        "transformers-quant-generator-main",
+    quant_manifest, quant_manifest_hash = write_formal_response_manifest(
+        quant_context,
         quant_output,
         attestation_hash=quant_attestation_hash,
         case_manifest_hash=case_info["file_sha256"],
         scorer_identity_value=scorer_identity(),
-        context=quant_context,
     )
     state["bf16_output_manifest_hash"] = bf16_manifest_hash
     state["quant_output_manifest_hash"] = quant_manifest_hash
-    write_registered_state("comparison-record-quant", state_path, state)
+    transition_formal_state(
+        load_and_verify_formal_run_context(
+            state_path, entrypoint_id="comparison-record-quant", arm="quant"
+        ),
+        FormalStateTransition.REFRESH_ARTIFACT_BINDINGS,
+        state,
+    )
     for raw, metrics, manifest in (
         (bf16_output, bf16_metrics, bf16_manifest),
         (quant_output, quant_metrics, quant_manifest),
@@ -280,6 +299,12 @@ def build_native_comparable(
             raise AssertionError(completed.stderr or completed.stdout)
     state["bf16_output_manifest_hash"] = sha256_file(bf16_manifest)
     state["quant_output_manifest_hash"] = sha256_file(quant_manifest)
-    write_registered_state("comparison-record-quant", state_path, state)
+    transition_formal_state(
+        load_and_verify_formal_run_context(
+            state_path, entrypoint_id="comparison-record-quant", arm="quant"
+        ),
+        FormalStateTransition.REFRESH_ARTIFACT_BINDINGS,
+        state,
+    )
     state = json.loads(state_path.read_text(encoding="utf-8"))
     return state_path, state

@@ -48,20 +48,14 @@ class P05EvidenceEnforcementTests(unittest.TestCase):
             score_rows([],protocol_id=V4_PROTOCOL,scorer_mode='canonical',scorer_identity_value=scorer_identity())
         with tempfile.TemporaryDirectory() as td:
             state_path, _ = build_native_comparable(Path(td))
-            result = score_rows(
-                [self._row()],
-                protocol_id=V4_PROTOCOL,
-                scorer_mode='canonical',
-                scorer_identity_value=scorer_identity(),
-                comparison_state_path=state_path,
-            )
-        self.assertEqual(result['row_count'],1)
-        self.assertEqual(result['formal_aggregate']['exact_call'],1)
-        self.assertEqual(len(result['row_results']),1)
-        self.assertTrue(
-            result['row_results'][0]['parser_diagnostics_v2']['exact_call']
-        )
-        self.assertIn('formal_aggregate', result)
+            with self.assertRaises(ScorerPolicyError):
+                score_rows(
+                    [self._row()],
+                    protocol_id=V4_PROTOCOL,
+                    scorer_mode='canonical',
+                    scorer_identity_value=scorer_identity(),
+                    comparison_state_path=state_path,
+                )
 
     def test_failure_priority_is_stable(self):
         self.assertEqual(normalize_failure_codes(['UNSUPPORTED_TOOL','TRAILING_CONTENT','UNSUPPORTED_TOOL']),('TRAILING_CONTENT',['TRAILING_CONTENT','UNSUPPORTED_TOOL']))

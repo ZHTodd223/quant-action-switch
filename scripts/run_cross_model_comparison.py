@@ -31,9 +31,14 @@ from comparison_eligibility import (
 )
 from model_state_attestation import verify_attestation, verify_output_manifest
 from scorer_identity import ScorerIdentityError, validate_scorer_identity
-from manifest_writer_registry import write_registered_state
+from manifest_writer_registry import (
+    FormalStateTransition,
+    initialize_formal_state,
+    transition_formal_state,
+)
 from formal_evidence import (
     FormalEvidenceError,
+    load_and_verify_formal_run_context,
     validate_formal_metrics,
     verify_metrics_binding,
     verify_state_integrity,
@@ -64,8 +69,6 @@ def model_configuration(config: dict[str, Any], model_id: str) -> dict[str, Any]
 
 
 def init_run(args: argparse.Namespace) -> None:
-    if hasattr(args, "invoke"):
-        return args.invoke("comparison-init")
     config = load_object(args.config)
     protocol = load_object(args.protocol)
     if config.get("protocol_id") != PROTOCOL_ID or protocol.get("protocol_id") != PROTOCOL_ID:
@@ -150,7 +153,7 @@ def init_run(args: argparse.Namespace) -> None:
     )
     state_path = run_root / "comparison_state.json"
     validate_comparison_state_schema(state)
-    write_registered_state("comparison-init", state_path, state)
+    initialize_formal_state(state_path, state)
     print(
         json.dumps(
             {
@@ -307,10 +310,11 @@ def _record_runtime_evidence(
 
 
 def record_bf16(args: argparse.Namespace) -> None:
-    if hasattr(args, "invoke"):
-        return args.invoke("comparison-record-bf16")
     state = load_object(args.state)
     validate_comparison_state_schema(state)
+    context = load_and_verify_formal_run_context(
+        args.state, entrypoint_id="comparison-record-bf16", arm="bf16"
+    )
     protocol = load_object(args.protocol)
     baseline = load_object(args.baseline_decision)
     gate = load_object(args.gate_decision)
@@ -328,14 +332,15 @@ def record_bf16(args: argparse.Namespace) -> None:
         state_root=args.state.parent,
         verify_files=True,
     )
-    write_registered_state("comparison-record-bf16", args.state, result)
+    transition_formal_state(context, FormalStateTransition.RECORD_BF16, result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 def record_quantized(args: argparse.Namespace) -> None:
-    if hasattr(args, "invoke"):
-        return args.invoke("comparison-record-quant")
     state = load_object(args.state)
+    context = load_and_verify_formal_run_context(
+        args.state, entrypoint_id="comparison-record-quant", arm="quant"
+    )
     protocol = load_object(args.protocol)
     gate = load_object(args.gate_decision)
     before = determine_comparison_eligibility(
@@ -390,7 +395,7 @@ def record_quantized(args: argparse.Namespace) -> None:
         state_root=args.state.parent,
         verify_files=True,
     )
-    write_registered_state("comparison-record-quant", args.state, result)
+    transition_formal_state(context, FormalStateTransition.RECORD_QUANT, result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

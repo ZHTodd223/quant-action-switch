@@ -23,7 +23,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
-from manifest_writer_registry import write_registered_response_manifest
+from manifest_writer_registry import write_formal_response_manifest
 
 SYSTEM_MESSAGE = (
     "You are in a synthetic sandbox. When a tool is required, return exactly one JSON object "
@@ -44,9 +44,7 @@ def build_messages(system_message: str, prompt: str, mode: str) -> list[dict[str
     raise ValueError(mode)
 
 
-def main(contract_request=None) -> None:
-    if contract_request is not None:
-        return contract_request.invoke("bf16-generator-main")
+def main(argv=None, *, generation_runtime=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--eval-data", type=Path, required=True)
@@ -71,7 +69,7 @@ def main(contract_request=None) -> None:
         choices=("system", "prepend_user"),
         default="system",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
 
@@ -82,8 +80,30 @@ def main(contract_request=None) -> None:
         output=args.output,
     )
     formal_context = load_and_verify_formal_run_context(
-        args.comparison_state, entrypoint_id="bf16-generator-main"
+        args.comparison_state, entrypoint_id="bf16-generator-main", arm="bf16"
     )
+    if generation_runtime is not None:
+        generation_runtime(args, context)
+        output_manifest, output_manifest_hash = write_formal_response_manifest(
+            formal_context,
+            args.output,
+            attestation_hash=context["state"][
+                "bf16_model_state_attestation_hash"
+            ],
+            case_manifest_hash=context["case_manifest_hash"],
+            scorer_identity_value=context["state"]["scorer"],
+        )
+        print(
+            json.dumps(
+                {
+                    "output": str(args.output),
+                    "output_manifest": str(output_manifest),
+                    "output_manifest_hash": output_manifest_hash,
+                    "injected_generation_runtime": True,
+                }
+            )
+        )
+        return
     try:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -217,13 +237,12 @@ def main(contract_request=None) -> None:
                     + "\n"
                 )
             handle.flush()
-    output_manifest, output_manifest_hash = write_registered_response_manifest(
-        "bf16-generator-main",
+    output_manifest, output_manifest_hash = write_formal_response_manifest(
+        formal_context,
         args.output,
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],
         scorer_identity_value=context["state"]["scorer"],
-        context=formal_context,
     )
     print(
         json.dumps(

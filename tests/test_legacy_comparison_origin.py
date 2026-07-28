@@ -16,8 +16,10 @@ from comparison_eligibility import (  # noqa: E402
     validate_comparison_state_schema,
 )
 from summarize_cross_model_comparison import summarize  # noqa: E402
-from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E402
-from manifest_writer_registry import write_registered_state  # noqa: E402
+from tests.runtime_evidence_fixtures import (  # noqa: E402
+    build_native_comparable,
+    reseal_state_for_attack,
+)
 
 
 class LegacyComparisonOriginTests(unittest.TestCase):
@@ -135,7 +137,7 @@ class LegacyComparisonOriginTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path, state = build_native_comparable(Path(temporary))
             state["quant_source_run_id"] = "different-source-run"
-            write_registered_state("comparison-record-quant", path, state)
+            reseal_state_for_attack(path, state)
             result = summarize([path])
         self.assertEqual(result["quantization_effect_run_ids"], [])
         self.assertEqual(result["models"], [])

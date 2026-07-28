@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import importlib
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -272,21 +273,164 @@ def _capability(entrypoint_id: str, writer_id: str) -> FormalWriteCapability:
     return FormalWriteCapability(entrypoint_id, writer_id, _CAPABILITY_NONCE)
 
 
-def write_registered_response_manifest(entrypoint_id: str, *args, **kwargs):
-    writer_id = "response-output-manifest-writer"
-    _require_entrypoint(entrypoint_id, writer_id)
-    formal_context = kwargs.pop("context", None)
-    from formal_evidence import FormalRunContext
-    if (
-        not isinstance(formal_context, FormalRunContext)
-        or formal_context.entrypoint_id != entrypoint_id
-    ):
+class FormalStateTransition(str, Enum):
+    RECORD_BF16 = "RECORD_BF16"
+    RECORD_QUANT = "RECORD_QUANT"
+    REFRESH_ARTIFACT_BINDINGS = "REFRESH_ARTIFACT_BINDINGS"
+
+
+_TRANSITION_ENTRYPOINT = {
+    FormalStateTransition.RECORD_BF16: "comparison-record-bf16",
+    FormalStateTransition.RECORD_QUANT: "comparison-record-quant",
+    FormalStateTransition.REFRESH_ARTIFACT_BINDINGS: "comparison-record-quant",
+}
+
+
+def initialize_formal_state(path: Path, state: Mapping[str, Any]) -> str:
+    """Create one state path once; callers cannot select an authorization id."""
+
+    writer_id = "comparison-state-integrity-writer"
+    from formal_evidence import state_hash_path, write_state_with_integrity
+    if path.exists() or state_hash_path(path).exists():
         raise ValueError(
-            "FORMAL_ENTRYPOINT_CONTEXT_INVALID: response manifest writer "
-            "requires a verified context for the calling entrypoint"
+            "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED: state already exists"
         )
+    payload = dict(state)
+    payload["formal_creation"] = formal_creation_record(
+        "comparison-init", writer_id, path
+    )
+    from comparison_eligibility import validate_comparison_state_schema
+    validate_comparison_state_schema(payload)
+    return write_state_with_integrity(
+        path,
+        payload,
+        _formal_capability=_capability("comparison-init", writer_id),
+    )
+
+
+def transition_formal_state(
+    context,
+    transition: FormalStateTransition,
+    state: Mapping[str, Any],
+) -> str:
+    """Compare-and-swap a state through one schema-constrained transition."""
+
+    writer_id = "comparison-state-integrity-writer"
+    if not isinstance(transition, FormalStateTransition):
+        raise ValueError(
+            "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED: invalid transition"
+        )
+    entrypoint_id = _TRANSITION_ENTRYPOINT[transition]
+    from formal_evidence import (
+        FormalEvidenceError,
+        revalidate_formal_run_context,
+        write_state_with_integrity,
+    )
+    current = revalidate_formal_run_context(
+        context,
+        allowed_entrypoint_ids=(entrypoint_id,),
+        expected_arm=("bf16" if transition is FormalStateTransition.RECORD_BF16 else "quant"),
+    )
+    target = dict(state)
+    for field in (
+        "run_id",
+        "protocol_id",
+        "source_checkpoint",
+        "source_checkpoint_manifest_hash",
+        "case_manifest_hash",
+        "logical_cases_hash",
+    ):
+        if target.get(field) != current.get(field):
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                f"state transition changes locked field {field}",
+            )
+    if transition is FormalStateTransition.RECORD_BF16:
+        if current.get("quantization_performed") is True or current.get(
+            "comparison_status"
+        ) == "COMPARABLE":
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
+                "BF16 transition cannot run after quantized completion",
+            )
+    elif transition is FormalStateTransition.RECORD_QUANT:
+        if current.get("comparison_status") != "ELIGIBLE_NOT_QUANTIZED":
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
+                "quant transition requires ELIGIBLE_NOT_QUANTIZED",
+            )
+    else:
+        allowed_changes = {
+            "bf16_output_manifest_hash",
+            "quant_output_manifest_hash",
+            "formal_creation",
+        }
+        changed = {
+            key
+            for key in set(current) | set(target)
+            if current.get(key) != target.get(key)
+        }
+        if not changed or changed - allowed_changes:
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                "artifact refresh may only update locked manifest hashes",
+            )
+        from comparison_eligibility import sha256_file
+        for field, path_field in (
+            ("bf16_output_manifest_hash", "bf16_output_manifest_path"),
+            ("quant_output_manifest_hash", "quant_output_manifest_path"),
+        ):
+            if field in changed:
+                manifest_path = Path(str(target[path_field]))
+                if not manifest_path.is_absolute():
+                    manifest_path = context.state_path.resolve().parent / manifest_path
+                if target[field] != sha256_file(manifest_path.resolve()):
+                    raise FormalEvidenceError(
+                        "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                        f"{field} does not match the locked manifest",
+                    )
+    target["formal_creation"] = formal_creation_record(
+        entrypoint_id, writer_id, context.state_path
+    )
+    from comparison_eligibility import validate_comparison_state_schema
+    validate_comparison_state_schema(target)
+    return write_state_with_integrity(
+        context.state_path,
+        target,
+        _formal_capability=_capability(entrypoint_id, writer_id),
+    )
+
+
+def write_formal_response_manifest(context, *args, **kwargs):
+    writer_id = "response-output-manifest-writer"
+    entrypoint_id = context.entrypoint_id
+    allowed = {
+        "bf16-generator-main": "bf16",
+        "transformers-quant-generator-main": "quant",
+        "native-quant-generator-main": "quant",
+        "gguf-generator-main": "quant",
+    }
+    if entrypoint_id not in allowed:
+        raise ValueError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID: generator context is required"
+        )
+    from formal_evidence import resolve_formal_arm_artifacts
     from model_state_attestation import write_output_manifest
     output = Path(args[0] if args else kwargs["output"])
+    state, artifacts = resolve_formal_arm_artifacts(
+        context,
+        allowed_entrypoint_ids=tuple(allowed),
+        arm=allowed[entrypoint_id],
+    )
+    if output.resolve() != artifacts["raw"]:
+        raise ValueError(
+            "FORMAL_ENTRYPOINT_ARM_MISMATCH: output is not the locked arm path"
+        )
+    identity = kwargs.get("scorer_identity_value")
+    if identity != state.get("scorer"):
+        raise ValueError(
+            "SCORER_IDENTITY_HASH_MISMATCH: writer identity differs from state"
+        )
     manifest_path = output.with_suffix(output.suffix + ".manifest.json")
     return write_output_manifest(
         *args,
@@ -298,47 +442,41 @@ def write_registered_response_manifest(entrypoint_id: str, *args, **kwargs):
     )
 
 
-def write_registered_state(
-    entrypoint_id: str, path: Path, state: Mapping[str, Any]
-) -> str:
-    writer_id = "comparison-state-integrity-writer"
-    _require_entrypoint(entrypoint_id, writer_id)
-    payload = dict(state)
-    payload["formal_creation"] = formal_creation_record(
-        entrypoint_id, writer_id, path
-    )
-    from comparison_eligibility import validate_comparison_state_schema
-    validate_comparison_state_schema(payload)
-    from formal_evidence import write_state_with_integrity
-    return write_state_with_integrity(
-        path,
-        payload,
-        _formal_capability=_capability(entrypoint_id, writer_id),
-    )
-
-
-def bind_registered_metrics(
-    entrypoint_id: str,
+def bind_formal_metrics(
+    context,
     manifest_path: Path,
     metrics_path: Path,
-    **kwargs,
 ) -> str:
     writer_id = "formal-metrics-manifest-binder"
-    _require_entrypoint(entrypoint_id, writer_id)
+    if context.entrypoint_id != "formal-scorer-main":
+        raise ValueError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID: scorer context is required"
+        )
     from formal_evidence import bind_metrics_to_output_manifest
     return bind_metrics_to_output_manifest(
         manifest_path,
         metrics_path,
-        **kwargs,
-        _formal_capability=_capability(entrypoint_id, writer_id),
+        context=context,
+        _formal_capability=_capability("formal-scorer-main", writer_id),
     )
 
 
-def write_registered_summary(
-    entrypoint_id: str, path: Path, summary: Mapping[str, Any]
+def write_formal_summary(
+    contexts, path: Path, summary: Mapping[str, Any]
 ) -> str:
     writer_id = "comparison-summary-integrity-writer"
-    _require_entrypoint(entrypoint_id, writer_id)
+    contexts = tuple(contexts)
+    if not contexts:
+        raise ValueError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID: summary requires verified states"
+        )
+    from formal_evidence import revalidate_formal_run_context
+    for context in contexts:
+        revalidate_formal_run_context(
+            context,
+            allowed_entrypoint_ids=("comparison-summary-main",),
+            expected_arm="summary",
+        )
     if (
         not isinstance(summary.get("included_runs"), list)
         or not isinstance(summary.get("input_evidence_hashes"), Mapping)
@@ -347,12 +485,36 @@ def write_registered_summary(
     from formal_evidence import write_summary_with_integrity
     payload = dict(summary)
     payload["formal_creation"] = formal_creation_record(
-        entrypoint_id, writer_id, path
+        "comparison-summary-main", writer_id, path
     )
     return write_summary_with_integrity(
         path,
         payload,
-        _formal_capability=_capability(entrypoint_id, writer_id),
+        _formal_capability=_capability("comparison-summary-main", writer_id),
+    )
+
+
+def write_registered_response_manifest(*args, **kwargs):
+    raise ValueError(
+        "FORMAL_WRITER_CONTEXT_INVALID: caller-supplied entrypoint dispatch removed"
+    )
+
+
+def write_registered_state(*args, **kwargs):
+    raise ValueError(
+        "FORMAL_WRITER_CONTEXT_INVALID: caller-supplied entrypoint dispatch removed"
+    )
+
+
+def bind_registered_metrics(*args, **kwargs):
+    raise ValueError(
+        "FORMAL_WRITER_CONTEXT_INVALID: caller-supplied entrypoint dispatch removed"
+    )
+
+
+def write_registered_summary(*args, **kwargs):
+    raise ValueError(
+        "FORMAL_WRITER_CONTEXT_INVALID: caller-supplied entrypoint dispatch removed"
     )
 
 
@@ -372,10 +534,11 @@ def discover_formal_entrypoint_calls(root: Path) -> set[tuple[str, str, str]]:
     """Resolve direct/module aliases and discover registered dispatcher calls."""
 
     dispatchers = {
-        "write_registered_response_manifest",
-        "write_registered_state",
-        "bind_registered_metrics",
-        "write_registered_summary",
+        "write_formal_response_manifest": "response-output-manifest-writer",
+        "initialize_formal_state": "comparison-state-integrity-writer",
+        "transition_formal_state": "comparison-state-integrity-writer",
+        "bind_formal_metrics": "formal-metrics-manifest-binder",
+        "write_formal_summary": "comparison-summary-integrity-writer",
     }
     found: set[tuple[str, str, str]] = set()
     for path in sorted((root / "scripts").glob("*.py")):
@@ -409,11 +572,17 @@ def discover_formal_entrypoint_calls(root: Path) -> set[tuple[str, str, str]]:
                     and child.func.value.id in module_aliases
                     else ""
                 )
-                if name not in dispatchers or not child.args:
+                if name not in dispatchers:
                     continue
-                first = child.args[0]
-                if isinstance(first, ast.Constant) and isinstance(first.value, str):
-                    found.add((module, node.name, first.value))
+                matches = [
+                    spec
+                    for spec in FORMAL_ENTRYPOINTS
+                    if spec["module"] == module
+                    and spec["function"] == node.name
+                    and spec["writer_id"] == dispatchers[name]
+                ]
+                for spec in matches:
+                    found.add((module, node.name, spec["id"]))
     return found
 
 

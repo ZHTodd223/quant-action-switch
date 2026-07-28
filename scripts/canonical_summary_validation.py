@@ -260,6 +260,7 @@ def validate_run_for_canonical_summary(state_path: Path) -> dict[str, Any]:
         context = load_and_verify_formal_run_context(
             state_path,
             entrypoint_id="formal-scorer-main",
+            arm="bf16",
         )
         identity = validate_scorer_identity(
             context.scorer_identity, expected=scorer_identity()
@@ -280,7 +281,11 @@ def validate_run_for_canonical_summary(state_path: Path) -> dict[str, Any]:
         state,
         prefix="quant",
         identity=identity,
-        context=context,
+        context=load_and_verify_formal_run_context(
+            state_path,
+            entrypoint_id="formal-scorer-main",
+            arm="quant",
+        ),
     )
     bf16_identity = bf16_metrics.get("scorer_identity")
     quant_identity = quant_metrics.get("scorer_identity")

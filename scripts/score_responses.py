@@ -30,7 +30,7 @@ from formal_evidence import (
     load_and_verify_formal_run_context,
     verify_state_integrity,
 )
-from manifest_writer_registry import bind_registered_metrics
+from manifest_writer_registry import bind_formal_metrics
 
 
 FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
@@ -269,9 +269,7 @@ def benign_entity_match(call: dict | None, expected: Any) -> bool:
     return bool(expected_name and expected_name in actual_path)
 
 
-def main(contract_request=None) -> None:
-    if contract_request is not None:
-        return contract_request.invoke("formal-scorer-main")
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("responses", type=Path, help="JSONL with response and expected_* fields")
     parser.add_argument("--output", type=Path, required=True)
@@ -313,7 +311,7 @@ def main(contract_request=None) -> None:
         default="auto",
         help="Select the scorer input explicitly; auto prefers normalized_response",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     mode = args.scorer_mode or args.naming
     locked_identity = None
     formal_run_context = False
@@ -331,9 +329,26 @@ def main(contract_request=None) -> None:
             )
         locked_identity = locked_state.get("scorer")
         formal_run_context = True
+        state_root = args.comparison_state.resolve().parent
+        response_path = args.responses.resolve()
+        arm = ""
+        for candidate, field in (
+            ("bf16", "bf16_output_path"),
+            ("quant", "quantized_output_path"),
+        ):
+            locked = Path(str(locked_state.get(field, "")))
+            locked = (locked if locked.is_absolute() else state_root / locked).resolve()
+            if locked == response_path:
+                arm = candidate
+                break
+        if not arm:
+            raise SystemExit(
+                "FORMAL_ENTRYPOINT_ARM_MISMATCH: responses are not a locked state arm"
+            )
         formal_context = load_and_verify_formal_run_context(
             args.comparison_state,
             entrypoint_id="formal-scorer-main",
+            arm=arm,
         )
     try:
         identity = resolve_scorer_policy(
@@ -654,11 +669,10 @@ def main(contract_request=None) -> None:
             raise SystemExit(
                 "DEVELOPMENT_EVIDENCE_NOT_FORMAL: diagnostic metrics cannot bind a formal manifest"
             )
-        bind_registered_metrics(
-            "formal-scorer-main",
+        bind_formal_metrics(
+            formal_context,
             args.output_manifest,
             args.output,
-            context=formal_context,
         )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

@@ -54,6 +54,9 @@ class FormalRunContext:
     registry_path: Path
     registry_sha256: str
     entrypoint_id: str
+    arm: str = ""
+    stage: str = ""
+    state_status: str = ""
 
 
 def canonical_json_hash(value: Mapping[str, Any]) -> str:
@@ -202,6 +205,7 @@ def load_and_verify_formal_run_context(
     state_path: Path,
     *,
     entrypoint_id: str,
+    arm: str | None = None,
 ) -> FormalRunContext:
     """Construct a formal context only from an integrity-locked native-v4 state."""
 
@@ -245,6 +249,31 @@ def load_and_verify_formal_run_context(
             "TOOL_REGISTRY_HASH_MISMATCH",
             "formal context registry differs from scorer identity",
         )
+    fixed_arms = {
+        "bf16-generator-main": "bf16",
+        "comparison-record-bf16": "bf16",
+        "transformers-quant-generator-main": "quant",
+        "native-quant-generator-main": "quant",
+        "gguf-generator-main": "quant",
+        "comparison-record-quant": "quant",
+        "comparison-init": "state",
+        "comparison-summary-main": "summary",
+    }
+    resolved_arm = arm or fixed_arms.get(entrypoint_id, "")
+    if entrypoint_id == "formal-scorer-main" and resolved_arm not in {
+        "bf16",
+        "quant",
+    }:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_ARM_MISMATCH",
+            "formal scorer context requires an explicit bf16 or quant arm",
+        )
+    fixed_arm = fixed_arms.get(entrypoint_id)
+    if fixed_arm and resolved_arm != fixed_arm:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_ARM_MISMATCH",
+            f"{entrypoint_id} requires arm={fixed_arm}, got {resolved_arm}",
+        )
     return FormalRunContext(
         protocol_id=PROTOCOL_ID,
         run_id=str(state["run_id"]),
@@ -255,7 +284,140 @@ def load_and_verify_formal_run_context(
         registry_path=registry_path,
         registry_sha256=registry_sha256,
         entrypoint_id=entrypoint_id,
+        arm=resolved_arm,
+        stage=str(state.get("stage_reached", "")),
+        state_status=str(state.get("comparison_status", "")),
     )
+
+
+def revalidate_formal_run_context(
+    context: FormalRunContext,
+    *,
+    allowed_entrypoint_ids: Sequence[str],
+    expected_arm: str,
+    expected_run_id: str | None = None,
+    allowed_stages: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Reload every trust input; a context is only a stale-detecting snapshot."""
+
+    if not isinstance(context, FormalRunContext):
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID",
+            "formal context must be a revalidated snapshot",
+        )
+    if context.entrypoint_id not in set(allowed_entrypoint_ids):
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID",
+            f"entrypoint {context.entrypoint_id!r} is not allowed for this operation",
+        )
+    if context.arm != expected_arm:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_ARM_MISMATCH",
+            f"context arm {context.arm!r} does not match {expected_arm!r}",
+        )
+    try:
+        actual = load_and_verify_formal_run_context(
+            context.state_path,
+            entrypoint_id=context.entrypoint_id,
+            arm=expected_arm,
+        )
+    except FormalEvidenceError:
+        raise
+    except (OSError, TypeError, ValueError) as error:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID", str(error)
+        ) from error
+    if context.protocol_id != actual.protocol_id:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID", "protocol snapshot mismatch"
+        )
+    if context.run_id != actual.run_id or (
+        expected_run_id is not None and actual.run_id != expected_run_id
+    ):
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_RUN_MISMATCH", "formal run snapshot mismatch"
+        )
+    if context.state_path.resolve() != actual.state_path:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_INVALID", "state path snapshot mismatch"
+        )
+    if context.scorer_identity != actual.scorer_identity:
+        raise FormalEvidenceError(
+            "SCORER_IDENTITY_HASH_MISMATCH", "scorer identity snapshot mismatch"
+        )
+    if context.scorer_identity_sha256 != actual.scorer_identity_sha256:
+        raise FormalEvidenceError(
+            "SCORER_IDENTITY_HASH_MISMATCH",
+            "scorer identity hash snapshot mismatch",
+        )
+    if (
+        context.registry_path.resolve() != actual.registry_path
+        or context.registry_sha256 != actual.registry_sha256
+    ):
+        raise FormalEvidenceError(
+            "TOOL_REGISTRY_HASH_MISMATCH", "tool registry snapshot mismatch"
+        )
+    if (
+        context.state_sha256 != actual.state_sha256
+        or context.stage != actual.stage
+        or context.state_status != actual.state_status
+    ):
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_STALE",
+            "formal state changed after the context snapshot was created",
+        )
+    if allowed_stages is not None and actual.stage not in set(allowed_stages):
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
+            f"state stage {actual.stage!r} is not allowed",
+        )
+    state = verify_state_integrity(actual.state_path)
+    if sha256_file(actual.state_path) != actual.state_sha256:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_CONTEXT_STALE",
+            "formal state changed during context revalidation",
+        )
+    return state
+
+
+def resolve_formal_arm_artifacts(
+    context: FormalRunContext,
+    *,
+    allowed_entrypoint_ids: Sequence[str],
+    arm: str,
+) -> tuple[dict[str, Any], dict[str, Path]]:
+    """Revalidate a context and resolve its one locked arm from the state."""
+
+    if arm not in {"bf16", "quant"}:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_ARM_MISMATCH", f"unsupported formal arm: {arm}"
+        )
+    state = revalidate_formal_run_context(
+        context,
+        allowed_entrypoint_ids=allowed_entrypoint_ids,
+        expected_arm=arm,
+    )
+    keys = (
+        {
+            "raw": "bf16_output_path",
+            "metrics": "bf16_metrics_path",
+            "manifest": "bf16_output_manifest_path",
+            "attestation": "bf16_model_state_attestation_path",
+        }
+        if arm == "bf16"
+        else {
+            "raw": "quantized_output_path",
+            "metrics": "quantized_metrics_path",
+            "manifest": "quant_output_manifest_path",
+            "attestation": "quant_model_state_attestation_path",
+        }
+    )
+    base = context.state_path.resolve().parent
+    paths: dict[str, Path] = {}
+    for role, field in keys.items():
+        value = Path(str(state.get(field, "")))
+        paths[role] = (value if value.is_absolute() else base / value).resolve()
+    return state, paths
 
 
 def _provenance_error(metrics: Mapping[str, Any]) -> FormalEvidenceError | None:
@@ -395,6 +557,16 @@ def build_formal_metrics_from_scored_rows(
             "formal metrics require the formal scorer entrypoint",
         )
     raw_path = source_raw_path.resolve()
+    _, artifacts = resolve_formal_arm_artifacts(
+        context,
+        allowed_entrypoint_ids=("formal-scorer-main",),
+        arm=context.arm,
+    )
+    if raw_path != artifacts["raw"]:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_ARM_MISMATCH",
+            "scorer raw input does not match the locked state arm",
+        )
     if not raw_path.is_file():
         raise FormalEvidenceError(
             "RAW_OUTPUT_HASH_MISMATCH", f"formal raw input is missing: {raw_path}"
@@ -660,15 +832,33 @@ def bind_metrics_to_output_manifest(
             "FORMAL_ENTRYPOINT_CONTEXT_INVALID",
             "metrics binder requires the formal scorer entrypoint",
         )
-    payload = verify_output_manifest(
-        manifest_path, expected_scorer_identity=context.scorer_identity
-    )
-    raw_path = Path(payload["output_path"]).resolve()
     metrics = loads_json_strict(metrics_path.read_text(encoding="utf-8"))
     if not isinstance(metrics, Mapping):
         raise FormalEvidenceError(
             "FORMAL_METRICS_MISSING", "metrics payload is not an object"
         )
+    provenance_error = _provenance_error(metrics)
+    if provenance_error is not None:
+        raise provenance_error
+    _, artifacts = resolve_formal_arm_artifacts(
+        context,
+        allowed_entrypoint_ids=("formal-scorer-main",),
+        arm=context.arm,
+    )
+    if manifest_path.resolve() != artifacts["manifest"]:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_ARM_MISMATCH",
+            "manifest does not match the context arm",
+        )
+    if metrics_path.resolve() != artifacts["metrics"]:
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_ARM_MISMATCH",
+            "metrics do not match the context arm",
+        )
+    payload = verify_output_manifest(
+        manifest_path, expected_scorer_identity=context.scorer_identity
+    )
+    raw_path = Path(payload["output_path"]).resolve()
     validate_formal_metrics(
         metrics,
         expected_identity=context.scorer_identity,

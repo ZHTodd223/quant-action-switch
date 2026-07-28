@@ -24,7 +24,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
-from manifest_writer_registry import write_registered_response_manifest
+from manifest_writer_registry import write_formal_response_manifest
 
 
 # Local llama-server traffic must never inherit a system HTTP/SOCKS proxy.
@@ -156,9 +156,7 @@ def gguf_generation_evidence(result: dict, max_new_tokens: int) -> dict:
     }
 
 
-def main(contract_request=None) -> None:
-    if contract_request is not None:
-        return contract_request.invoke("gguf-generator-main")
+def main(argv=None, *, generation_runtime=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--server-bin", type=Path, required=True)
     parser.add_argument("--gguf", type=Path, required=True)
@@ -176,7 +174,7 @@ def main(contract_request=None) -> None:
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     for path in (args.server_bin, args.gguf, args.eval_data):
         if not path.exists():
@@ -216,8 +214,30 @@ def main(contract_request=None) -> None:
         output=args.output,
     )
     formal_context = load_and_verify_formal_run_context(
-        args.comparison_state, entrypoint_id="gguf-generator-main"
+        args.comparison_state, entrypoint_id="gguf-generator-main", arm="quant"
     )
+    if generation_runtime is not None:
+        generation_runtime(args, context)
+        output_manifest, output_manifest_hash = write_formal_response_manifest(
+            formal_context,
+            args.output,
+            attestation_hash=context["state"][
+                "quant_model_state_attestation_hash"
+            ],
+            case_manifest_hash=context["case_manifest_hash"],
+            scorer_identity_value=context["state"]["scorer"],
+        )
+        print(
+            json.dumps(
+                {
+                    "output": str(args.output),
+                    "output_manifest": str(output_manifest),
+                    "output_manifest_hash": output_manifest_hash,
+                    "injected_generation_runtime": True,
+                }
+            )
+        )
+        return
 
     args.server_log.parent.mkdir(parents=True, exist_ok=True)
     with args.server_log.open("a", encoding="utf-8") as server_log:
@@ -395,13 +415,12 @@ def main(contract_request=None) -> None:
                             insufficient_generation_evidence = True
                         handle.write(json.dumps(row, ensure_ascii=False) + "\n")
                         handle.flush()
-            output_manifest, output_manifest_hash = write_registered_response_manifest(
-                "gguf-generator-main",
+            output_manifest, output_manifest_hash = write_formal_response_manifest(
+                formal_context,
                 args.output,
                 attestation_hash=attestation_hash,
                 case_manifest_hash=context["case_manifest_hash"],
                 scorer_identity_value=context["state"]["scorer"],
-                context=formal_context,
             )
         finally:
             try:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import io
+import unittest
 from collections import Counter
 from pathlib import Path
 
@@ -74,6 +76,20 @@ def main() -> None:
     entrypoints = formal_entrypoints()
     for entrypoint in entrypoints:
         load_formal_entrypoint_callable(entrypoint)
+    forbidden_shortcuts = (
+        "contract_request",
+        "FormalEntrypointContractRequest",
+        "request.invoke",
+    )
+    for entrypoint in entrypoints:
+        path = ROOT / "scripts" / f"{entrypoint['module']}.py"
+        source = path.read_text(encoding="utf-8")
+        present = [token for token in forbidden_shortcuts if token in source]
+        if present:
+            raise SystemExit(
+                f"P0-5 coverage failed: production entrypoint shortcut in "
+                f"{path.name}: {present}"
+            )
     expected_calls = {
         (row["module"], row["function"], row["id"]) for row in entrypoints
     }
@@ -92,14 +108,29 @@ def main() -> None:
     execution = execute_formal_entrypoint_contracts()
     if (
         execution["real_callable_executed"] != len(entrypoints)
+        or execution["normal_control_flow_reached"] != len(entrypoints)
         or execution["formal_context_created"] != len(entrypoints)
         or execution["writer_reached"] != len(entrypoints)
+        or execution["positive_contracts_passed"] != len(entrypoints)
         or execution["negative_contracts_tested"] != len(entrypoints)
     ):
         raise SystemExit(
             "P0-5 coverage failed: entrypoint execution mismatch: "
             f"{execution}"
         )
+    from tests import test_p0_5_fourth_trust_boundary as trust_tests
+    suite = unittest.defaultTestLoader.loadTestsFromModule(trust_tests)
+    trust_result = unittest.TextTestRunner(
+        stream=io.StringIO(), verbosity=0
+    ).run(suite)
+    if not trust_result.wasSuccessful():
+        raise SystemExit(
+            "P0-5 coverage failed: trust-boundary runtime attacks failed"
+        )
+    context_attacks = trust_tests.FormalContextTrustBoundaryTests.EXPECTED_ATTACKS
+    dynamic_attacks = (
+        trust_tests.DynamicDispatcherTrustBoundaryTests.EXPECTED_ATTACKS
+    )
     classifications = Counter(row["classification"] for row in __import__("manifest_writer_registry").WRITERS)
     print(json.dumps({
         **counts,
@@ -113,6 +144,9 @@ def main() -> None:
         "FORMAL_V4_entrypoint_contracts_executed": execution[
             "real_callable_executed"
         ],
+        "FORMAL_V4_entrypoint_normal_control_flow": execution[
+            "normal_control_flow_reached"
+        ],
         "FORMAL_V4_entrypoint_contexts_created": execution[
             "formal_context_created"
         ],
@@ -120,6 +154,8 @@ def main() -> None:
         "FORMAL_V4_entrypoint_negative_contracts": execution[
             "negative_contracts_tested"
         ],
+        "FORMAL_V4_context_runtime_attacks": context_attacks,
+        "FORMAL_V4_dynamic_runtime_attacks": dynamic_attacks,
         "FORMAL_V4_unregistered_direct_writers": len(direct),
         "writer_classifications": dict(sorted(classifications.items())),
     }, indent=2))

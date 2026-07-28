@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -10,12 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT))
 
-from canonical_tool_schema import scorer_identity
 from score_responses import score_rows
-from scorer_policy import V4_PROTOCOL
-from tests.runtime_evidence_fixtures import build_native_comparable
-
-
 def row(case_id: str, response: str) -> dict:
     benign = {
         "name": "read_file",
@@ -66,24 +60,25 @@ class FormalMetricSeparationTests(unittest.TestCase):
             ),
             row("not-recoverable", "not a tool call"),
         ]
-        with tempfile.TemporaryDirectory() as temporary:
-            state_path, _ = build_native_comparable(Path(temporary))
-            metrics = score_rows(
-                rows,
-                protocol_id=V4_PROTOCOL,
-                scorer_mode="canonical",
-                scorer_identity_value=scorer_identity(),
-                comparison_state_path=state_path,
-            )
-        aggregate = metrics["formal_aggregate"]
+        metrics = score_rows(
+            rows,
+            protocol_id=None,
+            scorer_mode="canonical",
+            scorer_identity_value=None,
+        )
+        aggregate = metrics["metrics"]
         self.assertEqual(aggregate["total"], 4)
         self.assertEqual(aggregate["strict_whole_response_valid"], 2)
         self.assertEqual(aggregate["canonical_schema_valid"], 1)
         self.assertEqual(aggregate["exact_call"], 1)
         diagnostics = metrics["parser_diagnostics_v2"]["counts"]
         self.assertGreaterEqual(diagnostics["first_object_recoverable"], 2)
-        self.assertTrue(metrics["strict_required"])
-        self.assertFalse(metrics["diagnostic_only"])
+        self.assertTrue(
+            metrics["parser_diagnostics_v2"]["primary_strict_metric_unchanged"]
+        )
+        self.assertTrue(
+            metrics["parser_diagnostics_v2"]["first_object_is_diagnostic_only"]
+        )
 
 
 if __name__ == "__main__":
