@@ -12,7 +12,7 @@ from comparison_eligibility import (
     ComparisonStateSchemaError,
     quantization_authorization,
 )
-from generate_bf16_responses import SYSTEM_MESSAGE, build_messages
+from generate_bf16_responses import SYSTEM_MESSAGE
 from generation_termination import (
     auditable_completed_case_ids,
     generation_evidence,
@@ -30,6 +30,16 @@ from model_state_attestation import (
     write_output_manifest,
 )
 from manifest_writer_registry import write_formal_response_manifest
+from native_tool_protocol import (
+    INTERFACE_MODES,
+    build_messages,
+    build_native_tool_schemas,
+    created_at_utc,
+    render_transformers_chat_prompt,
+    resolve_system_message,
+    tool_protocol_metadata,
+    transformers_interface_evidence,
+)
 
 
 def load_backend(
@@ -125,7 +135,11 @@ def main(argv=None) -> None:
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--limit", type=int)
-    parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
+    parser.add_argument("--system-message")
+    parser.add_argument(
+        "--interface-mode", choices=INTERFACE_MODES, default="raw_json"
+    )
+    parser.add_argument("--tool-choice", default="auto")
     parser.add_argument("--include-template-end-token", action="store_true")
     parser.add_argument(
         "--system-message-mode",
@@ -133,6 +147,15 @@ def main(argv=None) -> None:
         default="system",
     )
     args = parser.parse_args(argv)
+    system_message = resolve_system_message(args.interface_mode, args.system_message)
+    tool_metadata = tool_protocol_metadata(
+        args.interface_mode, tool_choice=args.tool_choice
+    )
+    tool_schemas = (
+        build_native_tool_schemas()
+        if args.interface_mode == "native_tools"
+        else None
+    )
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
 
@@ -273,10 +296,11 @@ def main(argv=None) -> None:
         for start in range(0, len(pending), args.batch_size):
             batch = pending[start : start + args.batch_size]
             texts = [
-                tokenizer.apply_chat_template(
-                    build_messages(args.system_message, row["prompt"], args.system_message_mode),
-                    tokenize=False,
-                    add_generation_prompt=True,
+                render_transformers_chat_prompt(
+                    tokenizer,
+                    build_messages(system_message, row["prompt"], args.system_message_mode),
+                    interface_mode=args.interface_mode,
+                    tool_schemas=tool_schemas,
                 )
                 for row in batch
             ]
@@ -302,14 +326,27 @@ def main(argv=None) -> None:
                     json.dumps(
                         row
                         | {
-                            "response": evidence["normalized_response"],
                             "native_backend": args.backend,
+                            "precision": f"{args.backend}{args.bits}",
+                            "run_id": context["run_id"],
+                            "model": context["model_id"],
+                            "protocol_id": context["protocol_id"],
+                            "created_at": created_at_utc(),
+                            "sampling_config": {"do_sample": False},
+                            "generation_config": {
+                                "max_new_tokens": args.max_new_tokens,
+                                "termination": termination_config,
+                            },
                             "generation_batch_size": args.batch_size,
                             "system_message_mode": args.system_message_mode,
+                            **tool_metadata,
                             "generation_termination_config": termination_config,
                             "case_manifest_hash": context["case_manifest_hash"],
                             **attestation_ref,
                             **evidence,
+                            **transformers_interface_evidence(
+                                evidence, args.interface_mode
+                            ),
                         },
                         ensure_ascii=False,
                     )
@@ -322,6 +359,7 @@ def main(argv=None) -> None:
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],
         scorer_identity_value=context["state"]["scorer"],
+        artifact_metadata=tool_metadata,
     )
     print(
         json.dumps(
