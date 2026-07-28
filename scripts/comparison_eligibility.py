@@ -29,13 +29,19 @@ DEFAULT_STATE_SCHEMA = (
 
 
 class Stage(StrEnum):
+    INITIALIZED = "INITIALIZED"
+    BF16_GENERATION_COMPLETE = "BF16_GENERATION_COMPLETE"
+    BF16_SCORED = "BF16_SCORED"
     BASELINE = "BASELINE"
     BENIGN_ADAPTATION = "BENIGN_ADAPTATION"
     RECONSTRUCTION = "RECONSTRUCTION"
     BF16_GATE = "BF16_GATE"
     QUANTIZATION = "QUANTIZATION"
+    QUANTIZATION_COMPLETE = "QUANTIZATION_COMPLETE"
+    QUANT_SCORED = "QUANT_SCORED"
     QUANTIZED_EVALUATION = "QUANTIZED_EVALUATION"
     COMPARABLE = "COMPARABLE"
+    SUMMARY_COMPLETE = "SUMMARY_COMPLETE"
 
 
 class ComparisonStatus(StrEnum):
@@ -228,6 +234,34 @@ def validate_comparison_state_schema(
             validate_scorer_identity(state.get("scorer", {}))
         except ScorerIdentityError as error:
             raise ComparisonStateSchemaError(str(error)) from error
+    creation = state.get("formal_creation")
+    if (
+        isinstance(creation, Mapping)
+        and creation.get("entrypoint_id") == "comparison-init"
+    ):
+        initial_contract = {
+            "stage_reached": Stage.INITIALIZED,
+            "baseline_completed": False,
+            "baseline_capability_passed": False,
+            "bf16_reconstruction_completed": False,
+            "bf16_gate_passed": False,
+            "quantization_requested": False,
+            "quantization_performed": False,
+            "quantized_evaluation_completed": False,
+            "abnormal_termination": False,
+            "comparison_status": ComparisonStatus.NOT_ELIGIBLE_BASELINE_FAILED,
+            "native_protocol_comparable": False,
+        }
+        invalid = [
+            field
+            for field, expected in initial_contract.items()
+            if state.get(field) != expected
+        ]
+        if invalid:
+            raise ComparisonStateSchemaError(
+                "FORMAL_STATE_INITIALIZATION_OVERRIDE_FORBIDDEN: "
+                + ", ".join(invalid)
+            )
     if status == ComparisonStatus.COMPARABLE and origin == "native_v4":
         comparable_nonempty = (
             "source_checkpoint",
@@ -411,7 +445,7 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "case_manifest_hash": "",
         "logical_cases_hash": "",
         "renderer_id": "",
-        "stage_reached": Stage.BASELINE,
+        "stage_reached": Stage.INITIALIZED,
         "baseline_completed": False,
         "baseline_capability_passed": False,
         "bf16_reconstruction_completed": False,
@@ -421,7 +455,7 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "quantized_evaluation_completed": False,
         "abnormal_termination": False,
         "comparison_status": ComparisonStatus.NOT_ELIGIBLE_BASELINE_FAILED,
-        "blocking_reason": "baseline has not completed",
+        "blocking_reason": "formal run initialized; baseline has not completed",
         "bf16_output_path": "",
         "bf16_metrics_path": "",
         "bf16_model_state_attestation_path": "",

@@ -24,27 +24,25 @@ from manifest_writer_registry import (
     write_registered_response_manifest,
 )
 from model_state_attestation import verify_output_manifest, write_output_manifest
-from tests.test_attestation_comparison_integration import eligible_state
+from comparison_eligibility import sha256_file
+from tests.runtime_evidence_fixtures import build_native_comparable
 
 
 class ManifestWriterRegistryTests(unittest.TestCase):
     @staticmethod
-    def _formal_context(root: Path, output: Path):
-        state_path = root / (
-            f"manifest-writer-{len(list(root.glob('manifest-writer-*.state.json')))}"
-            ".state.json"
+    def _formal_context(root: Path):
+        fixture_root = root / (
+            f"manifest-writer-{len(list(root.glob('manifest-writer-*')))}"
         )
-        initialize_formal_state(
-            state_path,
-            eligible_state(
-                bf16_output_path=str(output.resolve()),
-                bf16_output_manifest_path=str(
-                    output.with_suffix(output.suffix + ".manifest.json").resolve()
-                ),
+        state_path, state = build_native_comparable(
+            fixture_root, stop_after="initialized"
+        )
+        return (
+            load_and_verify_formal_run_context(
+                state_path, entrypoint_id="bf16-generator-main", arm="bf16"
             ),
-        )
-        return load_and_verify_formal_run_context(
-            state_path, entrypoint_id="bf16-generator-main", arm="bf16"
+            state,
+            Path(state["bf16_output_path"]),
         )
 
     def test_writer_and_entrypoint_registries_are_distinct_and_complete(self):
@@ -134,14 +132,14 @@ class ManifestWriterRegistryTests(unittest.TestCase):
             )
 
     def _fresh_manifest(self, root: Path) -> tuple[Path, Path, dict]:
-        output = root / "raw.jsonl"
-        output.write_text('{"case_id":"x"}\n', encoding="utf-8")
-        context = self._formal_context(root, output)
+        context, state, output = self._formal_context(root)
         manifest, _ = write_formal_response_manifest(
             context,
             output,
-            attestation_hash="a" * 64,
-            case_manifest_hash="b" * 64,
+            attestation_hash=sha256_file(
+                Path(state["bf16_model_state_attestation_path"])
+            ),
+            case_manifest_hash=state["case_manifest_hash"],
             scorer_identity_value=scorer_identity(),
         )
         return output, manifest, json.loads(manifest.read_text(encoding="utf-8"))
@@ -202,9 +200,7 @@ class ManifestWriterRegistryTests(unittest.TestCase):
     def test_writer_rejects_missing_noncanonical_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            output = root / "raw.jsonl"
-            output.write_text("{}\n", encoding="utf-8")
-            context = self._formal_context(root, output)
+            context, state, output = self._formal_context(root)
             for identity in (
                 None,
                 scorer_identity() | {"evidence_class": "LEGACY_HISTORICAL"},
@@ -217,8 +213,10 @@ class ManifestWriterRegistryTests(unittest.TestCase):
                     write_formal_response_manifest(
                         context,
                         output,
-                        attestation_hash="a" * 64,
-                        case_manifest_hash="b" * 64,
+                        attestation_hash=sha256_file(
+                            Path(state["bf16_model_state_attestation_path"])
+                        ),
+                        case_manifest_hash=state["case_manifest_hash"],
                         scorer_identity_value=identity,
                     )
 

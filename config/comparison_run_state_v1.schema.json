@@ -132,13 +132,19 @@
     },
     "stage_reached": {
       "enum": [
+        "INITIALIZED",
+        "BF16_GENERATION_COMPLETE",
+        "BF16_SCORED",
         "BASELINE",
         "BENIGN_ADAPTATION",
         "RECONSTRUCTION",
         "BF16_GATE",
         "QUANTIZATION",
+        "QUANTIZATION_COMPLETE",
+        "QUANT_SCORED",
         "QUANTIZED_EVALUATION",
-        "COMPARABLE"
+        "COMPARABLE",
+        "SUMMARY_COMPLETE"
       ]
     },
     "baseline_completed": {
@@ -334,7 +340,7 @@
         "entrypoint_id": {"type": "string", "minLength": 1},
         "entrypoint_module": {"type": "string", "minLength": 1},
         "entrypoint_function": {"type": "string", "minLength": 1},
-        "entrypoint_implementation_version": {"const": "p0-5-v3"},
+        "entrypoint_implementation_version": {"const": "p0-5-v4"},
         "writer_id": {"const": "comparison-state-integrity-writer"},
         "target_path": {"type": "string", "minLength": 1}
       },

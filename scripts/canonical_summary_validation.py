@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from case_schema import loads_json_strict
 from canonical_tool_schema import scorer_identity
@@ -18,6 +18,7 @@ from formal_evidence import (
     FormalRunContext,
     FormalEvidenceError,
     load_and_verify_formal_run_context,
+    revalidate_formal_run_context,
     validate_formal_metrics,
     verify_metrics_against_raw,
     verify_metrics_binding,
@@ -37,6 +38,126 @@ class SummaryExclusion(ValueError):
         self.run_id = run_id
         self.code = code
         self.detail = detail
+
+
+CANONICAL_SUMMARY_SCHEMA = "formal-comparison-summary-v2"
+CANONICAL_SUMMARY_CALCULATION_VERSION = "p0-5-production-summary-v1"
+
+
+def compute_canonical_comparison_summary(
+    contexts: Iterable[FormalRunContext],
+) -> dict[str, Any]:
+    """Revalidate contexts and deterministically recompute every formal result."""
+
+    from manifest_writer_registry import formal_writer_spec
+
+    verified_contexts = tuple(contexts)
+    if not verified_contexts:
+        raise FormalEvidenceError(
+            "FORMAL_SUMMARY_INPUT_INVALID", "at least one formal context is required"
+        )
+    spec = formal_writer_spec("comparison-summary-main", arm="summary")
+    paths: list[Path] = []
+    for context in verified_contexts:
+        revalidate_formal_run_context(
+            context,
+            allowed_entrypoint_ids=("comparison-summary-main",),
+            expected_arm="summary",
+            allowed_stages=spec.allowed_stages + ("SUMMARY_COMPLETE",),
+            allowed_statuses=spec.allowed_statuses,
+            artifact_kind=spec.artifact_kind,
+        )
+        paths.append(context.state_path.resolve())
+    if len(set(paths)) != len(paths):
+        raise FormalEvidenceError(
+            "FORMAL_SUMMARY_INPUT_INVALID", "duplicate run state context"
+        )
+    models = sorted(
+        (validate_run_for_canonical_summary(path) for path in paths),
+        key=lambda row: row["run_id"],
+    )
+    run_ids = [row["run_id"] for row in models]
+    if len(set(run_ids)) != len(run_ids):
+        raise FormalEvidenceError(
+            "FORMAL_SUMMARY_INPUT_INVALID", "duplicate formal run_id"
+        )
+    deltas = [
+        float(row["formal_metrics"]["quant_minus_bf16_exact_call_rate"])
+        for row in models
+    ]
+    identity = validate_scorer_identity(models[0]["scorer"], expected=scorer_identity())
+    if any(
+        hash_scorer_identity(row["scorer"]) != hash_scorer_identity(identity)
+        for row in models
+    ):
+        raise FormalEvidenceError(
+            "STATE_METRICS_IDENTITY_MISMATCH",
+            "included runs do not share one scorer identity",
+        )
+    return {
+        "summary_schema_version": CANONICAL_SUMMARY_SCHEMA,
+        "protocol_id": PROTOCOL_ID,
+        "calculation_version": CANONICAL_SUMMARY_CALCULATION_VERSION,
+        "status": "formal_comparison_summary_complete",
+        "selection_mode": "native_v4_only",
+        "context_state_paths": [str(path) for path in sorted(paths)],
+        "scorer_identity": identity,
+        "scorer_identity_sha256": hash_scorer_identity(identity),
+        "tool_registry_sha256": verified_contexts[0].registry_sha256,
+        "models": models,
+        "included_runs": run_ids,
+        "excluded_runs": [],
+        "reason_codes": [],
+        "quantization_effect_model_count": len(models),
+        "formal_metrics": {
+            row["run_id"]: row["formal_metrics"] for row in models
+        },
+        "behavioral_drift": sum(deltas) / len(deltas),
+        "input_evidence_hashes": {
+            row["run_id"]: row["verified_input_hashes"] for row in models
+        },
+        "not_quantized_runs_are_zero_effects": False,
+    }
+
+
+def verify_formal_summary(
+    summary_path: Path,
+    contexts: Iterable[FormalRunContext],
+) -> dict[str, Any]:
+    """Verify the sidecar, rerun the production core, and compare full payload."""
+
+    from manifest_writer_registry import formal_creation_record
+
+    hash_path = summary_path.with_suffix(summary_path.suffix + ".sha256")
+    try:
+        declared = hash_path.read_text(encoding="ascii").strip()
+        actual = sha256_file(summary_path)
+        stored = loads_json_strict(summary_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        raise FormalEvidenceError(
+            "FORMAL_SUMMARY_EVIDENCE_HASH_MISMATCH", str(error)
+        ) from error
+    if declared != actual:
+        raise FormalEvidenceError(
+            "FORMAL_SUMMARY_EVIDENCE_HASH_MISMATCH",
+            "formal summary hash sidecar mismatch",
+        )
+    if not isinstance(stored, dict):
+        raise FormalEvidenceError(
+            "FORMAL_SUMMARY_INPUT_INVALID", "formal summary is not an object"
+        )
+    expected = compute_canonical_comparison_summary(contexts)
+    expected["formal_creation"] = formal_creation_record(
+        "comparison-summary-main",
+        "comparison-summary-integrity-writer",
+        summary_path,
+    )
+    if stored != expected:
+        raise FormalEvidenceError(
+            "FORMAL_SUMMARY_RECOMPUTE_MISMATCH",
+            "stored summary differs from deterministic production recomputation",
+        )
+    return stored
 
 
 def _exclude(run_id: str, code: str, detail: str, error: Exception | None = None):

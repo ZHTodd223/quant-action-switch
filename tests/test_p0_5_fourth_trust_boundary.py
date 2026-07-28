@@ -98,33 +98,19 @@ class FormalContextTrustBoundaryTests(unittest.TestCase):
                     _bind(state, context)
                 executed += 1
 
-            stale = genuine
             generator = load_and_verify_formal_run_context(
                 state_path, entrypoint_id="bf16-generator-main", arm="bf16"
             )
-            manifest, manifest_hash = write_formal_response_manifest(
-                generator,
-                Path(state["bf16_output_path"]),
-                attestation_hash=state["bf16_model_state_attestation_hash"],
-                case_manifest_hash=state["case_manifest_hash"],
-                scorer_identity_value=state["scorer"],
-            )
-            self.assertTrue(manifest.is_file())
-            changed = dict(state)
-            changed["bf16_output_manifest_hash"] = manifest_hash
-            transition_formal_state(
-                load_and_verify_formal_run_context(
-                    state_path,
-                    entrypoint_id="comparison-record-quant",
-                    arm="quant",
-                ),
-                FormalStateTransition.REFRESH_ARTIFACT_BINDINGS,
-                changed,
-            )
             with self.assertRaises(FormalEvidenceError) as caught:
-                _bind(state, stale)
+                write_formal_response_manifest(
+                    generator,
+                    Path(state["bf16_output_path"]),
+                    attestation_hash=state["bf16_model_state_attestation_hash"],
+                    case_manifest_hash=state["case_manifest_hash"],
+                    scorer_identity_value=state["scorer"],
+                )
             self.assertEqual(
-                caught.exception.code, "FORMAL_ENTRYPOINT_CONTEXT_STALE"
+                caught.exception.code, "FORMAL_ENTRYPOINT_STAGE_MISMATCH"
             )
             executed += 1
         self.assertEqual(executed, self.EXPECTED_ATTACKS)

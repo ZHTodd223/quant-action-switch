@@ -34,7 +34,7 @@ from model_state_attestation import (
 from manifest_writer_registry import write_formal_response_manifest
 
 
-def main(argv=None, *, generation_runtime=None) -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--eval-data", type=Path, required=True)
@@ -131,28 +131,6 @@ def main(argv=None, *, generation_runtime=None) -> None:
         entrypoint_id="transformers-quant-generator-main",
         arm="quant",
     )
-    if generation_runtime is not None:
-        generation_runtime(args, context)
-        output_manifest, output_manifest_hash = write_formal_response_manifest(
-            formal_context,
-            args.output,
-            attestation_hash=context["state"][
-                "quant_model_state_attestation_hash"
-            ],
-            case_manifest_hash=context["case_manifest_hash"],
-            scorer_identity_value=context["state"]["scorer"],
-        )
-        print(
-            json.dumps(
-                {
-                    "output": str(args.output),
-                    "output_manifest": str(output_manifest),
-                    "output_manifest_hash": output_manifest_hash,
-                    "injected_generation_runtime": True,
-                }
-            )
-        )
-        return
 
     requested_quant_config = (
         {
@@ -233,7 +211,6 @@ def main(argv=None, *, generation_runtime=None) -> None:
         args.output,
         attestation,
         case_manifest_hash=context["case_manifest_hash"],
-        scorer_identity_value=context["state"]["scorer"],
     )
     if attestation["attestation"]["passed"] is not True:
         print(json.dumps(attestation["attestation"], ensure_ascii=False))

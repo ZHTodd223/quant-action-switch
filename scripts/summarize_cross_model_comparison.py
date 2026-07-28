@@ -217,11 +217,11 @@ def main(argv=None) -> None:
             )
             for state_path in args.states
         ]
-        write_formal_summary(contexts, args.output, result)
+        result = write_formal_summary(contexts, args.output)
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    if result["invalid_evidence_runs"]:
+    if result.get("invalid_evidence_runs"):
         raise SystemExit(23)
-    if result["invalid_state_runs"]:
+    if result.get("invalid_state_runs"):
         raise SystemExit(21)
 
 

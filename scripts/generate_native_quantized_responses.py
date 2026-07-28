@@ -8,7 +8,10 @@ import json
 from pathlib import Path
 
 from case_schema import loads_json_strict
-from comparison_eligibility import ComparisonStateSchemaError, quantization_authorization
+from comparison_eligibility import (
+    ComparisonStateSchemaError,
+    quantization_authorization,
+)
 from generate_bf16_responses import SYSTEM_MESSAGE, build_messages
 from generation_termination import (
     auditable_completed_case_ids,
@@ -95,7 +98,7 @@ def model_device(model):
         return torch.device("cuda")
 
 
-def main(argv=None, *, generation_runtime=None) -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--quantized-checkpoint-manifest", type=Path, required=True)
@@ -171,28 +174,6 @@ def main(argv=None, *, generation_runtime=None) -> None:
         entrypoint_id="native-quant-generator-main",
         arm="quant",
     )
-    if generation_runtime is not None:
-        generation_runtime(args, context)
-        output_manifest, output_manifest_hash = write_formal_response_manifest(
-            formal_context,
-            args.output,
-            attestation_hash=context["state"][
-                "quant_model_state_attestation_hash"
-            ],
-            case_manifest_hash=context["case_manifest_hash"],
-            scorer_identity_value=context["state"]["scorer"],
-        )
-        print(
-            json.dumps(
-                {
-                    "output": str(args.output),
-                    "output_manifest": str(output_manifest),
-                    "output_manifest_hash": output_manifest_hash,
-                    "injected_generation_runtime": True,
-                }
-            )
-        )
-        return
     requested_quant_config = {
         "bits": args.bits,
         "group_size": args.group_size,
@@ -258,7 +239,6 @@ def main(argv=None, *, generation_runtime=None) -> None:
         args.output,
         attestation,
         case_manifest_hash=context["case_manifest_hash"],
-        scorer_identity_value=context["state"]["scorer"],
     )
     if attestation["attestation"]["passed"] is not True:
         print(json.dumps(attestation["attestation"], ensure_ascii=False))

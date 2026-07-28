@@ -297,6 +297,8 @@ def revalidate_formal_run_context(
     expected_arm: str,
     expected_run_id: str | None = None,
     allowed_stages: Sequence[str] | None = None,
+    allowed_statuses: Sequence[str] | None = None,
+    artifact_kind: str | None = None,
 ) -> dict[str, Any]:
     """Reload every trust input; a context is only a stale-detecting snapshot."""
 
@@ -327,6 +329,30 @@ def revalidate_formal_run_context(
         raise FormalEvidenceError(
             "FORMAL_ENTRYPOINT_CONTEXT_INVALID", str(error)
         ) from error
+    if artifact_kind is not None:
+        from manifest_writer_registry import formal_writer_spec
+
+        expected_kind = formal_writer_spec(
+            context.entrypoint_id, arm=expected_arm
+        ).artifact_kind
+        if artifact_kind != expected_kind:
+            raise FormalEvidenceError(
+                "FORMAL_ARTIFACT_KIND_MISMATCH",
+                f"artifact kind {artifact_kind!r} does not match {expected_kind!r}",
+            )
+    if allowed_stages is not None and actual.stage not in set(allowed_stages):
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
+            f"state stage {actual.stage!r} is not allowed",
+        )
+    if (
+        allowed_statuses is not None
+        and actual.state_status not in set(allowed_statuses)
+    ):
+        raise FormalEvidenceError(
+            "FORMAL_ENTRYPOINT_STATUS_MISMATCH",
+            f"state status {actual.state_status!r} is not allowed",
+        )
     if context.protocol_id != actual.protocol_id:
         raise FormalEvidenceError(
             "FORMAL_ENTRYPOINT_CONTEXT_INVALID", "protocol snapshot mismatch"
@@ -366,11 +392,6 @@ def revalidate_formal_run_context(
             "FORMAL_ENTRYPOINT_CONTEXT_STALE",
             "formal state changed after the context snapshot was created",
         )
-    if allowed_stages is not None and actual.stage not in set(allowed_stages):
-        raise FormalEvidenceError(
-            "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
-            f"state stage {actual.stage!r} is not allowed",
-        )
     state = verify_state_integrity(actual.state_path)
     if sha256_file(actual.state_path) != actual.state_sha256:
         raise FormalEvidenceError(
@@ -385,6 +406,9 @@ def resolve_formal_arm_artifacts(
     *,
     allowed_entrypoint_ids: Sequence[str],
     arm: str,
+    allowed_stages: Sequence[str],
+    allowed_statuses: Sequence[str],
+    artifact_kind: str,
 ) -> tuple[dict[str, Any], dict[str, Path]]:
     """Revalidate a context and resolve its one locked arm from the state."""
 
@@ -396,6 +420,9 @@ def resolve_formal_arm_artifacts(
         context,
         allowed_entrypoint_ids=allowed_entrypoint_ids,
         expected_arm=arm,
+        allowed_stages=allowed_stages,
+        allowed_statuses=allowed_statuses,
+        artifact_kind=artifact_kind,
     )
     keys = (
         {
@@ -557,10 +584,25 @@ def build_formal_metrics_from_scored_rows(
             "formal metrics require the formal scorer entrypoint",
         )
     raw_path = source_raw_path.resolve()
+    from manifest_writer_registry import formal_writer_spec
+    spec = formal_writer_spec(context.entrypoint_id, arm=context.arm)
+    recompute_stages = (
+        ("BF16_GENERATION_COMPLETE", "COMPARABLE", "SUMMARY_COMPLETE")
+        if context.arm == "bf16"
+        else ("QUANTIZATION_COMPLETE", "COMPARABLE", "SUMMARY_COMPLETE")
+    )
+    recompute_statuses = (
+        ("NOT_ELIGIBLE_BASELINE_FAILED", "COMPARABLE")
+        if context.arm == "bf16"
+        else ("ELIGIBLE_NOT_QUANTIZED", "COMPARABLE")
+    )
     _, artifacts = resolve_formal_arm_artifacts(
         context,
         allowed_entrypoint_ids=("formal-scorer-main",),
         arm=context.arm,
+        allowed_stages=recompute_stages,
+        allowed_statuses=recompute_statuses,
+        artifact_kind=spec.artifact_kind,
     )
     if raw_path != artifacts["raw"]:
         raise FormalEvidenceError(
@@ -815,6 +857,9 @@ def bind_metrics_to_output_manifest(
     metrics_path: Path,
     *,
     context: FormalRunContext,
+    allowed_stages: Sequence[str],
+    allowed_statuses: Sequence[str],
+    artifact_kind: str,
     _formal_capability: Any,
 ) -> str:
     """Verify production metrics against raw, then bind; never formalize input."""
@@ -844,6 +889,9 @@ def bind_metrics_to_output_manifest(
         context,
         allowed_entrypoint_ids=("formal-scorer-main",),
         arm=context.arm,
+        allowed_stages=allowed_stages,
+        allowed_statuses=allowed_statuses,
+        artifact_kind=artifact_kind,
     )
     if manifest_path.resolve() != artifacts["manifest"]:
         raise FormalEvidenceError(

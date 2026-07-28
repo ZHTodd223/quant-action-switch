@@ -49,7 +49,9 @@ class SidecarUpgradeAttacks(unittest.TestCase):
         executed = 0
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            state_path, state = build_native_comparable(root)
+            state_path, state = build_native_comparable(
+                root, stop_after="bf16_scoring_ready"
+            )
             metrics_path = Path(state["bf16_metrics_path"])
             valid = json.loads(metrics_path.read_text(encoding="utf-8"))
             sidecar = {
@@ -94,7 +96,9 @@ class RowAggregateAttacks(unittest.TestCase):
         for attack in range(14):
             with self.subTest(attack=attack), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
-                state_path, state = build_native_comparable(root, case_count=2)
+                state_path, state = build_native_comparable(
+                    root, case_count=2, stop_after="bf16_scoring_ready"
+                )
                 metrics_path = Path(state["bf16_metrics_path"])
                 metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
                 rows = copy.deepcopy(metrics["row_results"])

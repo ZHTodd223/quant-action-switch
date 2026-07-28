@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import argparse
+import contextlib
+import io
 import json
 import hashlib
 import shutil
@@ -9,6 +12,7 @@ from pathlib import Path
 
 from comparison_eligibility import (
     checkpoint_identity,
+    default_run_state,
     sha256_file,
     validate_logical_case_manifest,
 )
@@ -19,12 +23,9 @@ from model_state_attestation import (
 from formal_evidence import load_and_verify_formal_run_context
 from canonical_tool_schema import scorer_identity
 from manifest_writer_registry import (
-    FormalStateTransition,
     initialize_formal_state,
-    transition_formal_state,
     write_formal_response_manifest,
 )
-from tests.test_attestation_comparison_integration import eligible_state
 from tests.test_model_state_attestation import FakeModel, make_checkpoint
 
 
@@ -109,6 +110,7 @@ def build_native_comparable(
     *,
     relative_paths: bool = False,
     case_count: int = 1,
+    stop_after: str | None = None,
 ) -> tuple[Path, dict]:
     root.mkdir(parents=True, exist_ok=True)
     checkpoint, checkpoint_manifest = make_checkpoint(root)
@@ -181,8 +183,6 @@ def build_native_comparable(
     )
     bf16_manifest = bf16_output.with_suffix(bf16_output.suffix + ".manifest.json")
     quant_manifest = quant_output.with_suffix(quant_output.suffix + ".manifest.json")
-    bf16_manifest_hash = "0" * 64
-    quant_manifest_hash = "0" * 64
     bf16_metrics = root / "bf16.metrics.json"
     quant_metrics = root / "int8.metrics.json"
 
@@ -193,7 +193,13 @@ def build_native_comparable(
             else str(path.resolve())
         )
 
-    state = eligible_state(
+    state = default_run_state(
+        model_id="fixture",
+        model_family="qwen2",
+        run_id="run",
+        source_run_id="source",
+        training_stage="reconstruction",
+        renderer_id="fixture",
         source_checkpoint=owned(checkpoint),
         source_checkpoint_manifest=owned(checkpoint_manifest),
         source_checkpoint_manifest_hash=identity["checkpoint_manifest_hash"],
@@ -203,47 +209,30 @@ def build_native_comparable(
         case_manifest=owned(case_manifest),
         case_manifest_hash=case_info["file_sha256"],
         logical_cases_hash=case_info["logical_cases_sha256"],
-        quantization_requested=True,
-        quantization_performed=True,
-        quantized_evaluation_completed=True,
         bf16_output_path=owned(bf16_output),
         bf16_metrics_path=owned(bf16_metrics),
         bf16_model_state_attestation_path=owned(bf16_attestation),
-        bf16_model_state_attestation_hash=bf16_attestation_hash,
         bf16_output_manifest_path=owned(bf16_manifest),
-        bf16_output_manifest_hash=bf16_manifest_hash,
         quantized_output_path=owned(quant_output),
         quantized_metrics_path=owned(quant_metrics),
         quant_model_state_attestation_path=owned(quant_attestation),
-        quant_model_state_attestation_hash=quant_attestation_hash,
         quant_output_manifest_path=owned(quant_manifest),
-        quant_output_manifest_hash=quant_manifest_hash,
         bf16_source_checkpoint_hash=identity["checkpoint_manifest_hash"],
         bf16_source_checkpoint=owned(checkpoint),
         bf16_source_checkpoint_manifest=owned(checkpoint_manifest),
         bf16_config_hash=identity["config_hash"],
         bf16_tokenizer_hash=identity["tokenizer_hash"],
         bf16_generation_config_hash=identity["generation_config_hash"],
-        quant_source_checkpoint_hash=identity["checkpoint_manifest_hash"],
-        quant_source_checkpoint=owned(checkpoint),
-        quant_source_checkpoint_manifest=owned(checkpoint_manifest),
-        quant_config_hash=identity["config_hash"],
-        quant_tokenizer_hash=identity["tokenizer_hash"],
-        quant_generation_config_hash=identity["generation_config_hash"],
+        bf16_training_stage="reconstruction",
+        bf16_source_run_id="source",
         bf16_case_manifest_hash=case_info["file_sha256"],
-        quant_case_manifest_hash=case_info["file_sha256"],
-        stage_reached="COMPARABLE",
-        comparison_status="COMPARABLE",
-        blocking_reason="",
-        native_protocol_comparable=True,
     )
     state_path = root / "comparison_state.json"
     initialize_formal_state(state_path, state)
+    if stop_after == "initialized":
+        return state_path, json.loads(state_path.read_text(encoding="utf-8"))
     bf16_context = load_and_verify_formal_run_context(
         state_path, entrypoint_id="bf16-generator-main", arm="bf16"
-    )
-    quant_context = load_and_verify_formal_run_context(
-        state_path, entrypoint_id="transformers-quant-generator-main", arm="quant"
     )
     bf16_manifest, bf16_manifest_hash = write_formal_response_manifest(
         bf16_context,
@@ -252,44 +241,28 @@ def build_native_comparable(
         case_manifest_hash=case_info["file_sha256"],
         scorer_identity_value=scorer_identity(),
     )
-    quant_manifest, quant_manifest_hash = write_formal_response_manifest(
-        quant_context,
-        quant_output,
-        attestation_hash=quant_attestation_hash,
-        case_manifest_hash=case_info["file_sha256"],
-        scorer_identity_value=scorer_identity(),
-    )
-    state["bf16_output_manifest_hash"] = bf16_manifest_hash
-    state["quant_output_manifest_hash"] = quant_manifest_hash
-    transition_formal_state(
-        load_and_verify_formal_run_context(
-            state_path, entrypoint_id="comparison-record-quant", arm="quant"
-        ),
-        FormalStateTransition.REFRESH_ARTIFACT_BINDINGS,
-        state,
-    )
     for raw, metrics, manifest in (
         (bf16_output, bf16_metrics, bf16_manifest),
-        (quant_output, quant_metrics, quant_manifest),
     ):
+        command = [
+            sys.executable,
+            str(ROOT / "scripts" / "score_responses.py"),
+            str(raw),
+            "--output",
+            str(metrics),
+            "--scorer-mode",
+            "canonical",
+            "--protocol-id",
+            "agent_toolcall_protocol_v4_comparison_eligibility",
+            "--evidence-class",
+            "CANONICAL_V4",
+            "--comparison-state",
+            str(state_path),
+        ]
+        if stop_after != "bf16_scoring_ready":
+            command.extend(["--output-manifest", str(manifest)])
         completed = subprocess.run(
-            [
-                sys.executable,
-                str(ROOT / "scripts" / "score_responses.py"),
-                str(raw),
-                "--output",
-                str(metrics),
-                "--scorer-mode",
-                "canonical",
-                "--protocol-id",
-                "agent_toolcall_protocol_v4_comparison_eligibility",
-                "--evidence-class",
-                "CANONICAL_V4",
-                "--comparison-state",
-                str(state_path),
-                "--output-manifest",
-                str(manifest),
-            ],
+            command,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -297,14 +270,80 @@ def build_native_comparable(
         )
         if completed.returncode:
             raise AssertionError(completed.stderr or completed.stdout)
-    state["bf16_output_manifest_hash"] = sha256_file(bf16_manifest)
-    state["quant_output_manifest_hash"] = sha256_file(quant_manifest)
-    transition_formal_state(
-        load_and_verify_formal_run_context(
-            state_path, entrypoint_id="comparison-record-quant", arm="quant"
-        ),
-        FormalStateTransition.REFRESH_ARTIFACT_BINDINGS,
-        state,
+    if stop_after == "bf16_scoring_ready":
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        if state["stage_reached"] != "BF16_GENERATION_COMPLETE":
+            raise AssertionError(
+                "production fixture did not reach BF16_GENERATION_COMPLETE"
+            )
+        return state_path, state
+    if stop_after == "bf16_scored":
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        if state["stage_reached"] != "BF16_SCORED":
+            raise AssertionError("production fixture did not reach BF16_SCORED")
+        return state_path, state
+    baseline = root / "baseline.json"
+    gate = root / "gate.json"
+    baseline.write_text('{"pass": true}\n', encoding="utf-8")
+    gate.write_text('{"pass": true}\n', encoding="utf-8")
+    from run_cross_model_comparison import record_bf16, record_quantized
+    with contextlib.redirect_stdout(io.StringIO()):
+        record_bf16(
+            argparse.Namespace(
+                state=state_path,
+                protocol=ROOT / "config" / "agent_toolcall_protocol_v4.json",
+                baseline_decision=baseline,
+                gate_decision=gate,
+            )
+        )
+    quant_context = load_and_verify_formal_run_context(
+        state_path, entrypoint_id="transformers-quant-generator-main", arm="quant"
     )
+    quant_manifest, quant_manifest_hash = write_formal_response_manifest(
+        quant_context,
+        quant_output,
+        attestation_hash=quant_attestation_hash,
+        case_manifest_hash=case_info["file_sha256"],
+        scorer_identity_value=scorer_identity(),
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "score_responses.py"),
+            str(quant_output),
+            "--output",
+            str(quant_metrics),
+            "--scorer-mode",
+            "canonical",
+            "--protocol-id",
+            "agent_toolcall_protocol_v4_comparison_eligibility",
+            "--evidence-class",
+            "CANONICAL_V4",
+            "--comparison-state",
+            str(state_path),
+            "--output-manifest",
+            str(quant_manifest),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.returncode:
+        raise AssertionError(completed.stderr or completed.stdout)
+    with contextlib.redirect_stdout(io.StringIO()):
+        record_quantized(
+            argparse.Namespace(
+                state=state_path,
+                protocol=ROOT / "config" / "agent_toolcall_protocol_v4.json",
+                gate_decision=gate,
+                source_checkpoint=None,
+                source_checkpoint_manifest=None,
+                case_manifest=None,
+                failed=False,
+            )
+        )
     state = json.loads(state_path.read_text(encoding="utf-8"))
+    if state["stage_reached"] != "COMPARABLE":
+        raise AssertionError("production fixture did not reach COMPARABLE")
     return state_path, state

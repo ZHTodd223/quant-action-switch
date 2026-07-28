@@ -148,8 +148,6 @@ def init_run(args: argparse.Namespace) -> None:
         bf16_training_stage=args.training_stage,
         bf16_source_run_id=args.source_run_id,
         bf16_case_manifest_hash=locked_info["file_sha256"],
-        comparison_status=ComparisonStatus.NOT_ELIGIBLE_BASELINE_FAILED,
-        blocking_reason="baseline capability has not been recorded",
     )
     state_path = run_root / "comparison_state.json"
     validate_comparison_state_schema(state)
@@ -274,9 +272,14 @@ def _record_runtime_evidence(
     state: dict[str, Any],
     *,
     prefix: str,
+    state_path: Path,
     allow_failed: bool = False,
 ) -> None:
-    attestation_path = Path(state[f"{prefix}_model_state_attestation_path"])
+    from comparison_eligibility import resolve_evidence_path
+
+    attestation_path = resolve_evidence_path(
+        state_path, state[f"{prefix}_model_state_attestation_path"]
+    )
     if not attestation_path.is_file():
         if allow_failed:
             state[f"{prefix}_attestation_status"] = "LOADER_FAILED"
@@ -298,7 +301,9 @@ def _record_runtime_evidence(
         raise SystemExit(
             f"model-state attestation did not pass: {decision.get('status')}"
         )
-    output_manifest = Path(state[f"{prefix}_output_manifest_path"])
+    output_manifest = resolve_evidence_path(
+        state_path, state[f"{prefix}_output_manifest_path"]
+    )
     verify_output_manifest(
         output_manifest,
         expected_attestation_hash=state[
@@ -318,7 +323,8 @@ def record_bf16(args: argparse.Namespace) -> None:
     protocol = load_object(args.protocol)
     baseline = load_object(args.baseline_decision)
     gate = load_object(args.gate_decision)
-    _record_runtime_evidence(state, prefix="bf16")
+    state["formal_creation"] = None
+    _record_runtime_evidence(state, prefix="bf16", state_path=args.state)
     state.update(
         baseline_completed=True,
         baseline_capability_passed=baseline.get("pass") is True,
@@ -357,30 +363,43 @@ def record_quantized(args: argparse.Namespace) -> None:
         )
     state["quantization_requested"] = True
     if args.failed:
-        _record_runtime_evidence(state, prefix="quant", allow_failed=True)
+        _record_runtime_evidence(
+            state, prefix="quant", state_path=args.state, allow_failed=True
+        )
         state["quantization_performed"] = False
         state["quantized_evaluation_completed"] = False
     else:
-        quantized_output = Path(state["quantized_output_path"])
-        quantized_metrics = Path(state["quantized_metrics_path"])
+        from comparison_eligibility import resolve_evidence_path
+        quantized_output = resolve_evidence_path(
+            args.state, state["quantized_output_path"]
+        )
+        quantized_metrics = resolve_evidence_path(
+            args.state, state["quantized_metrics_path"]
+        )
         if not quantized_output.is_file() or not quantized_metrics.is_file():
             raise SystemExit("quantized output and metrics must exist before completion")
-        _record_runtime_evidence(state, prefix="quant")
+        _record_runtime_evidence(state, prefix="quant", state_path=args.state)
         source_checkpoint = (
-            args.source_checkpoint or Path(state["source_checkpoint"])
+            args.source_checkpoint
+            or resolve_evidence_path(args.state, state["source_checkpoint"])
         ).resolve()
         source_manifest = (
             args.source_checkpoint_manifest
             or source_checkpoint / "manifest.sha256.json"
         ).resolve()
-        case_manifest = (args.case_manifest or Path(state["case_manifest"])).resolve()
+        case_manifest = (
+            args.case_manifest
+            or resolve_evidence_path(args.state, state["case_manifest"])
+        ).resolve()
         identity = checkpoint_identity(source_checkpoint, source_manifest)
         state.update(
             quantization_performed=True,
             quantized_evaluation_completed=True,
             quant_source_checkpoint_hash=identity["source_checkpoint_hash"],
-            quant_source_checkpoint=identity["checkpoint_path"],
-            quant_source_checkpoint_manifest=identity["checkpoint_manifest"],
+            quant_source_checkpoint=state["bf16_source_checkpoint"],
+            quant_source_checkpoint_manifest=state[
+                "bf16_source_checkpoint_manifest"
+            ],
             quant_config_hash=identity["config_hash"],
             quant_tokenizer_hash=identity["tokenizer_hash"],
             quant_generation_config_hash=identity["generation_config_hash"],

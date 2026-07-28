@@ -16,7 +16,7 @@ CLASSIFICATIONS = {
     "UNRELATED",
 }
 FORMAL_CREATION_VERSION = "formal-evidence-creation-v1"
-FORMAL_ENTRYPOINT_IMPLEMENTATION_VERSION = "p0-5-v3"
+FORMAL_ENTRYPOINT_IMPLEMENTATION_VERSION = "p0-5-v4"
 
 WRITERS: tuple[dict[str, Any], ...] = (
     {
@@ -179,6 +179,110 @@ class FormalWriteCapability:
 _CAPABILITY_NONCE = object()
 
 
+@dataclass(frozen=True)
+class FormalWriterSpec:
+    id: str
+    artifact_kind: str
+    allowed_stages: tuple[str, ...]
+    allowed_statuses: tuple[str, ...]
+    allowed_arms: tuple[str, ...]
+    allowed_transitions: tuple[str, ...] = ()
+
+
+FORMAL_WRITER_SPECS: tuple[FormalWriterSpec, ...] = (
+    FormalWriterSpec(
+        "bf16-generator-main",
+        "response_output_manifest_v1",
+        ("INITIALIZED",),
+        ("NOT_ELIGIBLE_BASELINE_FAILED",),
+        ("bf16",),
+        ("RECORD_BF16_GENERATION",),
+    ),
+    FormalWriterSpec(
+        "transformers-quant-generator-main",
+        "response_output_manifest_v1",
+        ("BF16_GATE",),
+        ("ELIGIBLE_NOT_QUANTIZED",),
+        ("quant",),
+        ("RECORD_QUANT_GENERATION",),
+    ),
+    FormalWriterSpec(
+        "native-quant-generator-main",
+        "response_output_manifest_v1",
+        ("BF16_GATE",),
+        ("ELIGIBLE_NOT_QUANTIZED",),
+        ("quant",),
+        ("RECORD_QUANT_GENERATION",),
+    ),
+    FormalWriterSpec(
+        "gguf-generator-main",
+        "response_output_manifest_v1",
+        ("BF16_GATE",),
+        ("ELIGIBLE_NOT_QUANTIZED",),
+        ("quant",),
+        ("RECORD_QUANT_GENERATION",),
+    ),
+    FormalWriterSpec(
+        "comparison-record-bf16",
+        "comparison_state_hash_v1",
+        ("BF16_SCORED",),
+        ("NOT_ELIGIBLE_BASELINE_FAILED",),
+        ("bf16",),
+        ("RECORD_BF16",),
+    ),
+    FormalWriterSpec(
+        "comparison-record-quant",
+        "comparison_state_hash_v1",
+        ("QUANT_SCORED",),
+        ("ELIGIBLE_NOT_QUANTIZED",),
+        ("quant",),
+        ("RECORD_QUANT",),
+    ),
+    FormalWriterSpec(
+        "comparison-summary-main",
+        "comparison_summary_hash_v1",
+        ("COMPARABLE",),
+        ("COMPARABLE",),
+        ("summary",),
+        ("RECORD_SUMMARY",),
+    ),
+)
+
+
+def formal_writer_spec(entrypoint_id: str, *, arm: str = "") -> FormalWriterSpec:
+    if entrypoint_id == "formal-scorer-main":
+        if arm == "bf16":
+            return FormalWriterSpec(
+                entrypoint_id,
+                "formal_metrics_binding_v1",
+                ("BF16_GENERATION_COMPLETE",),
+                ("NOT_ELIGIBLE_BASELINE_FAILED",),
+                ("bf16",),
+                ("RECORD_BF16_SCORE",),
+            )
+        if arm == "quant":
+            return FormalWriterSpec(
+                entrypoint_id,
+                "formal_metrics_binding_v1",
+                ("QUANTIZATION_COMPLETE",),
+                ("ELIGIBLE_NOT_QUANTIZED",),
+                ("quant",),
+                ("RECORD_QUANT_SCORE",),
+            )
+    matches = [row for row in FORMAL_WRITER_SPECS if row.id == entrypoint_id]
+    if len(matches) != 1:
+        raise ValueError(
+            f"FORMAL_ENTRYPOINT_CONTEXT_INVALID: no writer contract for "
+            f"{entrypoint_id!r}/{arm!r}"
+        )
+    spec = matches[0]
+    if arm and arm not in spec.allowed_arms:
+        raise ValueError(
+            f"FORMAL_ENTRYPOINT_ARM_MISMATCH: {entrypoint_id} does not allow {arm}"
+        )
+    return spec
+
+
 def formal_writers() -> tuple[dict[str, Any], ...]:
     return FORMAL_WRITERS
 
@@ -274,38 +378,141 @@ def _capability(entrypoint_id: str, writer_id: str) -> FormalWriteCapability:
 
 
 class FormalStateTransition(str, Enum):
+    RECORD_BF16_GENERATION = "RECORD_BF16_GENERATION"
+    RECORD_BF16_SCORE = "RECORD_BF16_SCORE"
     RECORD_BF16 = "RECORD_BF16"
+    RECORD_QUANT_GENERATION = "RECORD_QUANT_GENERATION"
+    RECORD_QUANT_SCORE = "RECORD_QUANT_SCORE"
     RECORD_QUANT = "RECORD_QUANT"
-    REFRESH_ARTIFACT_BINDINGS = "REFRESH_ARTIFACT_BINDINGS"
+    RECORD_SUMMARY = "RECORD_SUMMARY"
+
+
+FORMAL_TRANSITION_GRAPH: dict[FormalStateTransition, dict[str, str]] = {
+    FormalStateTransition.RECORD_BF16_GENERATION: {
+        "entrypoint_id": "bf16-generator-main",
+        "source_stage": "INITIALIZED",
+        "target_stage": "BF16_GENERATION_COMPLETE",
+    },
+    FormalStateTransition.RECORD_BF16_SCORE: {
+        "entrypoint_id": "formal-scorer-main",
+        "source_stage": "BF16_GENERATION_COMPLETE",
+        "target_stage": "BF16_SCORED",
+    },
+    FormalStateTransition.RECORD_BF16: {
+        "entrypoint_id": "comparison-record-bf16",
+        "source_stage": "BF16_SCORED",
+        "target_stage": "BF16_GATE",
+    },
+    FormalStateTransition.RECORD_QUANT_GENERATION: {
+        "entrypoint_id": "quant-generator-dispatch",
+        "source_stage": "BF16_GATE",
+        "target_stage": "QUANTIZATION_COMPLETE",
+    },
+    FormalStateTransition.RECORD_QUANT_SCORE: {
+        "entrypoint_id": "formal-scorer-main",
+        "source_stage": "QUANTIZATION_COMPLETE",
+        "target_stage": "QUANT_SCORED",
+    },
+    FormalStateTransition.RECORD_QUANT: {
+        "entrypoint_id": "comparison-record-quant",
+        "source_stage": "QUANT_SCORED",
+        "target_stage": "COMPARABLE",
+    },
+    FormalStateTransition.RECORD_SUMMARY: {
+        "entrypoint_id": "comparison-summary-main",
+        "source_stage": "COMPARABLE",
+        "target_stage": "SUMMARY_COMPLETE",
+    },
+}
 
 
 _TRANSITION_ENTRYPOINT = {
+    FormalStateTransition.RECORD_BF16_GENERATION: "bf16-generator-main",
+    FormalStateTransition.RECORD_BF16_SCORE: "formal-scorer-main",
     FormalStateTransition.RECORD_BF16: "comparison-record-bf16",
     FormalStateTransition.RECORD_QUANT: "comparison-record-quant",
-    FormalStateTransition.REFRESH_ARTIFACT_BINDINGS: "comparison-record-quant",
+    FormalStateTransition.RECORD_QUANT_GENERATION: "",
+    FormalStateTransition.RECORD_QUANT_SCORE: "formal-scorer-main",
+    FormalStateTransition.RECORD_SUMMARY: "comparison-summary-main",
+}
+
+
+_INITIAL_STATE_FIELDS = {
+    "stage_reached": "INITIALIZED",
+    "baseline_completed": False,
+    "baseline_capability_passed": False,
+    "bf16_reconstruction_completed": False,
+    "bf16_gate_passed": False,
+    "quantization_requested": False,
+    "quantization_performed": False,
+    "quantized_evaluation_completed": False,
+    "abnormal_termination": False,
+    "comparison_status": "NOT_ELIGIBLE_BASELINE_FAILED",
+    "blocking_reason": "formal run initialized; baseline has not completed",
+    "bf16_model_state_attestation_hash": "",
+    "bf16_attestation_status": "",
+    "bf16_attestation_passed": False,
+    "bf16_output_manifest_hash": "",
+    "quant_model_state_attestation_hash": "",
+    "quant_attestation_status": "",
+    "quant_attestation_passed": False,
+    "quant_output_manifest_hash": "",
+    "quant_source_checkpoint_hash": "",
+    "quant_source_checkpoint": "",
+    "quant_source_checkpoint_manifest": "",
+    "quant_config_hash": "",
+    "quant_tokenizer_hash": "",
+    "quant_generation_config_hash": "",
+    "quant_training_stage": "",
+    "quant_source_run_id": "",
+    "quant_case_manifest_hash": "",
+    "native_protocol_comparable": False,
 }
 
 
 def initialize_formal_state(path: Path, state: Mapping[str, Any]) -> str:
-    """Create one state path once; callers cannot select an authorization id."""
+    """Create the one fixed formal initial state; lifecycle overrides fail closed."""
 
     writer_id = "comparison-state-integrity-writer"
-    from formal_evidence import state_hash_path, write_state_with_integrity
+    from formal_evidence import (
+        state_hash_path,
+        verify_state_integrity,
+        write_state_with_integrity,
+    )
     if path.exists() or state_hash_path(path).exists():
         raise ValueError(
             "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED: state already exists"
         )
     payload = dict(state)
+    invalid = [
+        field
+        for field, expected in _INITIAL_STATE_FIELDS.items()
+        if field in payload and payload[field] != expected
+    ]
+    if invalid:
+        stage_fields = {"stage_reached"} & set(invalid)
+        status_fields = {"comparison_status"} & set(invalid)
+        code = (
+            "FORMAL_STATE_INITIAL_STAGE_INVALID"
+            if stage_fields
+            else "FORMAL_STATE_INITIAL_STATUS_INVALID"
+            if status_fields
+            else "FORMAL_STATE_INITIALIZATION_OVERRIDE_FORBIDDEN"
+        )
+        raise ValueError(f"{code}: forbidden initial overrides: {', '.join(invalid)}")
+    payload.update(_INITIAL_STATE_FIELDS)
     payload["formal_creation"] = formal_creation_record(
         "comparison-init", writer_id, path
     )
     from comparison_eligibility import validate_comparison_state_schema
     validate_comparison_state_schema(payload)
-    return write_state_with_integrity(
+    digest = write_state_with_integrity(
         path,
         payload,
         _formal_capability=_capability("comparison-init", writer_id),
     )
+    verify_state_integrity(path)
+    return digest
 
 
 def transition_formal_state(
@@ -320,7 +527,17 @@ def transition_formal_state(
         raise ValueError(
             "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED: invalid transition"
         )
-    entrypoint_id = _TRANSITION_ENTRYPOINT[transition]
+    entrypoint_id = (
+        context.entrypoint_id
+        if transition is FormalStateTransition.RECORD_QUANT_GENERATION
+        else _TRANSITION_ENTRYPOINT[transition]
+    )
+    spec = formal_writer_spec(entrypoint_id, arm=context.arm)
+    if transition.value not in spec.allowed_transitions:
+        raise ValueError(
+            "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED: transition is not in "
+            f"the fixed writer contract for {entrypoint_id}"
+        )
     from formal_evidence import (
         FormalEvidenceError,
         revalidate_formal_run_context,
@@ -329,7 +546,10 @@ def transition_formal_state(
     current = revalidate_formal_run_context(
         context,
         allowed_entrypoint_ids=(entrypoint_id,),
-        expected_arm=("bf16" if transition is FormalStateTransition.RECORD_BF16 else "quant"),
+        expected_arm=spec.allowed_arms[0],
+        allowed_stages=spec.allowed_stages,
+        allowed_statuses=spec.allowed_statuses,
+        artifact_kind=spec.artifact_kind,
     )
     target = dict(state)
     for field in (
@@ -345,24 +565,26 @@ def transition_formal_state(
                 "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
                 f"state transition changes locked field {field}",
             )
-    if transition is FormalStateTransition.RECORD_BF16:
-        if current.get("quantization_performed") is True or current.get(
-            "comparison_status"
-        ) == "COMPARABLE":
-            raise FormalEvidenceError(
-                "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
-                "BF16 transition cannot run after quantized completion",
-            )
-    elif transition is FormalStateTransition.RECORD_QUANT:
-        if current.get("comparison_status") != "ELIGIBLE_NOT_QUANTIZED":
-            raise FormalEvidenceError(
-                "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
-                "quant transition requires ELIGIBLE_NOT_QUANTIZED",
-            )
-    else:
+    if transition in {
+        FormalStateTransition.RECORD_BF16_GENERATION,
+        FormalStateTransition.RECORD_QUANT_GENERATION,
+    }:
+        prefix = (
+            "bf16"
+            if transition is FormalStateTransition.RECORD_BF16_GENERATION
+            else "quant"
+        )
+        expected_stage = (
+            "BF16_GENERATION_COMPLETE"
+            if prefix == "bf16"
+            else "QUANTIZATION_COMPLETE"
+        )
         allowed_changes = {
-            "bf16_output_manifest_hash",
-            "quant_output_manifest_hash",
+            "stage_reached",
+            f"{prefix}_model_state_attestation_hash",
+            f"{prefix}_attestation_status",
+            f"{prefix}_attestation_passed",
+            f"{prefix}_output_manifest_hash",
             "formal_creation",
         }
         changed = {
@@ -370,35 +592,151 @@ def transition_formal_state(
             for key in set(current) | set(target)
             if current.get(key) != target.get(key)
         }
-        if not changed or changed - allowed_changes:
+        if target.get("stage_reached") != expected_stage or changed - allowed_changes:
             raise FormalEvidenceError(
                 "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
-                "artifact refresh may only update locked manifest hashes",
+                "generation transition changes fields outside its fixed artifact contract",
             )
-        from comparison_eligibility import sha256_file
-        for field, path_field in (
-            ("bf16_output_manifest_hash", "bf16_output_manifest_path"),
-            ("quant_output_manifest_hash", "quant_output_manifest_path"),
+        from comparison_eligibility import resolve_evidence_path, sha256_file
+        from model_state_attestation import verify_attestation, verify_output_manifest
+
+        attestation_path = resolve_evidence_path(
+            context.state_path, str(target[f"{prefix}_model_state_attestation_path"])
+        )
+        manifest_path = resolve_evidence_path(
+            context.state_path, str(target[f"{prefix}_output_manifest_path"])
+        )
+        attestation = verify_attestation(attestation_path)
+        decision = attestation["attestation"]
+        if (
+            target[f"{prefix}_model_state_attestation_hash"]
+            != sha256_file(attestation_path)
+            or target[f"{prefix}_attestation_status"] != decision.get("status")
+            or target[f"{prefix}_attestation_passed"] is not True
+            or decision.get("passed") is not True
         ):
-            if field in changed:
-                manifest_path = Path(str(target[path_field]))
-                if not manifest_path.is_absolute():
-                    manifest_path = context.state_path.resolve().parent / manifest_path
-                if target[field] != sha256_file(manifest_path.resolve()):
-                    raise FormalEvidenceError(
-                        "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
-                        f"{field} does not match the locked manifest",
-                    )
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                "generation transition attestation fields were not production verified",
+            )
+        verify_output_manifest(
+            manifest_path,
+            expected_attestation_hash=target[
+                f"{prefix}_model_state_attestation_hash"
+            ],
+            expected_scorer_identity=target["scorer"],
+        )
+        if target[f"{prefix}_output_manifest_hash"] != sha256_file(manifest_path):
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                "generation transition manifest hash mismatch",
+            )
+    elif transition in {
+        FormalStateTransition.RECORD_BF16_SCORE,
+        FormalStateTransition.RECORD_QUANT_SCORE,
+    }:
+        prefix = (
+            "bf16"
+            if transition is FormalStateTransition.RECORD_BF16_SCORE
+            else "quant"
+        )
+        expected_stage = "BF16_SCORED" if prefix == "bf16" else "QUANT_SCORED"
+        changed = {
+            key
+            for key in set(current) | set(target)
+            if current.get(key) != target.get(key)
+        }
+        if target.get("stage_reached") != expected_stage or changed - {
+            "stage_reached",
+            f"{prefix}_output_manifest_hash",
+            "formal_creation",
+        }:
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                "scoring transition changes fields outside its fixed metrics contract",
+            )
+        from comparison_eligibility import resolve_evidence_path, sha256_file
+        from formal_evidence import verify_metrics_binding
+
+        manifest_path = resolve_evidence_path(
+            context.state_path, str(target[f"{prefix}_output_manifest_path"])
+        )
+        metrics_field = (
+            "bf16_metrics_path" if prefix == "bf16" else "quantized_metrics_path"
+        )
+        metrics_path = resolve_evidence_path(
+            context.state_path, str(target[metrics_field])
+        )
+        from case_schema import loads_json_strict
+        manifest = loads_json_strict(manifest_path.read_text(encoding="utf-8"))
+        verify_metrics_binding(manifest, metrics_path)
+        if target[f"{prefix}_output_manifest_hash"] != sha256_file(manifest_path):
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                "scoring transition manifest hash mismatch",
+            )
+    elif transition is FormalStateTransition.RECORD_BF16:
+        if target.get("quantization_requested") is True or target.get(
+            "quantization_performed"
+        ) is True or target.get("comparison_status") == "COMPARABLE":
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
+                "BF16 transition cannot skip to quantized or comparable state",
+            )
+        from comparison_eligibility import (
+            PROTOCOL_ID,
+            determine_comparison_eligibility,
+        )
+        recomputed = determine_comparison_eligibility(
+            target,
+            None,
+            {"protocol_id": PROTOCOL_ID},
+            state_root=context.state_path.resolve().parent,
+            verify_files=True,
+        )
+        if target != recomputed:
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                "RECORD_BF16 target was not produced by production eligibility",
+            )
+    elif transition is FormalStateTransition.RECORD_QUANT:
+        from comparison_eligibility import (
+            PROTOCOL_ID,
+            determine_comparison_eligibility,
+        )
+        recomputed = determine_comparison_eligibility(
+            target,
+            None,
+            {"protocol_id": PROTOCOL_ID},
+            state_root=context.state_path.resolve().parent,
+            verify_files=True,
+        )
+        if target != recomputed:
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                "RECORD_QUANT target was not produced by production eligibility",
+            )
+    elif transition is FormalStateTransition.RECORD_SUMMARY:
+        expected = dict(current)
+        expected["stage_reached"] = "SUMMARY_COMPLETE"
+        if target != expected:
+            raise FormalEvidenceError(
+                "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                "summary completion may only advance the fixed lifecycle stage",
+            )
     target["formal_creation"] = formal_creation_record(
         entrypoint_id, writer_id, context.state_path
     )
     from comparison_eligibility import validate_comparison_state_schema
     validate_comparison_state_schema(target)
-    return write_state_with_integrity(
+    digest = write_state_with_integrity(
         context.state_path,
         target,
         _formal_capability=_capability(entrypoint_id, writer_id),
     )
+    from formal_evidence import verify_state_integrity
+    verify_state_integrity(context.state_path)
+    return digest
 
 
 def write_formal_response_manifest(context, *args, **kwargs):
@@ -415,12 +753,16 @@ def write_formal_response_manifest(context, *args, **kwargs):
             "FORMAL_ENTRYPOINT_CONTEXT_INVALID: generator context is required"
         )
     from formal_evidence import resolve_formal_arm_artifacts
-    from model_state_attestation import write_output_manifest
+    from model_state_attestation import verify_output_manifest, write_output_manifest
+    spec = formal_writer_spec(entrypoint_id, arm=allowed[entrypoint_id])
     output = Path(args[0] if args else kwargs["output"])
     state, artifacts = resolve_formal_arm_artifacts(
         context,
         allowed_entrypoint_ids=tuple(allowed),
         arm=allowed[entrypoint_id],
+        allowed_stages=spec.allowed_stages,
+        allowed_statuses=spec.allowed_statuses,
+        artifact_kind=spec.artifact_kind,
     )
     if output.resolve() != artifacts["raw"]:
         raise ValueError(
@@ -432,7 +774,7 @@ def write_formal_response_manifest(context, *args, **kwargs):
             "SCORER_IDENTITY_HASH_MISMATCH: writer identity differs from state"
         )
     manifest_path = output.with_suffix(output.suffix + ".manifest.json")
-    return write_output_manifest(
+    result = write_output_manifest(
         *args,
         **kwargs,
         formal_creation=formal_creation_record(
@@ -440,6 +782,45 @@ def write_formal_response_manifest(context, *args, **kwargs):
         ),
         _formal_capability=_capability(entrypoint_id, writer_id),
     )
+    verify_output_manifest(
+        result[0],
+        expected_attestation_hash=kwargs.get("attestation_hash"),
+        expected_scorer_identity=identity,
+    )
+    from comparison_eligibility import resolve_evidence_path, sha256_file
+    from formal_evidence import verify_state_integrity
+    from model_state_attestation import verify_attestation
+
+    prefix = "bf16" if allowed[entrypoint_id] == "bf16" else "quant"
+    target = verify_state_integrity(context.state_path)
+    attestation_path = resolve_evidence_path(
+        context.state_path,
+        str(target[f"{prefix}_model_state_attestation_path"]),
+    )
+    decision = verify_attestation(attestation_path)["attestation"]
+    target.update(
+        stage_reached=(
+            "BF16_GENERATION_COMPLETE"
+            if prefix == "bf16"
+            else "QUANTIZATION_COMPLETE"
+        ),
+        **{
+            f"{prefix}_model_state_attestation_hash": sha256_file(attestation_path),
+            f"{prefix}_attestation_status": str(decision.get("status", "")),
+            f"{prefix}_attestation_passed": decision.get("passed") is True,
+            f"{prefix}_output_manifest_hash": sha256_file(result[0]),
+        },
+    )
+    transition_formal_state(
+        context,
+        (
+            FormalStateTransition.RECORD_BF16_GENERATION
+            if prefix == "bf16"
+            else FormalStateTransition.RECORD_QUANT_GENERATION
+        ),
+        target,
+    )
+    return result
 
 
 def bind_formal_metrics(
@@ -453,45 +834,101 @@ def bind_formal_metrics(
             "FORMAL_ENTRYPOINT_CONTEXT_INVALID: scorer context is required"
         )
     from formal_evidence import bind_metrics_to_output_manifest
-    return bind_metrics_to_output_manifest(
+    spec = formal_writer_spec(context.entrypoint_id, arm=context.arm)
+    digest = bind_metrics_to_output_manifest(
         manifest_path,
         metrics_path,
         context=context,
+        allowed_stages=spec.allowed_stages,
+        allowed_statuses=spec.allowed_statuses,
+        artifact_kind=spec.artifact_kind,
         _formal_capability=_capability("formal-scorer-main", writer_id),
     )
+    from comparison_eligibility import sha256_file
+    from formal_evidence import verify_state_integrity
+
+    target = verify_state_integrity(context.state_path)
+    prefix = "bf16" if context.arm == "bf16" else "quant"
+    target["stage_reached"] = (
+        "BF16_SCORED" if prefix == "bf16" else "QUANT_SCORED"
+    )
+    target[f"{prefix}_output_manifest_hash"] = sha256_file(manifest_path)
+    transition_formal_state(
+        context,
+        (
+            FormalStateTransition.RECORD_BF16_SCORE
+            if prefix == "bf16"
+            else FormalStateTransition.RECORD_QUANT_SCORE
+        ),
+        target,
+    )
+    return digest
 
 
-def write_formal_summary(
-    contexts, path: Path, summary: Mapping[str, Any]
-) -> str:
+def write_formal_summary(contexts, path: Path) -> dict[str, Any]:
     writer_id = "comparison-summary-integrity-writer"
     contexts = tuple(contexts)
     if not contexts:
         raise ValueError(
             "FORMAL_ENTRYPOINT_CONTEXT_INVALID: summary requires verified states"
         )
-    from formal_evidence import revalidate_formal_run_context
+    from formal_evidence import (
+        load_and_verify_formal_run_context,
+        revalidate_formal_run_context,
+        verify_state_integrity,
+    )
+    spec = formal_writer_spec("comparison-summary-main", arm="summary")
     for context in contexts:
         revalidate_formal_run_context(
             context,
             allowed_entrypoint_ids=("comparison-summary-main",),
             expected_arm="summary",
+            allowed_stages=spec.allowed_stages,
+            allowed_statuses=spec.allowed_statuses,
+            artifact_kind=spec.artifact_kind,
         )
-    if (
-        not isinstance(summary.get("included_runs"), list)
-        or not isinstance(summary.get("input_evidence_hashes"), Mapping)
-    ):
-        raise ValueError("formal summary lacks verified included runs/input hashes")
+    from canonical_summary_validation import (
+        compute_canonical_comparison_summary,
+        verify_formal_summary,
+    )
     from formal_evidence import write_summary_with_integrity
-    payload = dict(summary)
+
+    payload = compute_canonical_comparison_summary(contexts)
     payload["formal_creation"] = formal_creation_record(
         "comparison-summary-main", writer_id, path
     )
-    return write_summary_with_integrity(
+    write_summary_with_integrity(
         path,
         payload,
         _formal_capability=_capability("comparison-summary-main", writer_id),
     )
+    verify_formal_summary(path, contexts)
+    for context in contexts:
+        target = verify_state_integrity(context.state_path)
+        target["stage_reached"] = "SUMMARY_COMPLETE"
+        transition_formal_state(
+            context,
+            FormalStateTransition.RECORD_SUMMARY,
+            target,
+        )
+    final_contexts = tuple(
+        load_and_verify_formal_run_context(
+            context.state_path,
+            entrypoint_id="comparison-summary-main",
+            arm="summary",
+        )
+        for context in contexts
+    )
+    payload = compute_canonical_comparison_summary(final_contexts)
+    payload["formal_creation"] = formal_creation_record(
+        "comparison-summary-main", writer_id, path
+    )
+    write_summary_with_integrity(
+        path,
+        payload,
+        _formal_capability=_capability("comparison-summary-main", writer_id),
+    )
+    return verify_formal_summary(path, final_contexts)
 
 
 def write_registered_response_manifest(*args, **kwargs):
@@ -519,6 +956,10 @@ def write_registered_summary(*args, **kwargs):
 
 
 def _require_entrypoint(entrypoint_id: str, writer_id: str) -> None:
+    if writer_id == "comparison-state-integrity-writer" and any(
+        row["id"] == entrypoint_id for row in FORMAL_ENTRYPOINTS
+    ):
+        return
     matches = [
         row for row in FORMAL_ENTRYPOINTS
         if row["id"] == entrypoint_id and row["writer_id"] == writer_id
@@ -708,3 +1149,8 @@ def validate_registry() -> None:
             raise ValueError(
                 f"{row['id']} references unknown writer {row['writer_id']}"
             )
+    if set(FORMAL_TRANSITION_GRAPH) != set(FormalStateTransition):
+        raise ValueError("formal transition graph does not cover the transition enum")
+    for transition, graph_row in FORMAL_TRANSITION_GRAPH.items():
+        if not graph_row["source_stage"] or not graph_row["target_stage"]:
+            raise ValueError(f"incomplete transition graph row: {transition.value}")

@@ -2,6 +2,7 @@
 """Fail-closed numeric acceptance gate for P0-5 code coverage."""
 from __future__ import annotations
 
+import ast
 import json
 import io
 import unittest
@@ -13,6 +14,7 @@ from manifest_writer_registry import (
     discover_formal_entrypoint_calls,
     discover_unregistered_direct_formal_writes,
     formal_entrypoints,
+    formal_writer_spec,
     formal_writers,
     load_formal_entrypoint_callable,
     validate_registry,
@@ -56,6 +58,57 @@ def semantic_count(filename: str) -> int:
     return len(serialized)
 
 
+def unapproved_formal_semantic_mutations() -> list[str]:
+    """Find direct formal lifecycle/result writes outside production owners."""
+
+    semantic_fields = {
+        "stage_reached",
+        "comparison_status",
+        "included_runs",
+        "quantization_effect_model_count",
+        "behavioral_drift",
+    }
+    allowed = {
+        ("comparison_eligibility.py", "_result"),
+        ("manifest_writer_registry.py", "transition_formal_state"),
+        ("manifest_writer_registry.py", "bind_formal_metrics"),
+        ("manifest_writer_registry.py", "write_formal_summary"),
+    }
+    findings: list[str] = []
+    for path in sorted((ROOT / "scripts").glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        function_stack: list[str] = []
+
+        class Visitor(ast.NodeVisitor):
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+                function_stack.append(node.name)
+                self.generic_visit(node)
+                function_stack.pop()
+
+            visit_AsyncFunctionDef = visit_FunctionDef
+
+            def visit_Assign(self, node: ast.Assign) -> None:
+                self._check(node.targets, node.lineno)
+                self.generic_visit(node)
+
+            def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+                self._check((node.target,), node.lineno)
+                self.generic_visit(node)
+
+            def _check(self, targets, lineno: int) -> None:
+                for target in targets:
+                    if not isinstance(target, ast.Subscript):
+                        continue
+                    key = target.slice
+                    if isinstance(key, ast.Constant) and key.value in semantic_fields:
+                        owner = function_stack[-1] if function_stack else "<module>"
+                        if (path.name, owner) not in allowed:
+                            findings.append(f"{path.name}:{lineno}:{owner}:{key.value}")
+
+        Visitor().visit(tree)
+    return findings
+
+
 def main() -> None:
     validate_registry()
     counts = {name: count(filename) for name, (filename, _) in FILES.items()}
@@ -76,11 +129,43 @@ def main() -> None:
     entrypoints = formal_entrypoints()
     for entrypoint in entrypoints:
         load_formal_entrypoint_callable(entrypoint)
+        if entrypoint["id"] != "comparison-init":
+            arms = (
+                ("bf16", "quant")
+                if entrypoint["id"] == "formal-scorer-main"
+                else ("",)
+            )
+            for arm in arms:
+                spec = formal_writer_spec(entrypoint["id"], arm=arm)
+                if (
+                    not spec.artifact_kind
+                    or not spec.allowed_stages
+                    or not spec.allowed_statuses
+                    or not spec.allowed_arms
+                ):
+                    raise SystemExit(
+                        "P0-5 coverage failed: incomplete fixed writer stage contract"
+                    )
     forbidden_shortcuts = (
         "contract_request",
         "FormalEntrypointContractRequest",
         "request.invoke",
+        "generation_runtime",
     )
+    trace_source = (ROOT / "scripts" / "formal_entrypoint_contracts.py").read_text(
+        encoding="utf-8"
+    )
+    for token in (
+        '"arguments_validated": True',
+        '"formal_context_created": True',
+        "arguments_validated=True",
+        "formal_context_created=True",
+    ):
+        if token in trace_source:
+            raise SystemExit(
+                "P0-5 coverage failed: entrypoint trace contains self-reported "
+                f"success field: {token}"
+            )
     for entrypoint in entrypoints:
         path = ROOT / "scripts" / f"{entrypoint['module']}.py"
         source = path.read_text(encoding="utf-8")
@@ -105,12 +190,20 @@ def main() -> None:
         raise SystemExit(
             f"P0-5 coverage failed: unregistered direct formal writers: {sorted(direct)}"
         )
+    semantic_mutations = unapproved_formal_semantic_mutations()
+    if semantic_mutations:
+        raise SystemExit(
+            "P0-5 coverage failed: unapproved direct formal semantic mutations: "
+            f"{semantic_mutations}"
+        )
     execution = execute_formal_entrypoint_contracts()
     if (
         execution["real_callable_executed"] != len(entrypoints)
         or execution["normal_control_flow_reached"] != len(entrypoints)
         or execution["formal_context_created"] != len(entrypoints)
         or execution["writer_reached"] != len(entrypoints)
+        or execution["verifier_observed"] != len(entrypoints)
+        or execution["core_observed"] != len(entrypoints)
         or execution["positive_contracts_passed"] != len(entrypoints)
         or execution["negative_contracts_tested"] != len(entrypoints)
     ):
@@ -126,6 +219,15 @@ def main() -> None:
     if not trust_result.wasSuccessful():
         raise SystemExit(
             "P0-5 coverage failed: trust-boundary runtime attacks failed"
+        )
+    from tests import test_p0_5_fifth_consistency as fifth_tests
+    fifth_suite = unittest.defaultTestLoader.loadTestsFromModule(fifth_tests)
+    fifth_result = unittest.TextTestRunner(
+        stream=io.StringIO(), verbosity=0
+    ).run(fifth_suite)
+    if not fifth_result.wasSuccessful():
+        raise SystemExit(
+            "P0-5 coverage failed: fifth-round state/summary contracts failed"
         )
     context_attacks = trust_tests.FormalContextTrustBoundaryTests.EXPECTED_ATTACKS
     dynamic_attacks = (
@@ -151,12 +253,38 @@ def main() -> None:
             "formal_context_created"
         ],
         "FORMAL_V4_entrypoint_writers_reached": execution["writer_reached"],
+        "FORMAL_V4_entrypoint_parsers_observed": execution["parser_observed"],
+        "FORMAL_V4_entrypoint_policies_observed": execution["policy_observed"],
+        "FORMAL_V4_entrypoint_contexts_observed": execution["context_observed"],
+        "FORMAL_V4_entrypoint_transitions_observed": execution[
+            "transition_observed"
+        ],
+        "FORMAL_V4_entrypoint_cores_observed": execution["core_observed"],
+        "FORMAL_V4_entrypoint_verifiers_observed": execution[
+            "verifier_observed"
+        ],
         "FORMAL_V4_entrypoint_negative_contracts": execution[
             "negative_contracts_tested"
         ],
         "FORMAL_V4_context_runtime_attacks": context_attacks,
         "FORMAL_V4_dynamic_runtime_attacks": dynamic_attacks,
         "FORMAL_V4_unregistered_direct_writers": len(direct),
+        "unapproved_direct_formal_semantic_mutations": len(semantic_mutations),
+        "initializer_fixed_state_cases": (
+            fifth_tests.InitializerFixedStateTests.INITIALIZER_CASES
+        ),
+        "transition_graph_cases": (
+            fifth_tests.TransitionAndWriterStageTests.TRANSITION_CASES
+        ),
+        "writer_stage_contract_cases": (
+            fifth_tests.TransitionAndWriterStageTests.WRITER_STAGE_CASES
+        ),
+        "summary_production_recompute_cases": (
+            fifth_tests.FormalSummaryRecomputeTests.SUMMARY_RECOMPUTE_CASES
+        ),
+        "summary_verifier_recompute_cases": (
+            fifth_tests.FormalSummaryRecomputeTests.SUMMARY_VERIFIER_CASES
+        ),
         "writer_classifications": dict(sorted(classifications.items())),
     }, indent=2))
 
