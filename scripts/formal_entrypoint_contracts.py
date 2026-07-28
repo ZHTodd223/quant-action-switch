@@ -5,6 +5,7 @@ import argparse
 import contextlib
 import io
 import json
+import re
 import sys
 import tempfile
 import types
@@ -23,6 +24,9 @@ from manifest_writer_registry import (
 )
 from tests.runtime_evidence_fixtures import build_native_comparable
 from tests.test_model_state_attestation import FakeModel, make_checkpoint
+from tests.p0_5_audit_expectations import negative_contract_specs
+
+_INVALID_INITIAL_STAGE = "COMPARABLE"
 
 
 def _callable_name(value) -> str:
@@ -370,15 +374,157 @@ def _call_and_trace(
     }
 
 
-def _expect_failure(callable_value, argument, **kwargs) -> bool:
-    try:
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
-            io.StringIO()
-        ):
-            callable_value(argument, **kwargs)
-    except (OSError, TypeError, ValueError, SystemExit):
-        return True
-    return False
+_PHASE_BY_VALIDATOR = {
+    "formal_evidence.revalidate_formal_run_context": "stage-validation",
+    "generate_quantized_responses.quantization_authorization": "quantization-authorization",
+    "generate_native_quantized_responses.quantization_authorization": "quantization-authorization",
+    "generate_gguf_responses.quantization_authorization": "quantization-authorization",
+    "run_cross_model_comparison.initialize_formal_state": "writer-validation",
+    "run_cross_model_comparison.determine_comparison_eligibility": "status-validation",
+    "score_responses.verify_state_integrity": "arm-validation",
+}
+
+
+def _reason_code(error: BaseException, stdout: str) -> tuple[str, dict | None]:
+    code = getattr(error, "code", "")
+    if code and not isinstance(error, SystemExit):
+        return str(code), None
+    message = str(error)
+    match = re.search(r"\b(FORMAL_[A-Z0-9_]+|QUANTIZATION_FAILED)\b", message)
+    if match:
+        return match.group(1), None
+    for line in reversed(stdout.splitlines()):
+        try:
+            payload = json.loads(line)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(payload, dict):
+            value = payload.get("comparison_status")
+            if value:
+                return str(value), {
+                    key: payload.get(key)
+                    for key in (
+                        "comparison_status",
+                        "blocking_reason",
+                        "quantization_launch_allowed",
+                    )
+                    if key in payload
+                }
+    prefix = message.partition(":")[0]
+    return (prefix if prefix.isupper() else ""), None
+
+
+def _evaluate_negative_contract(spec, actual: dict) -> tuple[bool, list[str]]:
+    differences = []
+    checks = {
+        "real callable not observed": actual["real_callable_observed"],
+        "target validator not observed": actual["target_validator_observed"],
+        "fixture preconditions invalid": actual["fixture_preconditions_valid"],
+        "no exception observed": bool(actual["exception_type"]),
+        "exception type mismatch": actual["exception_type"]
+        in spec.expected_exception_types,
+        "reason code mismatch": actual["reason_code"] in spec.expected_reason_codes,
+        "failure phase mismatch": actual["failure_phase"]
+        == spec.expected_failure_phase,
+        "callable mismatch": actual["callable"] == spec.expected_callable,
+        "forbidden exception observed": actual["exception_type"]
+        not in spec.forbidden_exception_types,
+    }
+    if spec.expected_exit_code is not None:
+        checks["exit code mismatch"] = actual["exit_code"] == spec.expected_exit_code
+        checks["SystemExit lacks structured evidence"] = bool(
+            actual["structured_payload"]
+        )
+    for label, passed in checks.items():
+        if not passed:
+            differences.append(label)
+    return not differences, differences
+
+
+def _execute_negative_contract(
+    spec,
+    callable_value,
+    argument,
+    *,
+    target_owner,
+    target_name: str,
+    required_paths: tuple[Path, ...] = (),
+    absent_paths: tuple[Path, ...] = (),
+    mock_generation_dependencies: bool = False,
+) -> dict:
+    target = getattr(target_owner, target_name)
+    callable_spy = mock.Mock(wraps=callable_value)
+    stdout = io.StringIO()
+    error = None
+    preconditions = {
+        "required_paths": {
+            str(path): path.exists() for path in required_paths
+        },
+        "absent_paths": {
+            str(path): not path.exists() for path in absent_paths
+        },
+    }
+    fixture_valid = all(
+        value
+        for group in preconditions.values()
+        for value in group.values()
+    )
+    with contextlib.ExitStack() as stack:
+        if mock_generation_dependencies:
+            _install_generation_dependency_mocks(
+                stack, sys.modules[callable_value.__module__], argument
+            )
+        target_spy = stack.enter_context(
+            mock.patch.object(target_owner, target_name, wraps=target)
+        )
+        try:
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(
+                io.StringIO()
+            ):
+                callable_spy(argument)
+        except BaseException as caught:  # evaluated fail-closed below
+            error = caught
+    reason_code, structured = (
+        _reason_code(error, stdout.getvalue()) if error else ("", None)
+    )
+    actual = {
+        "exception_type": type(error).__name__ if error else "",
+        "reason_code": reason_code,
+        "message": str(error) if error else "",
+        "failure_phase": (
+            _PHASE_BY_VALIDATOR.get(spec.target_validator, "")
+            if target_spy.call_count
+            else ""
+        ),
+        "callable": _callable_name(callable_value),
+        "exit_code": error.code if isinstance(error, SystemExit) else None,
+        "structured_payload": structured,
+        "real_callable_observed": callable_spy.call_count == 1,
+        "target_validator_observed": target_spy.call_count > 0,
+        "target_validator_call_count": target_spy.call_count,
+        "fixture_preconditions_valid": fixture_valid,
+        "fixture_preconditions": preconditions,
+    }
+    passed, differences = _evaluate_negative_contract(spec, actual)
+    return {
+        "case_id": f"entrypoint::{spec.entrypoint_id}::negative-contract",
+        "entrypoint_id": spec.entrypoint_id,
+        "scenario_id": spec.scenario_id,
+        "executed": callable_spy.call_count == 1,
+        "passed": passed,
+        "skipped": False,
+        "fixture_preconditions_valid": fixture_valid,
+        "expected": {
+            "exception_types": list(spec.expected_exception_types),
+            "reason_codes": list(spec.expected_reason_codes),
+            "failure_phase": spec.expected_failure_phase,
+            "callable": spec.expected_callable,
+            "target_validator": spec.target_validator,
+            "exit_code": spec.expected_exit_code,
+        },
+        "actual": actual,
+        "differences": differences,
+    }
 
 
 def execute_formal_entrypoint_contracts() -> dict:
@@ -395,7 +541,8 @@ def execute_formal_entrypoint_contracts() -> dict:
     import summarize_cross_model_comparison as summary_module
 
     traces: dict[str, dict] = {}
-    negatives: dict[str, bool] = {}
+    negative_specs = {spec.entrypoint_id: spec for spec in negative_contract_specs()}
+    negatives: dict[str, dict] = {}
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
 
@@ -456,9 +603,30 @@ def execute_formal_entrypoint_contracts() -> dict:
             "artifact_written": (init_args.run_root / "comparison_state.json").is_file(),
             "transition_values": [],
         }
-        negatives["comparison-init"] = _expect_failure(
-            comparison_module.init_run, init_args
+        invalid_init_args = argparse.Namespace(
+            **(vars(init_args) | {"run_root": root / "invalid-initial-stage"})
         )
+        real_default_state = comparison_module.default_run_state
+        with mock.patch.object(
+            comparison_module,
+            "default_run_state",
+            side_effect=lambda **kwargs: real_default_state(**kwargs)
+            | {"stage_reached": _INVALID_INITIAL_STAGE},
+        ):
+            negatives["comparison-init"] = _execute_negative_contract(
+                negative_specs["comparison-init"],
+                comparison_module.init_run,
+                invalid_init_args,
+                target_owner=comparison_module,
+                target_name="initialize_formal_state",
+                required_paths=(
+                    invalid_init_args.config,
+                    invalid_init_args.protocol,
+                    invalid_init_args.source_checkpoint,
+                    invalid_init_args.source_checkpoint_manifest,
+                ),
+                absent_paths=(invalid_init_args.run_root,),
+            )
 
         state_path, initial, baseline, gate = _initial_pipeline_state(root / "flow")
         protocol = ROOT / "config" / "agent_toolcall_protocol_v4.json"
@@ -485,9 +653,19 @@ def execute_formal_entrypoint_contracts() -> dict:
             writer_name="write_formal_response_manifest",
             mock_generation_dependencies=True,
         )
-        negatives["bf16-generator-main"] = _expect_failure(
+        negatives["bf16-generator-main"] = _execute_negative_contract(
+            negative_specs["bf16-generator-main"],
             bf16_module.main,
-            bf16_argv[:-1] + [str(root / "missing-state.json")],
+            bf16_argv,
+            target_owner=evidence_module,
+            target_name="revalidate_formal_run_context",
+            required_paths=(
+                state_path,
+                state_path.with_suffix(state_path.suffix + ".sha256"),
+                checkpoint,
+                eval_data,
+            ),
+            mock_generation_dependencies=True,
         )
 
         scorer_bf16_argv = [
@@ -636,20 +814,73 @@ def execute_formal_entrypoint_contracts() -> dict:
             writer_name="write_formal_response_manifest",
             mock_generation_dependencies=True,
         )
+        negative_quant_state, _ = build_native_comparable(
+            root / "negative-quant", stop_after="bf16_scored"
+        )
+        negative_quant_baseline = root / "negative-quant-baseline.json"
+        negative_quant_gate = root / "negative-quant-gate.json"
+        _write_json(negative_quant_baseline, {"pass": True})
+        _write_json(negative_quant_gate, {"pass": False})
+        with contextlib.redirect_stdout(io.StringIO()):
+            comparison_module.record_bf16(
+                argparse.Namespace(
+                    state=negative_quant_state,
+                    protocol=protocol,
+                    baseline_decision=negative_quant_baseline,
+                    gate_decision=negative_quant_gate,
+                )
+            )
         for entrypoint_id, module, argv in (
             ("transformers-quant-generator-main", quant_module, quant_argv),
             ("native-quant-generator-main", native_module, native_argv),
             ("gguf-generator-main", gguf_module, gguf_argv),
         ):
-            negatives[entrypoint_id] = _expect_failure(
+            negative_argv = [
+                str(negative_quant_state)
+                if value == str(state_path)
+                else str(negative_quant_gate)
+                if value == str(gate)
+                else value
+                for value in argv
+            ]
+            negatives[entrypoint_id] = _execute_negative_contract(
+                negative_specs[entrypoint_id],
                 module.main,
-                [
-                    str(root / "missing-state.json")
-                    if value == str(state_path)
-                    else value
-                    for value in argv
-                ],
+                negative_argv,
+                target_owner=module,
+                target_name="quantization_authorization",
+                required_paths=(
+                    negative_quant_state,
+                    negative_quant_state.with_suffix(
+                        negative_quant_state.suffix + ".sha256"
+                    ),
+                    negative_quant_gate,
+                    eval_data,
+                ),
             )
+
+        negatives["comparison-record-quant"] = _execute_negative_contract(
+            negative_specs["comparison-record-quant"],
+            comparison_module.record_quantized,
+            argparse.Namespace(
+                state=state_path,
+                protocol=protocol,
+                gate_decision=gate,
+                source_checkpoint=None,
+                source_checkpoint_manifest=None,
+                case_manifest=None,
+                failed=False,
+            ),
+            target_owner=evidence_module,
+            target_name="revalidate_formal_run_context",
+            required_paths=(
+                state_path,
+                state_path.with_suffix(state_path.suffix + ".sha256"),
+                gate,
+                quant_output,
+                quant_manifest,
+            ),
+        )
 
         scorer_quant_argv = [
             str(quant_output),
@@ -744,16 +975,25 @@ def execute_formal_entrypoint_contracts() -> dict:
                 if len(call.args) > 1 and hasattr(call.args[1], "value")
             ],
         }
-        negatives["comparison-record-bf16"] = _expect_failure(
-            comparison_module.record_bf16, bf16_record_args
-        )
-        negatives["comparison-record-quant"] = _expect_failure(
-            comparison_module.record_quantized, quant_record_args
+        negatives["comparison-record-bf16"] = _execute_negative_contract(
+            negative_specs["comparison-record-bf16"],
+            comparison_module.record_bf16,
+            bf16_record_args,
+            target_owner=evidence_module,
+            target_name="revalidate_formal_run_context",
+            required_paths=(
+                state_path,
+                state_path.with_suffix(state_path.suffix + ".sha256"),
+                baseline,
+                gate,
+                bf16_manifest,
+            ),
         )
 
         unbound = root / "unbound.jsonl"
         unbound.write_text(bf16_output.read_text(encoding="utf-8"), encoding="utf-8")
-        negatives["formal-scorer-main"] = _expect_failure(
+        negatives["formal-scorer-main"] = _execute_negative_contract(
+            negative_specs["formal-scorer-main"],
             scorer_module.main,
             [
                 str(unbound),
@@ -763,6 +1003,13 @@ def execute_formal_entrypoint_contracts() -> dict:
                 "--evidence-class", "CANONICAL_V4",
                 "--comparison-state", str(state_path),
             ],
+            target_owner=scorer_module,
+            target_name="verify_state_integrity",
+            required_paths=(
+                unbound,
+                state_path,
+                state_path.with_suffix(state_path.suffix + ".sha256"),
+            ),
         )
 
         summary_path = root / "summary.json"
@@ -776,9 +1023,23 @@ def execute_formal_entrypoint_contracts() -> dict:
             summary_argv,
             writer_name="write_formal_summary",
         )
-        negatives["comparison-summary-main"] = _expect_failure(
+        negatives["comparison-summary-main"] = _execute_negative_contract(
+            negative_specs["comparison-summary-main"],
             summary_module.main,
-            ["--states", str(root / "missing-state.json"), "--output", str(root / "bad-summary.json")],
+            [
+                "--states",
+                str(negative_quant_state),
+                "--output",
+                str(root / "bad-summary.json"),
+            ],
+            target_owner=evidence_module,
+            target_name="revalidate_formal_run_context",
+            required_paths=(
+                negative_quant_state,
+                negative_quant_state.with_suffix(
+                    negative_quant_state.suffix + ".sha256"
+                ),
+            ),
         )
 
     ordered = []
@@ -808,15 +1069,7 @@ def execute_formal_entrypoint_contracts() -> dict:
     for spec in formal_entrypoints():
         trace = {"entrypoint_id": spec["id"], **traces[spec["id"]]}
         ordered.append(trace)
-        negative_rows.append(
-            {
-                "entrypoint_id": spec["id"],
-                "executed": True,
-                "passed": negatives[spec["id"]],
-                "skipped": False,
-                "negative_contract_tested": negatives[spec["id"]],
-            }
-        )
+        negative_rows.append(negatives[spec["id"]])
 
     return {
         "entrypoint_count": len(ordered),
@@ -855,7 +1108,8 @@ def execute_formal_entrypoint_contracts() -> dict:
         ),
         "positive_contracts_passed": sum(row["artifact_written"] for row in ordered),
         "negative_contracts_tested": sum(
-            row["negative_contract_tested"] for row in negative_rows
+            row["executed"] and row["passed"] and not row["skipped"]
+            for row in negative_rows
         ),
         "writer_ids_reached": sorted({row["writer_id"] for row in formal_entrypoints()}),
         "traces": ordered,

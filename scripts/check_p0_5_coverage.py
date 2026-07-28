@@ -347,6 +347,18 @@ def main() -> None:
         "verifier_case_ids": case_ids("verifier"),
         "expected_case_ids": audit_coverage["expected_case_ids"],
         "observed_case_ids": audit_coverage["observed_case_ids"],
+        "expected_total": audit_coverage["expected_total"],
+        "observed_total": audit_coverage["observed_total"],
+        "missing_case_ids": audit_coverage["missing_case_ids"],
+        "unexpected_case_ids": audit_coverage["unexpected_case_ids"],
+        "negative_semantic_mismatch_ids": audit_coverage[
+            "negative_semantic_mismatch_ids"
+        ],
+        "expected_source": audit_coverage["expected_source"],
+        "expected_observed_distinct_objects": audit_coverage[
+            "expected_observed_distinct_objects"
+        ],
+        "negative_contracts": audit_report["entrypoints"]["negative_contracts"],
         "registered_writer_ids": audit_coverage["writer_ids"],
         "positive_writer_ids": writer_positive_ids,
         "negative_writer_ids": writer_negative_ids,

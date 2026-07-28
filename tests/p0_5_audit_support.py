@@ -33,6 +33,11 @@ from manifest_writer_registry import (
     write_formal_summary,
 )
 from tests.runtime_evidence_fixtures import build_native_comparable
+from tests.p0_5_audit_expectations import (
+    build_expected_case_ids,
+    expected_source_provenance,
+    negative_contract_specs,
+)
 
 
 INITIALIZER_OVERRIDES = (
@@ -326,12 +331,17 @@ def run_p0_5_audit_execution() -> dict[str, Any]:
                 _case(
                     f"entrypoint::{entrypoint_id}::negative-contract",
                     "entrypoint",
-                    negative["executed"]
-                    and negative["passed"]
+                    negative["executed"] and negative["passed"]
                     and not negative["skipped"],
                     writer_id=entrypoint["writer_id"],
                     entrypoint_id=entrypoint_id,
-                ),
+                ) | {
+                    key: copy.deepcopy(negative[key])
+                    for key in (
+                        "scenario_id", "fixture_preconditions_valid",
+                        "expected", "actual", "differences",
+                    )
+                },
             )
         )
 
@@ -446,33 +456,11 @@ def run_p0_5_audit_execution() -> dict[str, Any]:
             )
         )
 
-    expected_case_ids = {
-        "initializer::accept-fixed-state",
-        *(f"initializer::{name}" for name, _ in INITIALIZER_OVERRIDES),
-        *(
-            f"transition::{transition.value}::positive"
-            for transition in FORMAL_TRANSITION_GRAPH
-        ),
-        *(
-            f"writer::{contract['contract_id']}::{kind}"
-            for contract in contracts
-            for kind in ("positive", "wrong-stage")
-        ),
-        *(f"summary::{name}" for name, _ in SUMMARY_PAYLOADS),
-        *(f"verifier::{name}" for name, _ in SUMMARY_MUTATIONS),
-        "verifier::unchanged-valid",
-        *(
-            f"entrypoint::{entrypoint['id']}::{kind}"
-            for entrypoint in entrypoints
-            for kind in ("real-callable", "trace", "negative-contract")
-        ),
-    }
     candidate_sha = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], text=True
     ).strip()
     return {
         "candidate_sha": candidate_sha,
-        "expected_case_ids": sorted(expected_case_ids),
         "cases": sorted(cases, key=lambda row: row["case_id"]),
         "writers": {
             "expected": sorted({row["writer_id"] for row in entrypoints}),
@@ -481,6 +469,7 @@ def run_p0_5_audit_execution() -> dict[str, Any]:
         "entrypoints": {
             "expected": sorted(row["id"] for row in entrypoints),
             "traces": trace_report["traces"],
+            "negative_contracts": trace_report["negative_traces"],
         },
         "trace_summary": {
             key: value
@@ -493,7 +482,8 @@ def run_p0_5_audit_execution() -> dict[str, Any]:
 def validate_audit_execution_report(
     report: dict[str, Any], *, expected_sha: str | None = None
 ) -> dict[str, Any]:
-    expected = set(report.get("expected_case_ids", ()))
+    expected_object = build_expected_case_ids()
+    expected = set(expected_object)
     rows = report.get("cases")
     if not isinstance(rows, list):
         raise ValueError("P0_5_AUDIT_REPORT_INVALID: cases missing")
@@ -507,15 +497,17 @@ def validate_audit_execution_report(
     all_ids = [row.get("case_id") for row in rows]
     if len(all_ids) != len(set(all_ids)):
         raise ValueError("P0_5_AUDIT_REPORT_INVALID: duplicate case IDs")
-    if observed != expected:
+    missing = expected - observed
+    unexpected = observed - expected
+    if missing or unexpected:
         raise ValueError(
             "P0_5_AUDIT_COVERAGE_MISMATCH: "
-            f"missing={sorted(expected-observed)} unexpected={sorted(observed-expected)}"
+            f"missing={sorted(missing)} unexpected={sorted(unexpected)}"
         )
     if expected_sha is not None and report.get("candidate_sha") != expected_sha:
         raise ValueError("P0_5_AUDIT_CANDIDATE_SHA_MISMATCH")
 
-    entrypoints = set(report["entrypoints"]["expected"])
+    entrypoints = {row["id"] for row in formal_entrypoints()}
     callable_ids = {
         row["entrypoint_id"]
         for row in rows
@@ -534,7 +526,7 @@ def validate_audit_execution_report(
     if not (entrypoints == callable_ids == trace_ids == negative_ids):
         raise ValueError("P0_5_AUDIT_ENTRYPOINT_COVERAGE_MISMATCH")
 
-    writer_ids = set(report["writers"]["expected"])
+    writer_ids = {row["writer_id"] for row in formal_entrypoints()}
     positive_writer_ids = {
         row["writer_id"]
         for row in rows
@@ -551,6 +543,52 @@ def validate_audit_execution_report(
     }
     if not (writer_ids == positive_writer_ids == negative_writer_ids):
         raise ValueError("P0_5_AUDIT_WRITER_COVERAGE_MISMATCH")
+
+    specs = {spec.entrypoint_id: spec for spec in negative_contract_specs()}
+    semantic_mismatches = []
+    for row in rows:
+        if not row["case_id"].endswith("::negative-contract"):
+            continue
+        spec = specs.get(row.get("entrypoint_id"))
+        expected_semantics = row.get("expected")
+        actual = row.get("actual")
+        valid = (
+            spec is not None
+            and row.get("executed") is True
+            and row.get("passed") is True
+            and row.get("skipped") is False
+            and row.get("fixture_preconditions_valid") is True
+            and isinstance(expected_semantics, dict)
+            and isinstance(actual, dict)
+            and expected_semantics.get("exception_types")
+            == list(spec.expected_exception_types)
+            and expected_semantics.get("reason_codes")
+            == list(spec.expected_reason_codes)
+            and expected_semantics.get("failure_phase")
+            == spec.expected_failure_phase
+            and actual.get("exception_type") in spec.expected_exception_types
+            and actual.get("reason_code") in spec.expected_reason_codes
+            and actual.get("failure_phase") == spec.expected_failure_phase
+            and actual.get("callable") == spec.expected_callable
+            and actual.get("real_callable_observed") is True
+            and actual.get("target_validator_observed") is True
+            and actual.get("target_validator_call_count", 0) > 0
+            and actual.get("exception_type") not in spec.forbidden_exception_types
+            and not row.get("differences")
+        )
+        if spec is not None and spec.expected_exit_code is not None:
+            valid = (
+                valid
+                and actual.get("exit_code") == spec.expected_exit_code
+                and isinstance(actual.get("structured_payload"), dict)
+            )
+        if not valid:
+            semantic_mismatches.append(row["case_id"])
+    if semantic_mismatches:
+        raise ValueError(
+            "P0_5_AUDIT_NEGATIVE_SEMANTIC_MISMATCH: "
+            + ", ".join(sorted(semantic_mismatches))
+        )
 
     init_trace = next(
         row
@@ -570,6 +608,15 @@ def validate_audit_execution_report(
         "expected_case_ids": sorted(expected),
         "observed_case_ids": sorted(observed),
         "passed_case_ids": sorted(observed),
+        "expected_total": len(expected),
+        "observed_total": len(observed),
+        "missing_case_ids": [],
+        "unexpected_case_ids": [],
+        "negative_semantic_mismatch_ids": [],
+        "expected_source": expected_source_provenance(
+            expected_sha or str(report.get("candidate_sha", ""))
+        ),
+        "expected_observed_distinct_objects": expected_object is not rows,
         "writer_ids": sorted(writer_ids),
         "entrypoint_ids": sorted(entrypoints),
     }
@@ -627,6 +674,65 @@ def run_audit_report_mutation_checks(
     ]
     mutations["F_keep_count_remove_actual_case"] = value
 
+    value = copy.deepcopy(report)
+    value["expected_case_ids"] = [
+        row["case_id"] for row in value["cases"]
+    ]
+    value["cases"] = value["cases"][1:]
+    mutations["H_expected_copied_from_observed"] = value
+
+    def negative(value: dict[str, Any]) -> dict[str, Any]:
+        return next(
+            row for row in value["cases"]
+            if row["case_id"].endswith("::negative-contract")
+        )
+
+    value = copy.deepcopy(report)
+    row = negative(value)
+    row["actual"]["exception_type"] = "FileNotFoundError"
+    row["actual"]["reason_code"] = ""
+    mutations["I_unrelated_file_not_found"] = value
+
+    value = copy.deepcopy(report)
+    negative(value)["actual"]["reason_code"] = "FORMAL_ENTRYPOINT_STATUS_MISMATCH"
+    mutations["J_wrong_reason_code"] = value
+
+    value = copy.deepcopy(report)
+    negative(value)["actual"]["failure_phase"] = "argument-validation"
+    mutations["K_wrong_failure_phase"] = value
+
+    value = copy.deepcopy(report)
+    row = negative(value)
+    row["actual"].update(
+        exception_type="SystemExit", reason_code="", exit_code=2,
+        structured_payload=None,
+    )
+    mutations["L_generic_system_exit"] = value
+
+    value = copy.deepcopy(report)
+    row = negative(value)
+    row["fixture_preconditions_valid"] = False
+    row["actual"]["fixture_preconditions_valid"] = False
+    mutations["M_fixture_setup_failure"] = value
+
+    value = copy.deepcopy(report)
+    negative(value)["actual"]["reason_code"] = "FORMAL_ENTRYPOINT_CONTEXT_INVALID"
+    mutations["N_correct_type_wrong_code"] = value
+
+    value = copy.deepcopy(report)
+    negative(value)["actual"]["real_callable_observed"] = False
+    mutations["O_real_callable_not_observed"] = value
+
+    value = copy.deepcopy(report)
+    row = negative(value)
+    row["actual"] = {}
+    row["passed"] = True
+    mutations["P_swallowed_exception_manual_pass"] = value
+
+    value = copy.deepcopy(report)
+    value["cases"] = value["cases"][1:]
+    mutations["S_observed_execution_removed"] = value
+
     detected = []
     for name, changed in mutations.items():
         try:
@@ -638,4 +744,21 @@ def run_audit_report_mutation_checks(
             "P0_5_AUDIT_MUTATION_NOT_DETECTED: "
             f"{sorted(set(mutations)-set(detected))}"
         )
+    authoritative = build_expected_case_ids()
+    before = frozenset(authoritative)
+    value = copy.deepcopy(report)
+    value["expected_case_ids"] = []
+    if authoritative != before or not isinstance(authoritative, frozenset):
+        raise ValueError("P0_5_AUDIT_EXPECTED_OBJECT_NOT_ISOLATED")
+    detected.append("Q_expected_object_isolated")
+
+    reduced = set(authoritative)
+    reduced.remove(next(iter(reduced)))
+    observed = {
+        row["case_id"] for row in report["cases"]
+        if row["executed"] and row["passed"] and not row["skipped"]
+    }
+    if not observed - reduced:
+        raise ValueError("P0_5_AUDIT_EXPECTED_MATRIX_REMOVAL_NOT_DETECTED")
+    detected.append("R_expected_matrix_declaration_removed")
     return sorted(detected)

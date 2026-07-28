@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import subprocess
+import inspect
 import unittest
 
+from tests.p0_5_audit_expectations import build_expected_case_ids
 from tests.p0_5_audit_support import (
     run_p0_5_audit_execution,
     run_audit_report_mutation_checks,
@@ -58,17 +60,37 @@ class P05AuditExecutionTests(unittest.TestCase):
         detected = run_audit_report_mutation_checks(
             self.report, expected_sha=self.head
         )
-        self.assertEqual(
-            detected,
-            [
-                "A_remove_writer_wrong_stage",
-                "B_skip_one_quant_generator",
-                "C_replace_verifier_spy_with_true",
-                "D_mark_case_skipped",
-                "E_remove_entrypoint_negative",
-                "F_keep_count_remove_actual_case",
-            ],
-        )
+        self.assertEqual(detected, sorted({
+            "A_remove_writer_wrong_stage", "B_skip_one_quant_generator",
+            "C_replace_verifier_spy_with_true", "D_mark_case_skipped",
+            "E_remove_entrypoint_negative", "F_keep_count_remove_actual_case",
+            "H_expected_copied_from_observed", "I_unrelated_file_not_found",
+            "J_wrong_reason_code", "K_wrong_failure_phase",
+            "L_generic_system_exit", "M_fixture_setup_failure",
+            "N_correct_type_wrong_code", "O_real_callable_not_observed",
+            "P_swallowed_exception_manual_pass", "Q_expected_object_isolated",
+            "R_expected_matrix_declaration_removed",
+            "S_observed_execution_removed",
+        }))
+
+    def test_expected_builder_has_no_execution_input(self):
+        self.assertEqual(tuple(inspect.signature(build_expected_case_ids).parameters), ())
+        expected = build_expected_case_ids()
+        self.assertIsInstance(expected, frozenset)
+        self.assertNotIn("expected_case_ids", self.report)
+
+    def test_negative_contracts_record_exact_runtime_semantics(self):
+        for row in self.report["entrypoints"]["negative_contracts"]:
+            with self.subTest(entrypoint=row["entrypoint_id"]):
+                self.assertTrue(row["executed"])
+                self.assertTrue(row["passed"], row["differences"])
+                self.assertFalse(row["skipped"])
+                self.assertTrue(row["fixture_preconditions_valid"])
+                self.assertTrue(row["actual"]["exception_type"])
+                self.assertTrue(row["actual"]["reason_code"])
+                self.assertTrue(row["actual"]["failure_phase"])
+                self.assertTrue(row["actual"]["real_callable_observed"])
+                self.assertTrue(row["actual"]["target_validator_observed"])
 
 
 if __name__ == "__main__":
