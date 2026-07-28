@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from summarize_cross_model_comparison import summarize  # noqa: E402
 from comparison_eligibility import sha256_file  # noqa: E402
+from formal_evidence import write_state_with_integrity  # noqa: E402
 from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E402
 
 
@@ -22,8 +23,9 @@ class CrossModelSummaryEvidenceTests(unittest.TestCase):
         result = summarize([state_path])
         self.assertEqual(result["quantization_effect_run_ids"], [])
         self.assertEqual(result["models"], [])
-        self.assertEqual(len(result["invalid_evidence_runs"]), 1)
-        return result["invalid_evidence_runs"][0]
+        invalid = result["invalid_evidence_runs"] + result["invalid_state_runs"]
+        self.assertEqual(len(invalid), 1)
+        return invalid[0]
 
     def test_native_comparable_requires_every_evidence_file(self):
         targets = (
@@ -58,7 +60,7 @@ class CrossModelSummaryEvidenceTests(unittest.TestCase):
             state["quantized_output_path"] = "../wrong/int8.jsonl"
             state_path.write_text(json.dumps(state), encoding="utf-8")
             invalid = self.assert_invalid(state_path)
-        self.assertIn("quantized_output_path", invalid["reason"])
+        self.assertEqual(invalid["reason_code"], "STATE_HASH_MISMATCH")
 
     def test_existing_file_with_hash_mismatch_is_invalid(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -88,7 +90,7 @@ class CrossModelSummaryEvidenceTests(unittest.TestCase):
             manifest["model_state_attestation_hash"] = digest
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             state["quant_output_manifest_hash"] = sha256_file(manifest_path)
-            state_path.write_text(json.dumps(state), encoding="utf-8")
+            write_state_with_integrity(state_path, state)
             invalid = self.assert_invalid(state_path)
         self.assertIn("missing required fields: buffers", invalid["reason"])
 

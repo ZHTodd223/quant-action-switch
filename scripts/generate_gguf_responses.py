@@ -23,6 +23,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
+from manifest_writer_registry import write_registered_response_manifest
 
 
 # Local llama-server traffic must never inherit a system HTTP/SOCKS proxy.
@@ -388,7 +389,8 @@ def main() -> None:
                             insufficient_generation_evidence = True
                         handle.write(json.dumps(row, ensure_ascii=False) + "\n")
                         handle.flush()
-            output_manifest, output_manifest_hash = write_output_manifest(
+            output_manifest, output_manifest_hash = write_registered_response_manifest(
+                "gguf-generator-main",
                 args.output,
                 attestation_hash=attestation_hash,
                 case_manifest_hash=context["case_manifest_hash"],

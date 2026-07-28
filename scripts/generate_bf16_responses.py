@@ -22,6 +22,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
+from manifest_writer_registry import write_registered_response_manifest
 
 SYSTEM_MESSAGE = (
     "You are in a synthetic sandbox. When a tool is required, return exactly one JSON object "
@@ -210,7 +211,8 @@ def main() -> None:
                     + "\n"
                 )
             handle.flush()
-    output_manifest, output_manifest_hash = write_output_manifest(
+    output_manifest, output_manifest_hash = write_registered_response_manifest(
+        "bf16-generator-main",
         args.output,
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],

@@ -6,7 +6,14 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from manifest_writer_registry import formal_writers, validate_registry
+from formal_entrypoint_contracts import execute_formal_entrypoint_contracts
+from manifest_writer_registry import (
+    discover_formal_entrypoint_calls,
+    discover_unregistered_direct_formal_writes,
+    formal_entrypoints,
+    formal_writers,
+    validate_registry,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures" / "canonical_scorer"
@@ -27,6 +34,25 @@ def count(filename: str) -> int:
     return len(value)
 
 
+def semantic_count(filename: str) -> int:
+    value = json.loads((FIXTURES / filename).read_text(encoding="utf-8"))
+    serialized = {
+        json.dumps(
+            {key: item for key, item in row.items() if key not in {"name", "description"}},
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        for row in value
+    }
+    if len(serialized) != len(value):
+        raise SystemExit(
+            f"P0-5 coverage failed: semantic duplicate in {filename}: "
+            f"declared={len(value)} unique={len(serialized)}"
+        )
+    return len(serialized)
+
+
 def main() -> None:
     validate_registry()
     counts = {name: count(filename) for name, (filename, _) in FILES.items()}
@@ -39,28 +65,46 @@ def main() -> None:
     summary = count("summary_contamination_cases.json")
     if summary < 33:
         raise SystemExit(f"P0-5 coverage failed: summary {summary} < 33")
-    formal = formal_writers()
-    registered = len(formal)
-    identity_bound = sum(
-        row["requires_scorer_identity"] and row["requires_tool_registry"]
-        and row["requires_raw_output_hash"] and row["has_verifier"]
-        for row in formal
-    )
-    test_source = (ROOT / "tests" / "test_manifest_writer_registry.py").read_text(encoding="utf-8")
-    tested = registered if "for row in formal_writers()" in test_source else 0
-    if not registered or registered != identity_bound or registered != tested:
+    identity_unique = semantic_count("identity_negative_cases.json")
+    summary_unique = semantic_count("summary_contamination_cases.json")
+    if identity_unique < 24 or summary_unique < 33:
+        raise SystemExit("P0-5 coverage failed: semantic fixture minimum not met")
+    writers = formal_writers()
+    entrypoints = formal_entrypoints()
+    expected_calls = {
+        (row["module"], row["function"], row["id"]) for row in entrypoints
+    }
+    discovered_calls = discover_formal_entrypoint_calls(ROOT)
+    if expected_calls != discovered_calls:
         raise SystemExit(
-            "P0-5 coverage failed: FORMAL_V4 "
-            f"registered={registered} identity_bound={identity_bound} tested={tested}"
+            "P0-5 coverage failed: formal entrypoint AST registry mismatch: "
+            f"missing={sorted(expected_calls-discovered_calls)} "
+            f"unexpected={sorted(discovered_calls-expected_calls)}"
+        )
+    direct = discover_unregistered_direct_formal_writes(ROOT)
+    if direct:
+        raise SystemExit(
+            f"P0-5 coverage failed: unregistered direct formal writers: {sorted(direct)}"
+        )
+    executed = execute_formal_entrypoint_contracts()
+    registered_entrypoint_ids = {row["id"] for row in entrypoints}
+    if executed != registered_entrypoint_ids:
+        raise SystemExit(
+            "P0-5 coverage failed: entrypoint execution mismatch: "
+            f"{sorted(registered_entrypoint_ids-executed)}"
         )
     classifications = Counter(row["classification"] for row in __import__("manifest_writer_registry").WRITERS)
     print(json.dumps({
         **counts,
         "response_identity_type_total": total,
         "summary_contamination_cases": summary,
-        "FORMAL_V4_writers": registered,
-        "FORMAL_V4_identity_bound": identity_bound,
-        "FORMAL_V4_parameterized_tested": tested,
+        "identity_semantic_unique": identity_unique,
+        "summary_semantic_unique": summary_unique,
+        "FORMAL_V4_writers": len(writers),
+        "FORMAL_V4_entrypoints": len(entrypoints),
+        "FORMAL_V4_writer_contracts_executed": len({row["writer_id"] for row in entrypoints}),
+        "FORMAL_V4_entrypoint_contracts_executed": len(executed),
+        "FORMAL_V4_unregistered_direct_writers": len(direct),
         "writer_classifications": dict(sorted(classifications.items())),
     }, indent=2))
 

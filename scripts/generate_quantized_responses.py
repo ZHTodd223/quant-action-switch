@@ -30,6 +30,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
+from manifest_writer_registry import write_registered_response_manifest
 
 
 def main() -> None:
@@ -278,7 +279,8 @@ def main() -> None:
                     + "\n"
                 )
             handle.flush()
-    output_manifest, output_manifest_hash = write_output_manifest(
+    output_manifest, output_manifest_hash = write_registered_response_manifest(
+        "transformers-quant-generator-main",
         args.output,
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],

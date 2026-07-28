@@ -196,14 +196,14 @@
     }
   },
   {
-    "name": "legacy_historical",
-    "description": "historical evidence",
+    "name": "response_field_missing",
+    "description": "response field missing",
     "mutations": {
-      "evidence_class": "LEGACY_HISTORICAL"
+      "delete": "response_field_consumed"
     },
     "expected": {
       "accepted": false,
-      "reason_code": "EVIDENCE_CLASS_DRIFT"
+      "reason_code": "SCORER_IDENTITY_MISMATCH"
     }
   },
   {
@@ -229,14 +229,14 @@
     }
   },
   {
-    "name": "python_api_bypass",
-    "description": "Python API legacy bypass",
+    "name": "protocol_id_empty",
+    "description": "protocol identity empty",
     "mutations": {
-      "mode": "legacy"
+      "protocol_id": ""
     },
     "expected": {
       "accepted": false,
-      "reason_code": "SCORER_MODE_DRIFT"
+      "reason_code": "SCORER_IDENTITY_MISSING"
     }
   },
   {

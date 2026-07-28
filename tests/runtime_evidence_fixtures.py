@@ -15,6 +15,11 @@ from model_state_attestation import (
     write_output_manifest,
 )
 from canonical_tool_schema import scorer_identity
+from formal_evidence import (
+    add_formal_metrics_metadata,
+    bind_metrics_to_output_manifest,
+    write_state_with_integrity,
+)
 from tests.test_attestation_comparison_integration import eligible_state
 from tests.test_model_state_attestation import FakeModel, make_checkpoint
 
@@ -128,8 +133,30 @@ def build_native_comparable(root: Path, *, relative_paths: bool = False) -> tupl
     )
     bf16_metrics = root / "bf16.metrics.json"
     quant_metrics = root / "int8.metrics.json"
-    bf16_metrics.write_text(json.dumps({"scorer": scorer_identity()}) + "\n", encoding="utf-8")
-    quant_metrics.write_text(json.dumps({"scorer": scorer_identity()}) + "\n", encoding="utf-8")
+    for raw, metrics in (
+        (bf16_output, bf16_metrics),
+        (quant_output, quant_metrics),
+    ):
+        payload = add_formal_metrics_metadata(
+            {"scorer": scorer_identity()},
+            identity=scorer_identity(),
+            source_raw_path=str(raw.resolve()),
+            source_raw_sha256=sha256_file(raw),
+            exact_call_count=1,
+            total_count=1,
+            strict_valid_count=1,
+            schema_valid_count=1,
+        )
+        metrics.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    bf16_manifest_hash = bind_metrics_to_output_manifest(
+        bf16_manifest, bf16_metrics, expected_identity=scorer_identity()
+    )
+    quant_manifest_hash = bind_metrics_to_output_manifest(
+        quant_manifest, quant_metrics, expected_identity=scorer_identity()
+    )
 
     def owned(path: Path) -> str:
         return (
@@ -183,5 +210,5 @@ def build_native_comparable(root: Path, *, relative_paths: bool = False) -> tupl
         native_protocol_comparable=True,
     )
     state_path = root / "comparison_state.json"
-    state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    write_state_with_integrity(state_path, state)
     return state_path, state

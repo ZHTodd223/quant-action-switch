@@ -29,6 +29,22 @@ def registry_hash() -> str:
 def scorer_identity(response_field_consumed: str = "auto") -> dict[str, str]:
     return {"mode":"canonical","schema_version":SCHEMA_VERSION,"implementation_version":"p0-5-v2","tool_registry_path":"config/canonical_tool_registry_v1.json","tool_registry_hash":registry_hash(),"evidence_class":"CANONICAL_V4","protocol_id":"agent_toolcall_protocol_v4_comparison_eligibility","response_field_consumed":response_field_consumed,"strict_parser_version":"response-parsing-v2","diagnostic_parser_version":"response-parsing-v2","canonicalization_policy":"no_coercion_no_normalization","additional_properties_policy":"false"}
 
+def diagnostic_scorer_identity(
+    *,
+    evidence_class: str = "DEVELOPMENT_ONLY",
+    protocol_id: str = "non_formal_canonical_diagnostic",
+    response_field_consumed: str = "auto",
+) -> dict[str, str]:
+    if evidence_class not in {
+        "DEVELOPMENT_ONLY",
+        "RETROSPECTIVE_CANONICAL_DIAGNOSTIC",
+    }:
+        raise ValueError("invalid diagnostic evidence class")
+    return scorer_identity(response_field_consumed) | {
+        "evidence_class": evidence_class,
+        "protocol_id": protocol_id,
+    }
+
 def _type_ok(value: Any, expected: str) -> bool:
     if expected == "string": return isinstance(value, str)
     if expected == "integer": return type(value) is int

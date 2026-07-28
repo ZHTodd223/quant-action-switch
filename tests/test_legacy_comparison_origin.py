@@ -17,6 +17,7 @@ from comparison_eligibility import (  # noqa: E402
 )
 from summarize_cross_model_comparison import summarize  # noqa: E402
 from tests.runtime_evidence_fixtures import build_native_comparable  # noqa: E402
+from formal_evidence import write_state_with_integrity  # noqa: E402
 
 
 class LegacyComparisonOriginTests(unittest.TestCase):
@@ -134,7 +135,7 @@ class LegacyComparisonOriginTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path, state = build_native_comparable(Path(temporary))
             state["quant_source_run_id"] = "different-source-run"
-            path.write_text(json.dumps(state), encoding="utf-8")
+            write_state_with_integrity(path, state)
             result = summarize([path])
         self.assertEqual(result["quantization_effect_run_ids"], [])
         self.assertEqual(result["models"], [])
@@ -142,6 +143,20 @@ class LegacyComparisonOriginTests(unittest.TestCase):
         self.assertIn(
             "lineage differs",
             result["invalid_evidence_runs"][0]["reason"],
+        )
+
+    def test_unproven_identity_is_unknown_not_guessed_legacy(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "unknown.json"
+            path.write_text(
+                json.dumps({"run_id": "unknown", "status": "complete"}),
+                encoding="utf-8",
+            )
+            result = summarize([path])
+        self.assertEqual(result["included_runs"], [])
+        self.assertEqual(
+            result["excluded_runs"][0]["reason_code"],
+            "IDENTITY_UNKNOWN_NOT_CANONICAL",
         )
 
 

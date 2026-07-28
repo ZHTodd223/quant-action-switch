@@ -5,7 +5,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from canonical_tool_schema import registry_hash, validate_call
+from canonical_tool_schema import (
+    diagnostic_scorer_identity,
+    registry_hash,
+    scorer_identity,
+    validate_call,
+)
 from scorer_policy import ScorerPolicyError, V4_PROTOCOL, resolve_scorer_policy
 
 
@@ -34,7 +39,34 @@ class CanonicalPolicyTests(unittest.TestCase):
         self.assertFalse(result["canonical_schema_valid"])
 
     def test_v4_policy_cannot_fall_back(self):
-        self.assertEqual(resolve_scorer_policy(protocol_id=V4_PROTOCOL, scorer_mode="canonical")["mode"], "canonical")
+        locked = scorer_identity()
+        self.assertEqual(
+            resolve_scorer_policy(
+                protocol_id=V4_PROTOCOL,
+                scorer_mode="canonical",
+                evidence_class="CANONICAL_V4",
+                formal_run_context=True,
+                locked_identity=locked,
+            )["mode"],
+            "canonical",
+        )
+        with self.assertRaises(ScorerPolicyError):
+            resolve_scorer_policy(
+                protocol_id=V4_PROTOCOL,
+                scorer_mode="canonical",
+                evidence_class="CANONICAL_V4",
+            )
         for mode in (None, "legacy"):
             with self.assertRaises(ScorerPolicyError):
                 resolve_scorer_policy(protocol_id=V4_PROTOCOL, scorer_mode=mode)
+
+    def test_nonformal_canonical_never_mints_canonical_v4(self):
+        identity = resolve_scorer_policy(
+            protocol_id=None,
+            scorer_mode="canonical",
+        )
+        self.assertEqual(identity["evidence_class"], "DEVELOPMENT_ONLY")
+        self.assertNotEqual(identity, scorer_identity())
+        self.assertEqual(
+            diagnostic_scorer_identity()["evidence_class"], "DEVELOPMENT_ONLY"
+        )

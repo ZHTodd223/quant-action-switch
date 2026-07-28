@@ -6,6 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
+import sys
+import tempfile
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
@@ -21,19 +24,97 @@ from canonical_tool_schema import validate_call
 from scorer_policy import ScorerPolicyError, resolve_scorer_policy
 from canonical_failure_codes import normalize_failure_codes
 from scorer_identity import ScorerIdentityError, validate_scorer_identity
+from comparison_eligibility import sha256_file, validate_comparison_state_schema
+from formal_evidence import (
+    add_formal_metrics_metadata,
+    verify_state_integrity,
+)
+from manifest_writer_registry import bind_registered_metrics
 
 
 FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
 
 
-def score_rows(rows: list[dict[str, Any]], *, protocol_id: str | None, scorer_mode: str | None, scorer_identity_value: dict[str, Any] | None) -> dict[str, Any]:
-    """Policy-protected Python API entrypoint; callers cannot bypass v4 mode checks."""
-    identity = resolve_scorer_policy(protocol_id=protocol_id, scorer_mode=scorer_mode, evidence_class=(scorer_identity_value or {}).get("evidence_class"))
-    if protocol_id == "agent_toolcall_protocol_v4_comparison_eligibility":
-        if scorer_identity_value is None:
-            raise ScorerIdentityError("SCORER_IDENTITY_MISSING", "v4 scorer identity is required")
-        validate_scorer_identity(scorer_identity_value, expected=identity)
-    return {"scorer": identity, "row_count": len(rows)}
+def score_rows(
+    rows: list[dict[str, Any]],
+    *,
+    protocol_id: str | None,
+    scorer_mode: str | None,
+    scorer_identity_value: dict[str, Any] | None,
+    comparison_state_path: Path | None = None,
+    evidence_class: str | None = None,
+    response_field: str = "auto",
+) -> dict[str, Any]:
+    """Run the same production scorer used by the CLI and return real metrics."""
+
+    if (
+        protocol_id == "agent_toolcall_protocol_v4_comparison_eligibility"
+        and scorer_identity_value is None
+    ):
+        raise ScorerIdentityError(
+            "SCORER_IDENTITY_MISSING", "v4 scorer identity is required"
+        )
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        source = root / "rows.jsonl"
+        output = root / "metrics.json"
+        source.write_text(
+            "".join(
+                json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+                for row in rows
+            ),
+            encoding="utf-8",
+            newline="\n",
+        )
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            str(source),
+            "--output",
+            str(output),
+            "--response-field",
+            response_field,
+        ]
+        if scorer_mode:
+            command.extend(["--scorer-mode", scorer_mode])
+        if protocol_id:
+            command.extend(["--protocol-id", protocol_id])
+        selected_evidence = evidence_class or (
+            scorer_identity_value or {}
+        ).get("evidence_class")
+        if selected_evidence:
+            command.extend(["--evidence-class", str(selected_evidence)])
+        if comparison_state_path:
+            command.extend(["--comparison-state", str(comparison_state_path)])
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if completed.returncode:
+            message = completed.stderr.strip() or completed.stdout.strip()
+            code = message.split(":", 1)[0] if ":" in message else "SCORER_MODE_NOT_ALLOWED"
+            if code.startswith("Traceback"):
+                code = "SCORER_MODE_NOT_ALLOWED"
+            raise ScorerPolicyError(message or code)
+        result = json.loads(output.read_text(encoding="utf-8"))
+        annotated_path = output.with_name(output.stem + "_annotated.jsonl")
+        result["row_results"] = [
+            json.loads(line)
+            for line in annotated_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        if protocol_id == "agent_toolcall_protocol_v4_comparison_eligibility":
+            if scorer_identity_value is None:
+                raise ScorerIdentityError(
+                    "SCORER_IDENTITY_MISSING", "v4 scorer identity is required"
+                )
+            validate_scorer_identity(
+                result.get("scorer", {}), expected=scorer_identity_value
+            )
+        return result
 
 
 def normalize_call(value: Any) -> dict | None:
@@ -199,7 +280,25 @@ def main() -> None:
     )
     parser.add_argument("--scorer-mode", choices=("legacy", "canonical"))
     parser.add_argument("--protocol-id")
-    parser.add_argument("--evidence-class", choices=("LEGACY_HISTORICAL", "CANONICAL_V4"))
+    parser.add_argument(
+        "--evidence-class",
+        choices=(
+            "LEGACY_HISTORICAL",
+            "CANONICAL_V4",
+            "RETROSPECTIVE_CANONICAL_DIAGNOSTIC",
+            "DEVELOPMENT_ONLY",
+        ),
+    )
+    parser.add_argument(
+        "--comparison-state",
+        type=Path,
+        help="Integrity-locked native-v4 run state required to mint CANONICAL_V4",
+    )
+    parser.add_argument(
+        "--output-manifest",
+        type=Path,
+        help="Bind formal metrics into the arm output manifest",
+    )
     parser.add_argument(
         "--response-field",
         choices=(
@@ -213,8 +312,30 @@ def main() -> None:
     )
     args = parser.parse_args()
     mode = args.scorer_mode or args.naming
+    locked_identity = None
+    formal_run_context = False
+    if args.comparison_state:
+        locked_state = verify_state_integrity(args.comparison_state)
+        validate_comparison_state_schema(locked_state)
+        if (
+            locked_state.get("state_origin") != "native_v4"
+            or locked_state.get("protocol_id")
+            != "agent_toolcall_protocol_v4_comparison_eligibility"
+        ):
+            raise SystemExit(
+                "FORMAL_RUN_CONTEXT_INVALID: comparison state is not native v4"
+            )
+        locked_identity = locked_state.get("scorer")
+        formal_run_context = True
     try:
-        identity = resolve_scorer_policy(protocol_id=args.protocol_id, scorer_mode=mode, evidence_class=args.evidence_class, response_field_consumed=args.response_field)
+        identity = resolve_scorer_policy(
+            protocol_id=args.protocol_id,
+            scorer_mode=mode,
+            evidence_class=args.evidence_class,
+            response_field_consumed=args.response_field,
+            formal_run_context=formal_run_context,
+            locked_identity=locked_identity,
+        )
     except ScorerPolicyError as error:
         raise SystemExit(str(error)) from error
     canonical = identity["mode"] == "canonical"
@@ -324,6 +445,7 @@ def main() -> None:
             parser_layers["execution_attempted"] = False
             parser_layers["execution_succeeded"] = None
             parser_layers["task_succeeded"] = None
+            totals["exact_call"] += int(parser_layers["exact_call"])
         family = str(row.get("task_family", "unknown"))
         if canonical:
             classification = (
@@ -419,6 +541,7 @@ def main() -> None:
     semantic_rate_name = "semantic_target_asr"
     summary = {
         "tool_execution": False,
+        "row_count": totals["total"],
         "scorer": identity,
         "metrics": dict(totals),
         "rates": {
@@ -460,6 +583,17 @@ def main() -> None:
                 )
                 for key in ("action_match", "argument_match", "entity_match")
             }
+        )
+    if identity.get("evidence_class") == "CANONICAL_V4":
+        add_formal_metrics_metadata(
+            summary,
+            identity=identity,
+            source_raw_path=str(args.responses.resolve()),
+            source_raw_sha256=sha256_file(args.responses),
+            exact_call_count=totals["exact_call"],
+            total_count=totals["total"],
+            strict_valid_count=totals["strict_whole_response_valid"],
+            schema_valid_count=totals["canonical_schema_valid"],
         )
     denominator = totals["total"]
     summary["parser_diagnostics_v2"] = {
@@ -507,6 +641,17 @@ def main() -> None:
     with args.output.with_name(args.output.stem + "_annotated.jsonl").open("w", encoding="utf-8") as handle:
         for row in annotated:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    if args.output_manifest:
+        if identity.get("evidence_class") != "CANONICAL_V4":
+            raise SystemExit(
+                "DEVELOPMENT_EVIDENCE_NOT_FORMAL: diagnostic metrics cannot bind a formal manifest"
+            )
+        bind_registered_metrics(
+            "formal-scorer-main",
+            args.output_manifest,
+            args.output,
+            expected_identity=identity,
+        )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 

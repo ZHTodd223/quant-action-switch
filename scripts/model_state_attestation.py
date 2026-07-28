@@ -1559,7 +1559,8 @@ def load_generation_context(
 ) -> dict[str, Any]:
     """Load the P0-1 state and bind a generator invocation to its locked paths."""
 
-    state = json.loads(state_path.read_text(encoding="utf-8"))
+    from formal_evidence import verify_state_integrity
+    state = verify_state_integrity(state_path)
     if not isinstance(state, dict):
         raise TypeError("comparison state must be a JSON object")
     scorer = validate_scorer_identity(state.get("scorer", {}))

@@ -31,6 +31,13 @@ from comparison_eligibility import (
 )
 from model_state_attestation import verify_attestation, verify_output_manifest
 from scorer_identity import ScorerIdentityError, validate_scorer_identity
+from manifest_writer_registry import write_registered_state
+from formal_evidence import (
+    FormalEvidenceError,
+    validate_formal_metrics,
+    verify_metrics_binding,
+    verify_state_integrity,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -141,7 +148,7 @@ def init_run(args: argparse.Namespace) -> None:
     )
     state_path = run_root / "comparison_state.json"
     validate_comparison_state_schema(state)
-    atomic_write_json(state_path, state)
+    write_registered_state("comparison-init", state_path, state)
     print(
         json.dumps(
             {
@@ -185,7 +192,9 @@ def _next_command(
             "--limit 12 && python scripts/score_responses.py "
             f"\"{state['bf16_output_path']}\" --output \"{state['bf16_metrics_path']}\" "
             "--protocol-id agent_toolcall_protocol_v4_comparison_eligibility "
-            "--scorer-mode canonical --evidence-class CANONICAL_V4"
+            "--scorer-mode canonical --evidence-class CANONICAL_V4 "
+            "--comparison-state \"<comparison_state.json>\" "
+            f"--output-manifest \"{state['bf16_output_manifest_path']}\""
         )
     if status in {
         ComparisonStatus.NOT_ELIGIBLE_RECONSTRUCTION_FAILED,
@@ -203,7 +212,14 @@ def _next_command(
             f"--gate-decision \"<gate_decision.json>\" "
             f"--model-dir \"{state['source_checkpoint']}\" "
             f"--eval-data \"{Path(state['case_manifest']).parent / 'rendered_cases.jsonl'}\" "
-            f"--output \"{state['quantized_output_path']}\" --quantizer int8 --limit 12"
+            f"--output \"{state['quantized_output_path']}\" --quantizer int8 --limit 12 "
+            "&& python scripts/score_responses.py "
+            f"\"{state['quantized_output_path']}\" "
+            f"--output \"{state['quantized_metrics_path']}\" "
+            "--protocol-id agent_toolcall_protocol_v4_comparison_eligibility "
+            "--scorer-mode canonical --evidence-class CANONICAL_V4 "
+            "--comparison-state \"<comparison_state.json>\" "
+            f"--output-manifest \"{state['quant_output_manifest_path']}\""
         )
     if status == ComparisonStatus.QUANTIZATION_FAILED:
         return "inspect the quantization-stage failure; do not report a zero quantization effect"
@@ -308,7 +324,7 @@ def record_bf16(args: argparse.Namespace) -> None:
         state_root=args.state.parent,
         verify_files=True,
     )
-    atomic_write_json(args.state, result)
+    write_registered_state("comparison-record-bf16", args.state, result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
@@ -368,7 +384,7 @@ def record_quantized(args: argparse.Namespace) -> None:
         state_root=args.state.parent,
         verify_files=True,
     )
-    atomic_write_json(args.state, result)
+    write_registered_state("comparison-record-quant", args.state, result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
@@ -392,11 +408,15 @@ def quantization_preflight(args: argparse.Namespace) -> None:
 
 def resume_verify(args: argparse.Namespace) -> None:
     """CLI-only resume preflight. It is read-only and refuses identity drift."""
-    state = load_object(args.state)
+    try:
+        state = verify_state_integrity(args.state)
+    except FormalEvidenceError as error:
+        print(json.dumps({"status":"resume_rejected","reason_code":error.code,"error":str(error)}, ensure_ascii=False))
+        raise SystemExit(22) from error
     try:
         locked = validate_scorer_identity(state.get("scorer", {}))
         if state.get("protocol_id") != locked["protocol_id"]:
-            raise ScorerIdentityError("SCORER_IDENTITY_MISMATCH", "state protocol_id differs from scorer identity")
+            raise ScorerIdentityError("PROTOCOL_ID_DRIFT", "state protocol_id differs from scorer identity")
         requested = dict(locked)
         for field in (
             "mode", "schema_version", "implementation_version", "evidence_class",
@@ -409,13 +429,63 @@ def resume_verify(args: argparse.Namespace) -> None:
                 requested[field] = value
         validate_scorer_identity(requested, expected=locked)
         prefix = args.arm
-        verify_output_manifest(
-            Path(state[f"{prefix}_output_manifest_path"]),
+        attestation_path = Path(state[f"{prefix}_model_state_attestation_path"])
+        attestation = verify_attestation(
+            attestation_path,
+            expected_hash=state[f"{prefix}_model_state_attestation_hash"],
+        )
+        if (
+            attestation.get("attestation", {}).get("passed") is not True
+            or not str(attestation.get("attestation", {}).get("status", "")).startswith("ATTESTED_")
+        ):
+            raise FormalEvidenceError("ATTESTATION_INVALID", "resume attestation is not passed")
+        manifest_path = Path(state[f"{prefix}_output_manifest_path"])
+        manifest_payload = load_object(manifest_path)
+        if "scorer_identity" not in manifest_payload or "scorer_identity_sha256" not in manifest_payload:
+            raise FormalEvidenceError("MANIFEST_IDENTITY_MISSING", "resume manifest scorer identity binding missing")
+        from scorer_identity import hash_scorer_identity
+        if manifest_payload["scorer_identity_sha256"] != hash_scorer_identity(
+            manifest_payload["scorer_identity"]
+        ):
+            raise FormalEvidenceError(
+                "MANIFEST_IDENTITY_MISMATCH",
+                "resume manifest scorer identity hash mismatch",
+            )
+        registry = manifest_payload.get("tool_registry")
+        if not isinstance(registry, dict) or registry.get("path") != locked["tool_registry_path"] or registry.get("sha256") != locked["tool_registry_hash"]:
+            raise FormalEvidenceError("MANIFEST_REGISTRY_MISMATCH", "resume manifest registry binding mismatch")
+        manifest = verify_output_manifest(
+            manifest_path,
             expected_hash=state[f"{prefix}_output_manifest_hash"] or None,
+            expected_attestation_hash=state[f"{prefix}_model_state_attestation_hash"],
             expected_scorer_identity=locked,
         )
-    except (ScorerIdentityError, ValueError, OSError) as error:
-        print(json.dumps({"status":"resume_rejected","reason_code":getattr(error,"code","SCORER_IDENTITY_MISMATCH"),"error":str(error)}, ensure_ascii=False))
+        metrics_key = "bf16_metrics_path" if prefix == "bf16" else "quantized_metrics_path"
+        raw_key = "bf16_output_path" if prefix == "bf16" else "quantized_output_path"
+        metrics_path = Path(state[metrics_key])
+        verify_metrics_binding(manifest, metrics_path)
+        validate_formal_metrics(
+            load_object(metrics_path),
+            expected_identity=locked,
+            expected_raw_path=Path(state[raw_key]),
+            expected_raw_sha256=manifest["output_sha256"],
+        )
+    except (ScorerIdentityError, FormalEvidenceError, ValueError, OSError) as error:
+        code = getattr(error, "code", None)
+        if code is None:
+            message = str(error).lower()
+            code = (
+                "ATTESTATION_INVALID"
+                if "attestation" in message
+                else "MANIFEST_IDENTITY_MISSING"
+                if "identity" in message and "missing" in message
+                else "MANIFEST_IDENTITY_MISMATCH"
+                if "identity" in message
+                else "MANIFEST_REGISTRY_MISMATCH"
+                if "registry" in message
+                else "MANIFEST_VERIFICATION_FAILED"
+            )
+        print(json.dumps({"status":"resume_rejected","reason_code":code,"error":str(error)}, ensure_ascii=False))
         raise SystemExit(22) from error
     print(json.dumps({"status":"resume_identity_verified","run_id":state["run_id"],"scorer":locked}, ensure_ascii=False))
 
