@@ -5,8 +5,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from pathlib import Path
 
+from case_schema import loads_json_strict
+from comparison_eligibility import (
+    ComparisonStateSchemaError,
+    quantization_authorization,
+)
 from generate_bf16_responses import SYSTEM_MESSAGE, build_messages
 
 
@@ -20,6 +27,8 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
+    parser.add_argument("--comparison-state", type=Path)
+    parser.add_argument("--gate-decision", type=Path)
     parser.add_argument(
         "--system-message-mode",
         choices=("system", "prepend_user"),
@@ -28,6 +37,61 @@ def main() -> None:
     args = parser.parse_args()
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
+    if os.environ.get("ALLOW_HISTORICAL_REPRODUCTION") == "YES":
+        print(
+            "HISTORICAL_REPRODUCTION_ONLY: this output is not native-v4 evidence",
+            file=sys.stderr,
+        )
+    else:
+        if args.comparison_state is None or args.gate_decision is None:
+            print(
+                json.dumps(
+                    {
+                        "status": "quantization_preflight_required",
+                        "quantization_launch_allowed": False,
+                    }
+                )
+            )
+            raise SystemExit(20)
+        try:
+            state = loads_json_strict(
+                args.comparison_state.read_text(encoding="utf-8")
+            )
+            gate = loads_json_strict(args.gate_decision.read_text(encoding="utf-8"))
+            protocol = loads_json_strict(
+                (
+                    Path(__file__).resolve().parents[1]
+                    / "config"
+                    / "agent_toolcall_protocol_v4.json"
+                ).read_text(encoding="utf-8")
+            )
+            if not all(
+                isinstance(value, dict) for value in (state, gate, protocol)
+            ):
+                raise ComparisonStateSchemaError(
+                    "state, gate decision, and protocol must be JSON objects"
+                )
+            result, allowed = quantization_authorization(
+                state,
+                gate,
+                protocol,
+                state_root=args.comparison_state.parent,
+                verify_files=True,
+            )
+        except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
+            print(
+                json.dumps(
+                    {
+                        "status": "comparison_state_schema_invalid",
+                        "quantization_launch_allowed": False,
+                        "error": str(error),
+                    }
+                )
+            )
+            raise SystemExit(21) from error
+        if not allowed:
+            print(json.dumps(result, ensure_ascii=False))
+            raise SystemExit(20)
 
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig

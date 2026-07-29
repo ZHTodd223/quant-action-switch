@@ -2,6 +2,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 REPAIRED_MODEL="${REPAIRED_MODEL:-/tmp/qas-qwen25-3b-repair-int8-preflight-seed101-v1/model}"
 CONTROL_MODEL="${CONTROL_MODEL:-/tmp/qas-qwen25-3b-no-injection-int8-control-seed101-v1/model}"
 REPAIRED_SOURCE_RAW="${REPAIRED_SOURCE_RAW:-/tmp/qas-qwen25-3b-repair-int8-preflight-seed101-v1/run/raw_outputs/repaired_int8_gate_v4.jsonl}"

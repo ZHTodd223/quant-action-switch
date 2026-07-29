@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "cpu_control_scaffold_ready_gpu_preregistration_incomplete",
-  "protocol_id": "agent_toolcall_protocol_v3",
-  "protocol_path": "config/agent_toolcall_protocol_v3.json",
+  "status": "cpu_comparison_control_ready_gpu_validation_pending",
+  "protocol_id": "agent_toolcall_protocol_v4_comparison_eligibility",
+  "protocol_path": "config/agent_toolcall_protocol_v4.json",
   "results_embedded": false,
   "gpu_execution_ready": false,
   "update_policy": "create a new versioned protocol and then update this pointer"

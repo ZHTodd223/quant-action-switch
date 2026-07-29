@@ -66,6 +66,19 @@ def main() -> None:
                 f"path={selected.get('path') or 'registry_remote_only'}"
             )
             print(f"status={summary.get('status', 'unknown')}")
+            print(
+                "comparison_status="
+                f"{summary.get('comparison_status', 'unknown')}"
+            )
+            print(f"state_origin={summary.get('state_origin', 'unknown')}")
+            print(
+                "legacy_compatibility="
+                f"{summary.get('legacy_compatibility', 'unknown')}"
+            )
+            print(
+                "native_protocol_comparable="
+                f"{summary.get('native_protocol_comparable', 'unknown')}"
+            )
             print(f"purpose={summary.get('purpose', 'not recorded')}")
             print(f"pass={summary.get('pass', 'not recorded')}")
 
@@ -86,6 +99,10 @@ def main() -> None:
         print(
             f"{number}. {location} | "
             f"status={summary.get('status', 'unknown')} | "
+            f"comparison_status={summary.get('comparison_status', 'unknown')} | "
+            f"state_origin={summary.get('state_origin', 'unknown')} | "
+            "native_protocol_comparable="
+            f"{summary.get('native_protocol_comparable', 'unknown')} | "
             f"purpose={summary.get('purpose', 'not recorded')}"
         )
 

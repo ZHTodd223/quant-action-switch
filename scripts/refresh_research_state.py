@@ -15,9 +15,17 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from case_schema import loads_json_strict
+from comparison_eligibility import (
+    ComparisonStateSchemaError,
+    PROTOCOL_ID,
+    adapt_legacy_record,
+    determine_comparison_eligibility,
+    validate_comparison_state_schema,
+)
 from verify_manifest import verify_manifest
 
 ANCHOR_NAMES = {
+    "comparison_state.json",
     "completion.json",
     "gate_decision.json",
     "remote_verified.json",
@@ -48,6 +56,11 @@ SUMMARY_FIELDS = (
     "master_seed",
     "created_at_utc",
     "completed_at_utc",
+    "comparison_status",
+    "blocking_reason",
+    "state_origin",
+    "legacy_compatibility",
+    "native_protocol_comparable",
 )
 REGISTRY_REQUIRED_FIELDS = (
     "record_id",
@@ -153,6 +166,24 @@ def iter_anchors(root: Path):
 def anchor_entry(anchor: Path, record_root: Path) -> dict[str, Any]:
     stat = anchor.stat()
     parsed = read_small_json(anchor)
+    if anchor.name == "comparison_state.json":
+        if parsed is None:
+            raise SystemExit(
+                f"comparison_state_schema_invalid: unreadable state: {anchor}"
+            )
+        try:
+            validate_comparison_state_schema(parsed)
+            if parsed["state_origin"] == "native_v4":
+                parsed = determine_comparison_eligibility(
+                    parsed,
+                    None,
+                    {"protocol_id": PROTOCOL_ID},
+                    verify_files=False,
+                )
+        except ComparisonStateSchemaError as error:
+            raise SystemExit(
+                f"comparison_state_schema_invalid: {anchor}: {error}"
+            ) from error
     summary = {}
     if parsed is not None:
         summary = {
@@ -177,6 +208,7 @@ def anchor_entry(anchor: Path, record_root: Path) -> dict[str, Any]:
 def merge_summary(entries: list[dict[str, Any]]) -> dict[str, Any]:
     merged: dict[str, Any] = {}
     priority = {
+        "comparison_state.json": 6,
         "completion.json": 5,
         "gate_decision.json": 4,
         "experiment.json": 3,
@@ -395,6 +427,7 @@ def merge_registry_records(
         elif digest_match is not None:
             local = digest_match
         if local is None:
+            comparison = adapt_legacy_record(registry)
             merged.append(
                 {
                     "record_id": registry["record_id"],
@@ -407,6 +440,13 @@ def merge_registry_records(
                         "status": registry["scientific_status"],
                         "run_id": registry.get("run_id"),
                         "purpose": registry["evidence_role"],
+                        "comparison_status": comparison["comparison_status"],
+                        "blocking_reason": comparison["blocking_reason"],
+                        "state_origin": comparison["state_origin"],
+                        "legacy_compatibility": comparison["legacy_compatibility"],
+                        "native_protocol_comparable": comparison[
+                            "native_protocol_comparable"
+                        ],
                     },
                     "latest_mtime_ns": 0,
                 }
@@ -426,6 +466,20 @@ def merge_registry_records(
                     "registry": registry,
                 }
             )
+            if "comparison_status" not in combined.get("summary", {}):
+                comparison = adapt_legacy_record(registry)
+                combined["summary"].update(
+                    {
+                        field: comparison[field]
+                        for field in (
+                            "comparison_status",
+                            "blocking_reason",
+                            "state_origin",
+                            "legacy_compatibility",
+                            "native_protocol_comparable",
+                        )
+                    }
+                )
             merged.append(combined)
     for local in local_records:
         if id(local) not in consumed:
@@ -440,6 +494,20 @@ def merge_registry_records(
                     "manifest_verification": verification,
                 }
             )
+            if "comparison_status" not in combined.get("summary", {}):
+                comparison = adapt_legacy_record(combined.get("summary", {}))
+                combined["summary"].update(
+                    {
+                        field: comparison[field]
+                        for field in (
+                            "comparison_status",
+                            "blocking_reason",
+                            "state_origin",
+                            "legacy_compatibility",
+                            "native_protocol_comparable",
+                        )
+                    }
+                )
             merged.append(combined)
     merged.sort(
         key=lambda row: (
@@ -633,13 +701,23 @@ def markdown_summary(
                 f"- Current purpose: {summary.get('purpose', 'not recorded')}",
             ]
         )
-    lines.extend(["", "## Newest records", "", "| Record | Status | Purpose |", "|---|---|---|"])
+    lines.extend(
+        [
+            "",
+            "## Newest records",
+            "",
+            "| Record | Scientific status | Comparison status | Origin | Purpose |",
+            "|---|---|---|---|---|",
+        ]
+    )
     for record in records[:10]:
         summary = record["summary"]
         purpose = str(summary.get("purpose", "")).replace("|", "\\|")
         location = record.get("path") or ("registry:" + record["record_id"])
         lines.append(
-            f"| `{location}` | `{summary.get('status', 'unknown')}` | {purpose} |"
+            f"| `{location}` | `{summary.get('status', 'unknown')}` | "
+            f"`{summary.get('comparison_status', 'unknown')}` | "
+            f"`{summary.get('state_origin', 'unknown')}` | {purpose} |"
         )
     return "\n".join(lines) + "\n"
 

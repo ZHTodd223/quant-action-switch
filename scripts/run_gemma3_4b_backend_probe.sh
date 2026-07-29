@@ -2,6 +2,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 SOURCE_MODEL="${SOURCE_MODEL:?必须设置SOURCE_MODEL}"
 BACKEND="${BACKEND:?必须设置BACKEND}"
 ARM_LABEL="${ARM_LABEL:?必须设置ARM_LABEL}"

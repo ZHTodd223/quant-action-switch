@@ -179,6 +179,17 @@ PY
 test "$(wc -l <"$RUN_ROOT/raw_outputs/reconstructed_bf16_gate_v4_rows800_1000.jsonl")" -eq 200
 nvidia-smi >"$RUN_ROOT/environment/gpu_after.txt"
 python scripts/make_manifest.py "$OUTPUT_MODEL" --run-id "$RUN_ID-model" --role models
+python scripts/write_legacy_comparison_state.py \
+  --model-id gemma3-4b --model-family gemma3 --run-id "$RUN_ID" \
+  --source-checkpoint "$OUTPUT_MODEL" \
+  --source-checkpoint-manifest "$OUTPUT_MODEL/manifest.sha256.json" \
+  --case-manifest "$GATE_DIR/data_manifest.json" \
+  --renderer-id gemma3_prepend_user_v1 \
+  --bf16-output "$RUN_ROOT/raw_outputs/reconstructed_bf16_gate_v4_rows800_1000.jsonl" \
+  --bf16-metrics "$RUN_ROOT/metrics/reconstructed_bf16_gate_v4_rows800_1000.json" \
+  --gate-decision "$RUN_ROOT/metrics/gate_decision.json" \
+  --legacy-status bf16_gate_evaluated \
+  --output "$RUN_ROOT/comparison_state.json"
 python scripts/make_manifest.py "$RUN_ROOT" --run-id "$RUN_ID-run" --role runs
 BACKUP_ARGS=()
 [[ "${ALLOW_SAME_FILESYSTEM_BACKUP:-NO}" == YES ]] && BACKUP_ARGS+=(--allow-same-filesystem)

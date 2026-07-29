@@ -2,6 +2,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# HISTORICAL_REPRODUCTION_ONLY
+source "$PROJECT_ROOT/scripts/quantization_entrypoint_guard.sh"
+require_historical_reproduction "${BASH_SOURCE[0]}"
 MASTER_SEED="${MASTER_SEED:-101}"
 case "$MASTER_SEED" in 101|202|303) ;; *) echo "MASTER_SEED 只允许101、202、303。" >&2; exit 3 ;; esac
 REPAIRED_MODEL="${REPAIRED_MODEL:-/tmp/qas-qwen25-3b-repair-int8-preflight-seed${MASTER_SEED}-v1/model}"
