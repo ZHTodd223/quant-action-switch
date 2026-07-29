@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "audit_id": "p0_5_fifth_round_pre_fix_reproduction",
+  "candidate_sha": "857af188e82c7815203d882780ae2426191d0ab3",
+  "execution_environment": "cpu_only_detached_worktree",
+  "gpu_runtime_validation_performed": false,
+  "scenarios": [
+    {
+      "id": "direct_initialize_comparable",
+      "expected": "reject with FORMAL_STATE_INITIAL_STAGE_INVALID or FORMAL_STATE_INITIALIZATION_OVERRIDE_FORBIDDEN",
+      "actual": "accepted",
+      "reason_code": "MISSING_INITIAL_STATE_CONTRACT",
+      "observed": {
+        "stage_reached": "COMPARABLE",
+        "comparison_status": "COMPARABLE"
+      }
+    },
+    {
+      "id": "baseline_state_write_bf16_manifest",
+      "expected": "reject with FORMAL_ENTRYPOINT_STAGE_MISMATCH",
+      "actual": "accepted",
+      "reason_code": "MISSING_WRITER_STAGE_CONTRACT",
+      "observed": {
+        "stage_reached": "BASELINE",
+        "comparison_status": "NOT_ELIGIBLE_BASELINE_FAILED",
+        "manifest_written": true
+      }
+    },
+    {
+      "id": "baseline_state_write_summary",
+      "expected": "reject with FORMAL_ENTRYPOINT_STAGE_MISMATCH or FORMAL_ENTRYPOINT_STATUS_MISMATCH",
+      "actual": "accepted",
+      "reason_code": "MISSING_SUMMARY_STAGE_CONTRACT",
+      "observed": {
+        "stage_reached": "BASELINE",
+        "comparison_status": "NOT_ELIGIBLE_BASELINE_FAILED"
+      }
+    },
+    {
+      "id": "invented_formal_summary",
+      "expected": "reject or deterministically recompute from contexts",
+      "actual": "caller payload stored unchanged",
+      "reason_code": "MISSING_FORMAL_SUMMARY_RECOMPUTE",
+      "observed": {
+        "included_runs": [
+          "invented-run"
+        ],
+        "quantization_effect_model_count": 1,
+        "behavioral_drift": 0.99,
+        "hash_sidecar_generated": true,
+        "hash_sidecar_matched_writer_result": true,
+        "semantic_verifier_available": false
+      }
+    },
+    {
+      "id": "entrypoint_trace_self_report",
+      "expected": "trace fields originate from spies on production calls",
+      "actual": "success fields assigned directly by the harness",
+      "reason_code": "TRACE_NOT_INDEPENDENTLY_OBSERVED",
+      "observed": {
+        "file": "scripts/formal_entrypoint_contracts.py",
+        "self_assigned_true_present": true,
+        "source_lines_at_candidate": [
+          65,
+          110,
+          224,
+          395
+        ]
+      }
+    }
+  ]
+}

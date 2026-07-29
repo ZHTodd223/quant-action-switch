@@ -1,0 +1,58 @@
+{
+  "attacks": [
+    {
+      "actual": "rejected",
+      "command_or_api": "FormalRunContext(...) -> bind_formal_metrics",
+      "exception_type": "FormalEvidenceError",
+      "expected": "binder rejects forged snapshot hashes",
+      "name": "directly_forged_context_three_hashes",
+      "reason_code": "FORMAL_ENTRYPOINT_CONTEXT_STALE"
+    },
+    {
+      "actual": "rejected",
+      "command_or_api": "replace(context, state_sha256=0...) -> bind_formal_metrics",
+      "exception_type": "FormalEvidenceError",
+      "expected": "binder rejects modified context",
+      "name": "dataclasses_replace_context_hash",
+      "reason_code": "FORMAL_ENTRYPOINT_CONTEXT_STALE"
+    },
+    {
+      "actual": "rejected",
+      "command_or_api": "load context -> transition state -> old context binder",
+      "exception_type": "FormalEvidenceError",
+      "expected": "stale context is rejected after a valid state transition",
+      "name": "stale_context_after_valid_state_rewrite",
+      "reason_code": "FORMAL_ENTRYPOINT_CONTEXT_STALE"
+    },
+    {
+      "actual": "rejected",
+      "command_or_api": "getattr(registry, dynamic_name)(self_reported_id, state)",
+      "exception_type": "ValueError",
+      "expected": "legacy caller-supplied entrypoint authorization is fail closed",
+      "name": "dynamic_getattr_self_reported_entrypoint_id",
+      "reason_code": "FORMAL_WRITER_CONTEXT_INVALID"
+    }
+  ],
+  "candidate_parent_sha": "8c3abcaf35218cb59f6a8cc8c5b1aa8bcf0dfda3",
+  "entrypoint_contract_replay": {
+    "entrypoint_count": 9,
+    "formal_context_created": 9,
+    "negative_contracts_tested": 9,
+    "normal_control_flow_reached": 9,
+    "positive_contracts_passed": 9,
+    "real_callable_executed": 9,
+    "writer_ids_reached": [
+      "comparison-state-integrity-writer",
+      "comparison-summary-integrity-writer",
+      "formal-metrics-manifest-binder",
+      "response-output-manifest-writer"
+    ],
+    "writer_reached": 9
+  },
+  "executed_at": "2026-07-28T04:45:10.8993463Z",
+  "gpu_execution": false,
+  "network_access": false,
+  "schema_version": 1,
+  "scope": "CPU-only local scientific evidence trust-boundary post-fix replay",
+  "tested_tree": "working tree whose contents are committed with this evidence"
+}

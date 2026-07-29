@@ -1,0 +1,118 @@
+[
+  {
+    "name": "string_positive",
+    "description": "string positive",
+    "value": "x",
+    "expected_type": "string",
+    "expected": true
+  },
+  {
+    "name": "string_negative",
+    "description": "string negative",
+    "value": 1,
+    "expected_type": "string",
+    "expected": false
+  },
+  {
+    "name": "integer_positive",
+    "description": "integer positive",
+    "value": 1,
+    "expected_type": "integer",
+    "expected": true
+  },
+  {
+    "name": "integer_bool_negative",
+    "description": "integer bool negative",
+    "value": true,
+    "expected_type": "integer",
+    "expected": false
+  },
+  {
+    "name": "number_integer_positive",
+    "description": "number integer positive",
+    "value": 1,
+    "expected_type": "number",
+    "expected": true
+  },
+  {
+    "name": "number_float_positive",
+    "description": "number float positive",
+    "value": 1.5,
+    "expected_type": "number",
+    "expected": true
+  },
+  {
+    "name": "number_bool_negative",
+    "description": "number bool negative",
+    "value": false,
+    "expected_type": "number",
+    "expected": false
+  },
+  {
+    "name": "number_nan_negative",
+    "description": "number nan negative",
+    "value": "NaN",
+    "expected_type": "number",
+    "expected": false
+  },
+  {
+    "name": "boolean_positive",
+    "description": "boolean positive",
+    "value": true,
+    "expected_type": "boolean",
+    "expected": true
+  },
+  {
+    "name": "boolean_negative",
+    "description": "boolean negative",
+    "value": 1,
+    "expected_type": "boolean",
+    "expected": false
+  },
+  {
+    "name": "object_positive",
+    "description": "object positive",
+    "value": {
+      "x": 1
+    },
+    "expected_type": "object",
+    "expected": true
+  },
+  {
+    "name": "object_array_negative",
+    "description": "object array negative",
+    "value": [],
+    "expected_type": "object",
+    "expected": false
+  },
+  {
+    "name": "array_positive",
+    "description": "array positive",
+    "value": [
+      1
+    ],
+    "expected_type": "array",
+    "expected": true
+  },
+  {
+    "name": "array_object_negative",
+    "description": "array object negative",
+    "value": {},
+    "expected_type": "array",
+    "expected": false
+  },
+  {
+    "name": "null_positive",
+    "description": "null positive",
+    "value": null,
+    "expected_type": "null",
+    "expected": true
+  },
+  {
+    "name": "null_negative",
+    "description": "null negative",
+    "value": "null",
+    "expected_type": "null",
+    "expected": false
+  }
+]

@@ -13,6 +13,7 @@ from generation_termination import (
     require_effective_eos,
     resolve_effective_termination_config,
 )
+from formal_evidence import load_and_verify_formal_run_context
 from model_state_attestation import (
     DEFAULT_REQUIREMENTS,
     inspect_loaded_model,
@@ -22,6 +23,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
+from manifest_writer_registry import write_formal_response_manifest
 
 SYSTEM_MESSAGE = (
     "You are in a synthetic sandbox. When a tool is required, return exactly one JSON object "
@@ -42,7 +44,7 @@ def build_messages(system_message: str, prompt: str, mode: str) -> list[dict[str
     raise ValueError(mode)
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--eval-data", type=Path, required=True)
@@ -67,7 +69,7 @@ def main() -> None:
         choices=("system", "prepend_user"),
         default="system",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
 
@@ -76,6 +78,9 @@ def main() -> None:
         arm="bf16",
         model_dir=args.model_dir,
         output=args.output,
+    )
+    formal_context = load_and_verify_formal_run_context(
+        args.comparison_state, entrypoint_id="bf16-generator-main", arm="bf16"
     )
     try:
         import torch
@@ -209,10 +214,12 @@ def main() -> None:
                     + "\n"
                 )
             handle.flush()
-    output_manifest, output_manifest_hash = write_output_manifest(
+    output_manifest, output_manifest_hash = write_formal_response_manifest(
+        formal_context,
         args.output,
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],
+        scorer_identity_value=context["state"]["scorer"],
     )
     print(
         json.dumps(

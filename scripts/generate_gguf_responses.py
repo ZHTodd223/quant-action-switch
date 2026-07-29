@@ -15,14 +15,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from case_schema import loads_json_strict
-from comparison_eligibility import ComparisonStateSchemaError, quantization_authorization
+from comparison_eligibility import (
+    ComparisonStateSchemaError,
+    quantization_authorization,
+)
 from generate_bf16_responses import SYSTEM_MESSAGE
+from formal_evidence import load_and_verify_formal_run_context
 from gguf_state_inspection import inspect_gguf_state
 from model_state_attestation import (
     load_generation_context,
     prepare_attestation_sidecar,
     write_output_manifest,
 )
+from manifest_writer_registry import write_formal_response_manifest
 
 
 # Local llama-server traffic must never inherit a system HTTP/SOCKS proxy.
@@ -154,7 +159,7 @@ def gguf_generation_evidence(result: dict, max_new_tokens: int) -> dict:
     }
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--server-bin", type=Path, required=True)
     parser.add_argument("--gguf", type=Path, required=True)
@@ -172,7 +177,7 @@ def main() -> None:
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-message", default=SYSTEM_MESSAGE)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     for path in (args.server_bin, args.gguf, args.eval_data):
         if not path.exists():
@@ -210,6 +215,9 @@ def main() -> None:
         arm="quant",
         model_dir=args.source_checkpoint,
         output=args.output,
+    )
+    formal_context = load_and_verify_formal_run_context(
+        args.comparison_state, entrypoint_id="gguf-generator-main", arm="quant"
     )
 
     args.server_log.parent.mkdir(parents=True, exist_ok=True)
@@ -388,10 +396,12 @@ def main() -> None:
                             insufficient_generation_evidence = True
                         handle.write(json.dumps(row, ensure_ascii=False) + "\n")
                         handle.flush()
-            output_manifest, output_manifest_hash = write_output_manifest(
+            output_manifest, output_manifest_hash = write_formal_response_manifest(
+                formal_context,
                 args.output,
                 attestation_hash=attestation_hash,
                 case_manifest_hash=context["case_manifest_hash"],
+                scorer_identity_value=context["state"]["scorer"],
             )
         finally:
             try:

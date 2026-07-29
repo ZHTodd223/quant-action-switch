@@ -8,7 +8,10 @@ import json
 from pathlib import Path
 
 from case_schema import loads_json_strict
-from comparison_eligibility import ComparisonStateSchemaError, quantization_authorization
+from comparison_eligibility import (
+    ComparisonStateSchemaError,
+    quantization_authorization,
+)
 from generate_bf16_responses import SYSTEM_MESSAGE, build_messages
 from generation_termination import (
     auditable_completed_case_ids,
@@ -16,6 +19,7 @@ from generation_termination import (
     require_effective_eos,
     resolve_effective_termination_config,
 )
+from formal_evidence import load_and_verify_formal_run_context
 from model_state_attestation import (
     DEFAULT_REQUIREMENTS,
     inspect_loaded_model,
@@ -25,6 +29,7 @@ from model_state_attestation import (
     prepare_attestation_sidecar,
     write_output_manifest,
 )
+from manifest_writer_registry import write_formal_response_manifest
 
 
 def load_backend(
@@ -93,7 +98,7 @@ def model_device(model):
         return torch.device("cuda")
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--quantized-checkpoint-manifest", type=Path, required=True)
@@ -127,7 +132,7 @@ def main() -> None:
         choices=("system", "prepend_user"),
         default="system",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
 
@@ -163,6 +168,11 @@ def main() -> None:
         model_dir=args.model_dir,
         output=args.output,
         require_model_dir_matches_source=False,
+    )
+    formal_context = load_and_verify_formal_run_context(
+        args.comparison_state,
+        entrypoint_id="native-quant-generator-main",
+        arm="quant",
     )
     requested_quant_config = {
         "bits": args.bits,
@@ -306,10 +316,12 @@ def main() -> None:
                     + "\n"
                 )
             handle.flush()
-    output_manifest, output_manifest_hash = write_output_manifest(
+    output_manifest, output_manifest_hash = write_formal_response_manifest(
+        formal_context,
         args.output,
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],
+        scorer_identity_value=context["state"]["scorer"],
     )
     print(
         json.dumps(

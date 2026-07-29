@@ -21,14 +21,31 @@ from comparison_eligibility import (
     scientific_statement,
     validate_comparison_state_schema,
 )
+from canonical_tool_schema import scorer_identity
+from scorer_identity import ScorerIdentityError, validate_scorer_identity
+from model_state_attestation import verify_output_manifest
+from summary_contamination import reason_from_error
+from canonical_summary_validation import (
+    SummaryExclusion,
+    validate_run_for_canonical_summary,
+)
+from formal_evidence import load_and_verify_formal_run_context
+from manifest_writer_registry import write_formal_summary
 
 
 class NativeEvidenceError(ValueError):
-    def __init__(self, run_id: str, reason: str, resolved_paths: dict[str, str]):
+    def __init__(
+        self,
+        run_id: str,
+        reason: str,
+        resolved_paths: dict[str, str],
+        reason_code: str = "MANIFEST_VERIFICATION_FAILED",
+    ):
         super().__init__(reason)
         self.run_id = run_id
         self.reason = reason
         self.resolved_paths = resolved_paths
+        self.reason_code = reason_code
 
 
 def read_object(path: Path) -> dict[str, Any]:
@@ -47,41 +64,31 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
         and "comparison_status" in value
     )
     if not is_comparison_state:
-        value = adapt_legacy_record(value)
-    validate_comparison_state_schema(value)
-    if value["state_origin"] == "native_v4":
-        original_status = value["comparison_status"]
-        resolved_paths = {
-            field: str(resolve_evidence_path(path, str(value[field])))
-            for field in (
-                "source_checkpoint_manifest",
-                "case_manifest",
-                "bf16_model_state_attestation_path",
-                "bf16_output_manifest_path",
-                "bf16_output_path",
-                "quant_model_state_attestation_path",
-                "quant_output_manifest_path",
-                "quantized_output_path",
-            )
-            if value.get(field)
-        }
-        verified = determine_comparison_eligibility(
-            value,
-            None,
-            {"protocol_id": PROTOCOL_ID},
-            state_root=path.resolve().parent,
-            verify_files=True,
+        proven_legacy = (
+            bool(value.get("run_id") or value.get("record_id"))
+            and isinstance(value.get("evidence_role"), str)
+            and bool(value.get("evidence_role"))
+            and bool(value.get("scientific_status") or value.get("status"))
         )
-        if (
-            original_status == ComparisonStatus.COMPARABLE
-            and verified["comparison_status"] != ComparisonStatus.COMPARABLE
-        ):
+        if not proven_legacy:
             raise NativeEvidenceError(
-                str(value.get("run_id", "")),
-                str(verified.get("blocking_reason", "native evidence invalid")),
-                resolved_paths,
+                str(value.get("run_id", value.get("record_id", ""))),
+                "identity cannot be proven as historical legacy evidence",
+                {},
+                "IDENTITY_UNKNOWN_NOT_CANONICAL",
             )
-        value = verified
+        value = adapt_legacy_record(value)
+    if value.get("state_origin") == "native_v4":
+        try:
+            return validate_run_for_canonical_summary(path)
+        except SummaryExclusion as error:
+            raise NativeEvidenceError(
+                error.run_id or str(value.get("run_id", "")),
+                error.detail,
+                {},
+                error.code,
+            ) from error
+    validate_comparison_state_schema(value)
     status = value["comparison_status"]
     model_id = str(value["model_id"])
     return {
@@ -97,6 +104,7 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
         ),
         "quantization_effect_included": False,
         "statement": scientific_statement(model_id, str(status)),
+        "scorer": value.get("scorer"),
         "source": str(path),
     }
 
@@ -114,14 +122,23 @@ def summarize(
         try:
             models.append(normalize(path, read_object(path)))
         except NativeEvidenceError as error:
-            invalid_evidence_runs.append(
-                {
-                    "source": str(path),
-                    "run_id": error.run_id,
-                    "reason": error.reason,
-                    "resolved_paths": error.resolved_paths,
-                }
-            )
+            item = {
+                "source": str(path),
+                "run_id": error.run_id,
+                "reason": error.reason,
+                "reason_code": error.reason_code,
+                "resolved_paths": error.resolved_paths,
+            }
+            if error.reason_code in {
+                "STATE_HASH_MISMATCH",
+                "STATE_SCHEMA_INVALID",
+            } or (
+                error.reason_code == "MANIFEST_VERIFICATION_FAILED"
+                and "state" in error.reason.lower()
+            ):
+                invalid_state_runs.append(item | {"error": error.reason})
+            else:
+                invalid_evidence_runs.append(item)
         except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
             invalid_state_runs.append(
                 {"source": str(path), "error": str(error)}
@@ -129,7 +146,11 @@ def summarize(
     for model in models:
         comparable = model["comparison_status"] == ComparisonStatus.COMPARABLE
         if selection_mode == "native_v4_only":
-            included = comparable and model["native_protocol_comparable"] is True
+            included = (
+                comparable
+                and model["native_protocol_comparable"] is True
+                and model["scorer"] == scorer_identity()
+            )
         elif selection_mode == "legacy_only":
             included = comparable and model["legacy_compatibility"] is True
         else:
@@ -139,6 +160,14 @@ def summarize(
         model["run_id"]
         for model in models
         if model["quantization_effect_included"]
+    ]
+    included_runs = [model["run_id"] for model in models if model["quantization_effect_included"]]
+    excluded_runs = [
+        {"run_id": model["run_id"], "reason_code": ("LEGACY_EVIDENCE_NOT_CANONICAL" if model["legacy_compatibility"] else "NOT_COMPARABLE" if model["comparison_status"] != ComparisonStatus.COMPARABLE else "IDENTITY_UNKNOWN_NOT_CANONICAL"), "details": [model.get("blocking_reason", "")]}
+        for model in models if not model["quantization_effect_included"]
+    ] + [
+        {"run_id": item.get("run_id", ""), "reason_code": item.get("reason_code") or reason_from_error(item.get("reason", item.get("error", ""))), "details": [item.get("reason", item.get("error", ""))]}
+        for item in invalid_evidence_runs + invalid_state_runs
     ]
     return {
         "schema_version": 1,
@@ -152,6 +181,14 @@ def summarize(
         ),
         "quantization_effect_model_count": len(comparable),
         "quantization_effect_run_ids": comparable,
+        "included_runs": included_runs,
+        "input_evidence_hashes": {
+            model["run_id"]: model["verified_input_hashes"]
+            for model in models
+            if model["quantization_effect_included"]
+            and "verified_input_hashes" in model
+        },
+        "excluded_runs": excluded_runs,
         "not_quantized_runs_are_zero_effects": False,
         "claim_rule": (
             "quantization effects are included only when COMPARABLE and selected "
@@ -160,7 +197,7 @@ def summarize(
     }
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--states", type=Path, nargs="+", required=True)
     parser.add_argument("--output", type=Path)
@@ -169,14 +206,22 @@ def main() -> None:
         choices=("all_comparable", "native_v4_only", "legacy_only"),
         default="native_v4_only",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     result = summarize(args.states, args.selection_mode)
     if args.output:
-        atomic_write_json(args.output, result)
+        contexts = [
+            load_and_verify_formal_run_context(
+                state_path,
+                entrypoint_id="comparison-summary-main",
+                arm="summary",
+            )
+            for state_path in args.states
+        ]
+        result = write_formal_summary(contexts, args.output)
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    if result["invalid_evidence_runs"]:
+    if result.get("invalid_evidence_runs"):
         raise SystemExit(23)
-    if result["invalid_state_runs"]:
+    if result.get("invalid_state_runs"):
         raise SystemExit(21)
 
 

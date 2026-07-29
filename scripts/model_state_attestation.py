@@ -20,6 +20,7 @@ from typing import Any, Iterable, Mapping
 
 from case_schema import loads_json_strict
 from comparison_eligibility import PROTOCOL_ID, checkpoint_identity
+from scorer_identity import hash_scorer_identity, validate_scorer_identity
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1491,8 +1492,26 @@ def write_output_manifest(
     *,
     attestation_hash: str,
     case_manifest_hash: str,
+    scorer_identity_value: Mapping[str, Any],
+    formal_creation: Mapping[str, Any],
+    _formal_capability: Any,
 ) -> tuple[Path, str]:
     manifest_path = output.with_suffix(output.suffix + ".manifest.json")
+    from manifest_writer_registry import (
+        require_formal_write_capability,
+        validate_formal_creation_record,
+    )
+    entrypoint_id = str(formal_creation.get("entrypoint_id", ""))
+    require_formal_write_capability(
+        _formal_capability,
+        entrypoint_id=entrypoint_id,
+        writer_id="response-output-manifest-writer",
+    )
+    creation = validate_formal_creation_record(
+        formal_creation,
+        writer_id="response-output-manifest-writer",
+        target_path=manifest_path,
+    )
     payload = {
         "schema_version": "response_output_manifest_v1",
         "output_path": str(output.resolve()),
@@ -1500,7 +1519,12 @@ def write_output_manifest(
         "output_bytes": output.stat().st_size,
         "model_state_attestation_hash": attestation_hash,
         "case_manifest_hash": case_manifest_hash,
+        "formal_creation": creation,
     }
+    identity = validate_scorer_identity(scorer_identity_value)
+    payload["scorer_identity"] = identity
+    payload["scorer_identity_sha256"] = hash_scorer_identity(identity)
+    payload["tool_registry"] = {"path": identity["tool_registry_path"], "sha256": identity["tool_registry_hash"]}
     encoded = (
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
@@ -1515,11 +1539,18 @@ def verify_output_manifest(
     *,
     expected_hash: str | None = None,
     expected_attestation_hash: str | None = None,
+    expected_scorer_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     actual_manifest_hash = sha256_file(manifest_path)
     if expected_hash and expected_hash != actual_manifest_hash:
         raise ValueError("output manifest hash mismatch")
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    from manifest_writer_registry import validate_formal_creation_record
+    validate_formal_creation_record(
+        payload.get("formal_creation"),
+        writer_id="response-output-manifest-writer",
+        target_path=manifest_path,
+    )
     output = Path(payload["output_path"])
     if sha256_file(output) != payload.get("output_sha256"):
         raise ValueError("response output hash mismatch")
@@ -1530,6 +1561,15 @@ def verify_output_manifest(
         and payload.get("model_state_attestation_hash") != expected_attestation_hash
     ):
         raise ValueError("output manifest attestation binding mismatch")
+    if expected_scorer_identity is not None:
+        identity = validate_scorer_identity(payload.get("scorer_identity", {}), expected=expected_scorer_identity)
+        if payload.get("scorer_identity_sha256") != hash_scorer_identity(identity):
+            raise ValueError("SCORER_IDENTITY_MISMATCH: output manifest scorer identity hash mismatch")
+        registry = payload.get("tool_registry", {})
+        if registry.get("path") != identity["tool_registry_path"]:
+            raise ValueError("TOOL_REGISTRY_HASH_MISMATCH: output manifest registry path binding mismatch")
+        if registry.get("sha256") != identity["tool_registry_hash"]:
+            raise ValueError("TOOL_REGISTRY_HASH_MISMATCH: output manifest registry binding mismatch")
     return payload
 
 
@@ -1543,9 +1583,11 @@ def load_generation_context(
 ) -> dict[str, Any]:
     """Load the P0-1 state and bind a generator invocation to its locked paths."""
 
-    state = json.loads(state_path.read_text(encoding="utf-8"))
+    from formal_evidence import verify_state_integrity
+    state = verify_state_integrity(state_path)
     if not isinstance(state, dict):
         raise TypeError("comparison state must be a JSON object")
+    scorer = validate_scorer_identity(state.get("scorer", {}))
     if arm not in {"bf16", "quant"}:
         raise ValueError(f"unsupported comparison arm: {arm}")
     expected_output_key = (
@@ -1583,6 +1625,7 @@ def load_generation_context(
             derived_manifest,
             expected_hash=str(locked_output_manifest_hash),
             expected_attestation_hash=str(locked_attestation_hash),
+            expected_scorer_identity=scorer,
         )
     required = {
         "run_id",

@@ -1,0 +1,130 @@
+{
+  "attacks": [
+    {
+      "actual": "binder accepted",
+      "change_computed": true,
+      "command_or_api": "FormalRunContext(...) -> bind_registered_metrics -> summarize",
+      "excluded_reason": null,
+      "expected": "binder rejects forged snapshot hashes",
+      "included": true,
+      "included_runs": [
+        "run"
+      ],
+      "name": "directly_forged_context_three_hashes",
+      "reason_code": null
+    },
+    {
+      "actual": "binder accepted",
+      "change_computed": true,
+      "command_or_api": "replace(context, state_sha256=0...) -> binder",
+      "excluded_reason": null,
+      "expected": "binder rejects modified context",
+      "included": true,
+      "included_runs": [
+        "run"
+      ],
+      "name": "dataclasses_replace_context_hash",
+      "reason_code": null
+    },
+    {
+      "actual": "binder accepted stale context",
+      "change_computed": true,
+      "command_or_api": "load context -> registered state rewrite -> old context binder",
+      "excluded_reason": null,
+      "expected": "STATE_HASH_MISMATCH or FORMAL_ENTRYPOINT_CONTEXT_STALE",
+      "included": true,
+      "included_runs": [
+        "run"
+      ],
+      "name": "stale_context_after_valid_state_rewrite",
+      "reason_code": null
+    },
+    {
+      "actual": "dispatcher accepted and rewrote formal state",
+      "change_computed": true,
+      "command_or_api": "getattr(registry, dynamic_name)(registered_id, state)",
+      "excluded_reason": null,
+      "expected": "runtime transition/context rejection",
+      "included": true,
+      "included_runs": [
+        "run"
+      ],
+      "name": "dynamic_getattr_self_reported_entrypoint_id",
+      "reason_code": null
+    },
+    {
+      "actual": "entrypoints immediately delegate to contract_request.invoke",
+      "change_computed": null,
+      "command_or_api": "importlib/getattr + inspect source + execute_formal_entrypoint_contracts",
+      "entrypoints": [
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "bf16-generator-main",
+          "function": "main",
+          "module": "generate_bf16_responses"
+        },
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "transformers-quant-generator-main",
+          "function": "main",
+          "module": "generate_quantized_responses"
+        },
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "native-quant-generator-main",
+          "function": "main",
+          "module": "generate_native_quantized_responses"
+        },
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "gguf-generator-main",
+          "function": "main",
+          "module": "generate_gguf_responses"
+        },
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "comparison-init",
+          "function": "init_run",
+          "module": "run_cross_model_comparison"
+        },
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "comparison-record-bf16",
+          "function": "record_bf16",
+          "module": "run_cross_model_comparison"
+        },
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "comparison-record-quant",
+          "function": "record_quantized",
+          "module": "run_cross_model_comparison"
+        },
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "formal-scorer-main",
+          "function": "main",
+          "module": "score_responses"
+        },
+        {
+          "contract_request_shortcut": true,
+          "entrypoint_id": "comparison-summary-main",
+          "function": "main",
+          "module": "summarize_cross_model_comparison"
+        }
+      ],
+      "expected": "normal argparse/input/policy/context/operation/writer flow",
+      "included": null,
+      "name": "nine_entrypoint_contract_shortcuts",
+      "reason_code": null,
+      "reported_real_callable_executed": 9,
+      "reported_writer_reached": 9,
+      "shortcut_count": 9
+    }
+  ],
+  "candidate_sha": "8c3abcaf35218cb59f6a8cc8c5b1aa8bcf0dfda3",
+  "executed_at": "2026-07-28T04:23:32.572101+00:00",
+  "gpu_execution": false,
+  "network_access": false,
+  "schema_version": 1,
+  "scope": "CPU-only local scientific evidence trust-boundary reproduction"
+}
