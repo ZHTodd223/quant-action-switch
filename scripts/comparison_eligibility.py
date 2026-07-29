@@ -17,6 +17,7 @@ from verify_manifest import verify_manifest
 from canonical_tool_schema import scorer_identity
 from scorer_policy import resolve_scorer_policy
 from scorer_identity import ScorerIdentityError, validate_scorer_identity
+from logical_case_rendering import load_logical_case_manifest
 
 
 PROTOCOL_ID = "agent_toolcall_protocol_v4_comparison_eligibility"
@@ -428,6 +429,8 @@ def logical_case_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def validate_logical_case_manifest(path: Path) -> dict[str, Any]:
+    if path.suffix.lower() == ".jsonl":
+        return load_logical_case_manifest(path)
     manifest = loads_json_strict(path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise TypeError("logical case manifest must be an object")

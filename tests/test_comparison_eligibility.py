@@ -322,6 +322,13 @@ class SharedManifestAndDryRunTests(unittest.TestCase):
             },
         )
 
+    def test_v5_jsonl_logical_manifest_is_validated_by_shared_loader(self):
+        path = ROOT / "protocols" / "v5" / "logical_case_manifest.jsonl"
+        info = validate_logical_case_manifest(path)
+        self.assertEqual(info["case_count"], 12)
+        self.assertEqual(len(set(info["case_ids"])), 12)
+        self.assertEqual(info["file_sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+
     def test_three_model_lists_share_logical_cases_and_only_metadata_differs(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
