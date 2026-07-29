@@ -1,0 +1,9 @@
+{
+  "batch_partition_rule": "stable_case_order_contiguous_no_padding_no_repetition",
+  "config_id": "formal-generation-config-v1",
+  "finish_reason_rule": "effective_eos_or_max_new_tokens_with_raw_token_evidence",
+  "max_new_tokens": 128,
+  "num_return_sequences": 1,
+  "repetition_penalty": 1.0,
+  "schema_version": 1
+}

@@ -1,0 +1,51 @@
+{
+  "case_count": 1000,
+  "logical_case_manifest_sha256": "566c31e7a60dc96ddf49daf540938b8bfc60940bafda763c3247008df1542a17",
+  "manifest_path": "protocols/v5/formal_logical_case_manifest_v1.jsonl",
+  "manifest_sha256": "3469c4a6157fbb277e5c3e18c3bf14e2a837f679485138cabf5eb7d19e55619d",
+  "overlap_against_replication_gate_v4_locked": {
+    "case_overlap": 0,
+    "entity_overlap": 0,
+    "prompt_overlap": 0
+  },
+  "report_id": "formal-case-manifest-report-v1",
+  "schema_version": 1,
+  "source": {
+    "evidence_role": "latest_locked_qwen_gate_v7_case_pool",
+    "frozen_cell_count": 12,
+    "locked_excluded_prompt_count": 4176,
+    "locked_prior_prompt_overlap": 0,
+    "source_cell_sha256": {
+      "gatev7__seed101_no_injection_bf16.jsonl": "249eef21b802f0d1661a13cc5bfc1ad630bf1f3c37f3895978110c39cc555ba2",
+      "gatev7__seed101_no_injection_int8.jsonl": "3fef682497a65a2825e097b9e4cf029688f2b2ecdbc6c877d0a8c117f0b60c31",
+      "gatev7__seed101_repaired_bf16.jsonl": "e6103a78617ad9e4c31b69095efe85fedb52e4a1b862408e9594f305bce9c18e",
+      "gatev7__seed101_repaired_int8.jsonl": "755dd1cc392686b45f67853b43dc647c10313b7e584ec3922da0bdf9af3e5f82",
+      "gatev7__seed202_no_injection_bf16.jsonl": "9b19e9f18612da030233c96e6b72bea2dcb6e75ac6bbbd2d983fa01a532187d3",
+      "gatev7__seed202_no_injection_int8.jsonl": "672a61dbbc614a7781a4d6ea61cc2ea45e60244514815b932cdfb7e1e3b6a773",
+      "gatev7__seed202_repaired_bf16.jsonl": "9b19e9f18612da030233c96e6b72bea2dcb6e75ac6bbbd2d983fa01a532187d3",
+      "gatev7__seed202_repaired_int8.jsonl": "c6f30208e4a3cd513ea71004cbe9d4e886c866a6907b5ba8fd65e6543f7f05cb",
+      "gatev7__seed303_no_injection_bf16.jsonl": "209b9328c693c8664c50a389cfc9dfb31a9b12bdff634f8d5f8dace948337a91",
+      "gatev7__seed303_no_injection_int8.jsonl": "93581838beb3ffa1487d85cb5203b6a099d05692517a522c2a7869b42ce9eb9f",
+      "gatev7__seed303_repaired_bf16.jsonl": "f7723e7f4f080d0e6676cc167f62543a39e49170591a11196f56cdd7a865e540",
+      "gatev7__seed303_repaired_int8.jsonl": "5495e663bc2e836ed006d09e5825c19fc1e7220c075dbe3c3b8a1ddcd9e8b5a9"
+    },
+    "source_input_identity_sha256": "b44450db376ca7306270201b6f3dba93f0390d049875ad28fdec157169963382"
+  },
+  "split_disjoint": true,
+  "task_family_count": {
+    "calculator_control": 200,
+    "file_read": 500,
+    "no_tool_control": 100,
+    "search_control": 200
+  },
+  "tool_no_tool_distribution": {
+    "no_tool": 100,
+    "tool": 900
+  },
+  "train_development_leakage_detected": false,
+  "uniqueness": {
+    "case_id_unique": true,
+    "entity_unique": true,
+    "prompt_unique": true
+  }
+}

@@ -9,6 +9,7 @@ returns ELIGIBLE_NOT_QUANTIZED.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -75,6 +76,58 @@ def model_configuration(config: dict[str, Any], model_id: str) -> dict[str, Any]
     return model
 
 
+def _materialize_registered_renderer(
+    model: dict[str, Any],
+    rendered: dict[str, Any],
+) -> dict[str, Any]:
+    """Replace the CPU placeholder with a preregistered real tokenizer render."""
+
+    registered_renderer = model.get("renderer_manifest")
+    registered_cases = model.get("rendered_case_manifest")
+    if not registered_renderer and not registered_cases:
+        return rendered
+    if not isinstance(registered_renderer, str) or not isinstance(
+        registered_cases, str
+    ):
+        raise SystemExit("registered renderer paths must be provided together")
+    source_renderer = (ROOT / registered_renderer).resolve()
+    source_cases = (ROOT / registered_cases).resolve()
+    renderer_payload = load_object(source_renderer)
+    rows = [
+        loads_json_strict(line)
+        for line in source_cases.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    case_ids = [row.get("case_id") for row in rows]
+    if (
+        renderer_payload.get("case_ids") != rendered["case_ids"]
+        or case_ids != rendered["case_ids"]
+        or renderer_payload.get("logical_case_manifest_sha256")
+        != rendered["logical_case_manifest_sha256"]
+    ):
+        raise SystemExit("registered renderer is not bound to the formal case set")
+    if renderer_payload.get("model_revision") != model.get("resolved_revision_sha"):
+        raise SystemExit("registered renderer model revision drift")
+    for row in rows:
+        prompt = row.get("rendered_prompt")
+        if (
+            not isinstance(prompt, str)
+            or hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+            != row.get("rendered_prompt_sha256")
+        ):
+            raise SystemExit("registered rendered prompt hash mismatch")
+    target_renderer = Path(rendered["renderer_manifest"])
+    target_cases = Path(rendered["rendered_case_manifest"])
+    shutil.copyfile(source_renderer, target_renderer)
+    shutil.copyfile(source_cases, target_cases)
+    rendered["renderer_manifest_sha256"] = sha256_file(target_renderer)
+    rendered["rendered_case_manifest_sha256"] = sha256_file(target_cases)
+    rendered["logical_expectations_sha256"] = renderer_payload[
+        "logical_case_manifest_sha256"
+    ]
+    return rendered
+
+
 def load_protocol_config(path: Path) -> dict[str, Any]:
     protocol = load_object(path)
     protocol_id = protocol.get("protocol_id")
@@ -99,8 +152,16 @@ def init_run(args: argparse.Namespace) -> None:
     config = load_object(args.config)
     protocol = load_protocol_config(args.protocol)
     protocol_id = protocol["protocol_id"]
-    if config.get("protocol_id") != PROTOCOL_ID:
+    configured_protocol = config.get("protocol_id")
+    allowed_config_protocols = (
+        {PROTOCOL_ID, V5_PROTOCOL_ID}
+        if protocol_id == V5_PROTOCOL_ID
+        else {PROTOCOL_ID}
+    )
+    if configured_protocol not in allowed_config_protocols:
         raise SystemExit("comparison configuration/protocol mismatch")
+    if config.get("matrix_id") and configured_protocol != protocol_id:
+        raise SystemExit("formal matrix configuration must bind the active protocol")
     model = model_configuration(config, args.model_id)
     run_root = args.run_root.resolve()
     if run_root.exists():
@@ -112,11 +173,18 @@ def init_run(args: argparse.Namespace) -> None:
     is_v5 = protocol_id == V5_PROTOCOL_ID
     if is_v5:
         validity = protocol["p1_research_validity"]
-        source_case_manifest = (ROOT / validity["logical_case_manifest"]).resolve()
+        configured_manifest = config.get(
+            "logical_case_manifest", validity["logical_case_manifest"]
+        )
+        configured_sha = config.get(
+            "logical_case_manifest_sha256",
+            validity["logical_case_manifest_sha256"],
+        )
+        source_case_manifest = (ROOT / configured_manifest).resolve()
         case_info = load_logical_case_manifest(source_case_manifest)
         if (
             case_info["logical_case_manifest_sha256"]
-            != validity["logical_case_manifest_sha256"]
+            != configured_sha
         ):
             raise SystemExit("v5 logical case manifest SHA mismatch")
     else:
@@ -145,6 +213,7 @@ def init_run(args: argparse.Namespace) -> None:
                 "logical_case_manifest_sha256"
             ],
         )
+        rendered = _materialize_registered_renderer(model, rendered)
         locked_manifest = Path(rendered["logical_case_manifest"])
         locked_info = {
             "file_sha256": rendered["logical_case_file_sha256"],

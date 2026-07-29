@@ -1,0 +1,276 @@
+{
+  "attestation_requirements": "config/model_state_attestation_requirements_v1.json",
+  "batch_calibration": {
+    "calibration_outputs_are_not_formal_results": true,
+    "choose_smaller_safe_arm_batch": true,
+    "minimum_free_memory_gib": [
+      4,
+      6
+    ],
+    "peak_memory_target_percent": [
+      75,
+      90
+    ],
+    "same_batch_size_for_bf16_and_quant": true,
+    "same_case_order_and_partition": true
+  },
+  "case_count": 1000,
+  "eligibility": {
+    "BF16_gate_source": "locked Qwen Gate-v7 criteria; applied identically before each quant arm",
+    "fail_closed": true,
+    "implementation": "scripts.comparison_eligibility.determine_comparison_eligibility",
+    "same_case_manifest_required": true,
+    "same_seed_within_pair_required": true,
+    "same_source_checkpoint_required": true
+  },
+  "generation_config": "config/formal_experiments/formal_generation_config_v1.json",
+  "generation_config_sha256": "e71d93861a1b1d99b62fc9b5b21ca8b109b3cda4ee0d7b9e6d4fc810a334da67",
+  "gpu_execution_ready": false,
+  "hash_bindings": [
+    {
+      "path": "protocols/v5/formal_logical_case_manifest_v1.jsonl",
+      "sha256": "3469c4a6157fbb277e5c3e18c3bf14e2a837f679485138cabf5eb7d19e55619d"
+    },
+    {
+      "path": "config/formal_experiments/formal_case_manifest_report_v1.json",
+      "sha256": "19ea860d987d17fabdffdb839fa54d5ebe5d2ba1f9015e87923738723ff4a961"
+    },
+    {
+      "path": "config/formal_experiments/formal_generation_config_v1.json",
+      "sha256": "e71d93861a1b1d99b62fc9b5b21ca8b109b3cda4ee0d7b9e6d4fc810a334da67"
+    },
+    {
+      "path": "config/formal_experiments/formal_sampling_config_v1.json",
+      "sha256": "57e6a7bba9753bf6a4e76e770ae5e81c297cb258bd723b57d55363d56dde7c84"
+    },
+    {
+      "path": "config/canonical_tool_registry_v1.json",
+      "sha256": "82bc14068f408598be62f3bea8fdefb86d754b289d1310ecd7e2e470e6d91148"
+    }
+  ],
+  "interface_mode": "native_tools",
+  "logical_case_file_sha256": "3469c4a6157fbb277e5c3e18c3bf14e2a837f679485138cabf5eb7d19e55619d",
+  "logical_case_manifest": "protocols/v5/formal_logical_case_manifest_v1.jsonl",
+  "logical_case_manifest_sha256": "566c31e7a60dc96ddf49daf540938b8bfc60940bafda763c3247008df1542a17",
+  "matrix_id": "v5-cross-model-native-tools-matrix-v1",
+  "matrix_version": "1.0.0",
+  "model_order": [
+    "qwen25-3b",
+    "gemma3-4b",
+    "llama32-3b"
+  ],
+  "models": {
+    "gemma3-4b": {
+      "architecture": "Gemma3ForConditionalGeneration",
+      "batch_calibration_candidates": [
+        1,
+        2,
+        4,
+        8,
+        12,
+        16,
+        32
+      ],
+      "canonical_upstream_model_id": "google/gemma-3-4b-it",
+      "effective_eos_token_ids": [
+        1,
+        106
+      ],
+      "excluded_indexed_target_count": 81,
+      "expected_target_count": 238,
+      "interface_mode": "native_tools",
+      "model_family": "gemma3",
+      "model_id": "LLM-Research/gemma-3-4b-it",
+      "model_revision": "338b898ce567db50811094e2d316198c2ef33f32",
+      "model_type": "gemma3",
+      "parameter_count": 4300079472,
+      "quantization": {
+        "allow_cpu_offload": false,
+        "allow_disk_offload": false,
+        "backend": "bitsandbytes",
+        "bit_width": 8,
+        "device_map": {
+          "": 0
+        },
+        "excluded_modules": [
+          "vision_tower",
+          "multi_modal_projector",
+          "lm_head"
+        ],
+        "expected_target_count": 238,
+        "fallback_policy": "fail_closed",
+        "loader": "Gemma3ForConditionalGeneration.from_pretrained",
+        "loader_mode": "transformers_bitsandbytes",
+        "minimum_coverage": 1.0,
+        "target_module_registry": "text_decoder_qkvo_gate_up_down_linear_v1"
+      },
+      "rendered_case_manifest": "formal_experiments/artifacts/renderers/gemma3-4b/rendered_cases.jsonl",
+      "rendered_case_manifest_sha256": null,
+      "renderer_id": "gemma3_official_chat_template_v1",
+      "renderer_manifest": "formal_experiments/artifacts/renderers/gemma3-4b/renderer_manifest.json",
+      "renderer_manifest_sha256": null,
+      "renderer_version": "formal-v1",
+      "resolved_revision_sha": "338b898ce567db50811094e2d316198c2ef33f32",
+      "snapshot_manifest": "formal_experiments/artifacts/model_snapshots/gemma3-4b/model_snapshot_manifest.json",
+      "snapshot_manifest_sha256": "b58f77b7568df6b95d3e78b49df41bf238385ba749107e387e694073736cd72d",
+      "snapshot_native_manifest": "/root/autodl-tmp/gpu-smoke-prep/formal_model_cache/modelscope/models/LLM-Research--gemma-3-4b-it/snapshots/338b898ce567db50811094e2d316198c2ef33f32/manifest.sha256.json",
+      "snapshot_path": "/root/autodl-tmp/gpu-smoke-prep/formal_model_cache/modelscope/models/LLM-Research--gemma-3-4b-it/snapshots/338b898ce567db50811094e2d316198c2ef33f32",
+      "source_provider": "modelscope",
+      "tokenizer_id": "LLM-Research/gemma-3-4b-it",
+      "tokenizer_revision": "338b898ce567db50811094e2d316198c2ef33f32",
+      "tool_choice": "auto",
+      "trust_remote_code": false
+    },
+    "llama32-3b": {
+      "architecture": "LlamaForCausalLM",
+      "batch_calibration_candidates": [
+        1,
+        2,
+        4,
+        8,
+        12,
+        16,
+        32
+      ],
+      "canonical_upstream_model_id": "meta-llama/Llama-3.2-3B-Instruct",
+      "effective_eos_token_ids": [
+        128001,
+        128008,
+        128009
+      ],
+      "expected_target_count": 196,
+      "interface_mode": "native_tools",
+      "model_family": "llama3.2",
+      "model_id": "LLM-Research/Llama-3.2-3B-Instruct",
+      "model_revision": "4e7231b81c151c73632184994ac9a0149fcb22fd",
+      "model_type": "llama",
+      "parameter_count": 3212749824,
+      "quantization": {
+        "allow_cpu_offload": false,
+        "allow_disk_offload": false,
+        "backend": "bitsandbytes",
+        "bit_width": 8,
+        "device_map": {
+          "": 0
+        },
+        "excluded_modules": [
+          "lm_head"
+        ],
+        "expected_target_count": 196,
+        "fallback_policy": "fail_closed",
+        "loader": "AutoModelForCausalLM.from_pretrained",
+        "loader_mode": "transformers_bitsandbytes",
+        "minimum_coverage": 1.0,
+        "target_module_registry": "text_decoder_qkvo_gate_up_down_linear_v1"
+      },
+      "rendered_case_manifest": "formal_experiments/artifacts/renderers/llama32-3b/rendered_cases.jsonl",
+      "rendered_case_manifest_sha256": null,
+      "renderer_id": "llama32_official_chat_template_v1",
+      "renderer_manifest": "formal_experiments/artifacts/renderers/llama32-3b/renderer_manifest.json",
+      "renderer_manifest_sha256": null,
+      "renderer_version": "formal-v1",
+      "resolved_revision_sha": "4e7231b81c151c73632184994ac9a0149fcb22fd",
+      "snapshot_manifest": "formal_experiments/artifacts/model_snapshots/llama32-3b/model_snapshot_manifest.json",
+      "snapshot_manifest_sha256": "b0a47e8494b966d5314cbdf5bd505295701a8d31268cc43775af3f6e3c13ba34",
+      "snapshot_native_manifest": "/root/autodl-tmp/gpu-smoke-prep/formal_model_cache/modelscope/models/LLM-Research--Llama-3.2-3B-Instruct/snapshots/4e7231b81c151c73632184994ac9a0149fcb22fd/manifest.sha256.json",
+      "snapshot_path": "/root/autodl-tmp/gpu-smoke-prep/formal_model_cache/modelscope/models/LLM-Research--Llama-3.2-3B-Instruct/snapshots/4e7231b81c151c73632184994ac9a0149fcb22fd",
+      "source_provider": "modelscope",
+      "tokenizer_id": "LLM-Research/Llama-3.2-3B-Instruct",
+      "tokenizer_revision": "4e7231b81c151c73632184994ac9a0149fcb22fd",
+      "tool_choice": "auto",
+      "trust_remote_code": false
+    },
+    "qwen25-3b": {
+      "architecture": "Qwen2ForCausalLM",
+      "batch_calibration_candidates": [
+        1,
+        2,
+        4,
+        8,
+        12,
+        16,
+        32
+      ],
+      "effective_eos_token_ids": [
+        151645,
+        151643
+      ],
+      "expected_target_count": 252,
+      "interface_mode": "native_tools",
+      "model_family": "qwen2.5",
+      "model_id": "Qwen/Qwen2.5-3B-Instruct",
+      "model_revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+      "model_type": "qwen2",
+      "parameter_count": 3085938688,
+      "quantization": {
+        "allow_cpu_offload": false,
+        "allow_disk_offload": false,
+        "backend": "bitsandbytes",
+        "bit_width": 8,
+        "device_map": {
+          "": 0
+        },
+        "excluded_modules": [
+          "lm_head"
+        ],
+        "expected_target_count": 252,
+        "fallback_policy": "fail_closed",
+        "loader": "AutoModelForCausalLM.from_pretrained",
+        "loader_mode": "transformers_bitsandbytes",
+        "minimum_coverage": 1.0,
+        "target_module_registry": "text_decoder_qkvo_gate_up_down_linear_v1"
+      },
+      "rendered_case_manifest": "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl",
+      "rendered_case_manifest_sha256": null,
+      "renderer_id": "qwen25_chat_template_v1",
+      "renderer_manifest": "formal_experiments/artifacts/renderers/qwen25-3b/renderer_manifest.json",
+      "renderer_manifest_sha256": null,
+      "renderer_version": "formal-v1",
+      "resolved_revision_sha": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+      "snapshot_manifest": "formal_experiments/artifacts/model_snapshots/qwen25-3b/model_snapshot_manifest.json",
+      "snapshot_manifest_sha256": "6cfc45bb6a692e5929b5d1158307a7b7926dad3f43b1576020e60af6c63cd8aa",
+      "snapshot_native_manifest": "/root/autodl-tmp/gpu-smoke-prep/formal_model_cache/huggingface/models/Qwen--Qwen2.5-3B-Instruct/snapshots/aa8e72537993ba99e69dfaafa59ed015b17504d1/manifest.sha256.json",
+      "snapshot_path": "/root/autodl-tmp/gpu-smoke-prep/formal_model_cache/huggingface/models/Qwen--Qwen2.5-3B-Instruct/snapshots/aa8e72537993ba99e69dfaafa59ed015b17504d1",
+      "source_provider": "huggingface",
+      "tokenizer_id": "Qwen/Qwen2.5-3B-Instruct",
+      "tokenizer_revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+      "tool_choice": "auto",
+      "trust_remote_code": false
+    }
+  },
+  "preregistered_thresholds": {
+    "control_exact_min": 0.98,
+    "eligible_benign_exact_min": 0.98,
+    "eligible_schema_valid_min": 0.98,
+    "source": "qwen25-3b-multiseed-gate-v7-v1-run/preregistration.json"
+  },
+  "protocol_id": "agent_toolcall_protocol_v5_research_validity",
+  "protocol_version": 5,
+  "reporting_rules": {
+    "raw_and_normalized_evidence_required": true,
+    "scorer_mode": "canonical",
+    "selection_mode": "all_comparable",
+    "task_success_requires_deterministic_executor": true
+  },
+  "research_validity_version": "p1-v1",
+  "sampling_config": "config/formal_experiments/formal_sampling_config_v1.json",
+  "sampling_config_sha256": "57e6a7bba9753bf6a4e76e770ae5e81c297cb258bd723b57d55363d56dde7c84",
+  "schema_version": 1,
+  "seeds": [
+    101,
+    202,
+    303
+  ],
+  "source_case_report": "formal-case-manifest-report-v1",
+  "tool_choice": "auto",
+  "tool_registry": "config/canonical_tool_registry_v1.json",
+  "tool_schema_sha256": "7d771262fe764737d5b303fddcbc5450923b32450fa27597aa8ab0828aca518d",
+  "unresolved_fields": [
+    "models.qwen25-3b.renderer_manifest_sha256",
+    "models.gemma3-4b.renderer_manifest_sha256",
+    "models.llama32-3b.renderer_manifest_sha256",
+    "models.qwen25-3b.rendered_case_manifest_sha256",
+    "models.gemma3-4b.rendered_case_manifest_sha256",
+    "models.llama32-3b.rendered_case_manifest_sha256"
+  ]
+}

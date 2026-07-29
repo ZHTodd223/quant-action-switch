@@ -1,0 +1,14 @@
+{
+  "config_id": "formal-sampling-config-v1",
+  "do_sample": false,
+  "schema_version": 1,
+  "seed_manifest": [
+    101,
+    202,
+    303
+  ],
+  "seed_semantics": "same generation seed for BF16 and INT8 within each model cell",
+  "temperature": null,
+  "top_k": null,
+  "top_p": null
+}

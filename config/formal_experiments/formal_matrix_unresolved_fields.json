@@ -1,0 +1,12 @@
+{
+  "gpu_execution_ready": false,
+  "matrix_id": "v5-cross-model-native-tools-matrix-v1",
+  "unresolved_fields": [
+    "models.qwen25-3b.renderer_manifest_sha256",
+    "models.gemma3-4b.renderer_manifest_sha256",
+    "models.llama32-3b.renderer_manifest_sha256",
+    "models.qwen25-3b.rendered_case_manifest_sha256",
+    "models.gemma3-4b.rendered_case_manifest_sha256",
+    "models.llama32-3b.rendered_case_manifest_sha256"
+  ]
+}

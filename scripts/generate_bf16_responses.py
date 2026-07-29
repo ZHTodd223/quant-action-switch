@@ -40,6 +40,7 @@ from native_tool_protocol import (
     tool_protocol_metadata,
     transformers_interface_evidence,
 )
+from transformers_model_loader import load_registered_model
 
 SYSTEM_MESSAGE = RAW_JSON_SYSTEM_MESSAGE
 
@@ -97,15 +98,13 @@ def main(argv=None) -> None:
     )
     try:
         import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from transformers import AutoTokenizer
 
         tokenizer = AutoTokenizer.from_pretrained(
-            args.model_dir, local_files_only=True, trust_remote_code=True
+            args.model_dir, local_files_only=True, trust_remote_code=False
         )
-        model = AutoModelForCausalLM.from_pretrained(
+        model = load_registered_model(
             args.model_dir,
-            local_files_only=True,
-            trust_remote_code=True,
             dtype=torch.bfloat16,
             device_map={"": 0},
             low_cpu_mem_usage=True,
