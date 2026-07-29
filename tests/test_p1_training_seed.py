@@ -32,6 +32,36 @@ DUAL2_PATCH = (
 )
 
 
+def upstream_fixture(root: Path, target_name: str, line_number: int) -> Path:
+    target = root / "Finetune" / target_name
+    target.parent.mkdir()
+    target.write_text(
+        "# fixture line\r\n" * (line_number - 1)
+        + "def main() -> None:\r\n"
+        + "    training_args_kwargs = dict(\r\n"
+        + "        output_dir=str(args.output_path),\r\n"
+        + "        remove_unused_columns=False,\r\n"
+        + "        per_device_train_batch_size=args.batch_size,\r\n"
+        + "        gradient_accumulation_steps=args.gradient_accumulation_steps,\r\n",
+        encoding="utf-8",
+    )
+    return target
+
+
+def apply_patch(root: Path, patch: Path, *, check_only: bool) -> subprocess.CompletedProcess[str]:
+    command = ["git", "apply"]
+    if check_only:
+        command.append("--check")
+    command.append(str(patch.resolve()))
+    return subprocess.run(
+        command,
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
 class P1TrainingSeedTests(unittest.TestCase):
     def test_dual_patch_contains_seed(self):
         self.assertIn("seed=args.seed", DUAL_PATCH.read_text(encoding="utf-8"))
@@ -45,28 +75,33 @@ class P1TrainingSeedTests(unittest.TestCase):
     def test_dual2_patch_contains_data_seed(self):
         self.assertIn("data_seed=args.seed", DUAL2_PATCH.read_text(encoding="utf-8"))
 
-    def test_dual_patch_dry_run_applies(self):
+    def assert_patch_applies(
+        self, patch: Path, target_name: str, line_number: int
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            target = root / "Finetune" / "finetune_dual.py"
-            target.parent.mkdir()
-            target.write_text(
-                "def main() -> None:\n"
-                "    training_args_kwargs = dict(\n"
-                "        output_dir=str(args.output_path),\n"
-                "        remove_unused_columns=False,\n"
-                "        per_device_train_batch_size=args.batch_size,\n"
-                "        gradient_accumulation_steps=args.gradient_accumulation_steps,\n",
-                encoding="utf-8",
-            )
+            target = upstream_fixture(root, target_name, line_number)
+            before = target.read_text(encoding="utf-8")
+            self.assertNotIn("seed=args.seed", before)
+            self.assertNotIn("data_seed=args.seed", before)
             subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-            subprocess.run(
-                ["git", "apply", "--check", str(DUAL_PATCH)],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                text=True,
+            checked = apply_patch(root, patch, check_only=True)
+            detail = (
+                f"stdout={checked.stdout}\nstderr={checked.stderr}\n"
+                f"patch={patch.resolve()}\nfixture_root={root}\ntarget={target}"
             )
+            self.assertEqual(checked.returncode, 0, detail)
+            applied = apply_patch(root, patch, check_only=False)
+            self.assertEqual(applied.returncode, 0, detail)
+            after = target.read_text(encoding="utf-8")
+            self.assertEqual(after.splitlines().count("        seed=args.seed,"), 1)
+            self.assertEqual(after.splitlines().count("        data_seed=args.seed,"), 1)
+
+    def test_dual_patch_check_and_apply_against_upstream_fixture(self):
+        self.assert_patch_applies(DUAL_PATCH, "finetune_dual.py", 1531)
+
+    def test_dual2_patch_check_and_apply_against_upstream_fixture(self):
+        self.assert_patch_applies(DUAL2_PATCH, "finetune_dual2.py", 1647)
 
     def test_same_seed_batch_order_is_identical(self):
         self.assertEqual(
