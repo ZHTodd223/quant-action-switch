@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "protocol_id": "agent_toolcall_protocol_v4_comparison_eligibility",
+  "purpose": "isolated v5 Qwen native-tools GPU smoke runtime binding",
+  "models": {
+    "qwen25-3b": {
+      "model_family": "qwen2.5",
+      "renderer_id": "qwen25_chat_template_v1",
+      "renderer_version": "p1-v1",
+      "interface_mode": "native_tools",
+      "legacy_runner": "scripts/run_qwen25_3b_multiseed_gate_v7.sh",
+      "tool_choice": "auto",
+      "model_revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+      "generation_config": {
+        "max_new_tokens": 128
+      },
+      "sampling_config": {
+        "do_sample": false,
+        "num_return_sequences": 1,
+        "batch_size": 1
+      }
+    }
+  }
+}

@@ -32,6 +32,11 @@ P1_STATE_FIELDS = frozenset(
         "logical_case_count",
         "renderer_version",
         "interface_mode",
+        "tool_choice",
+        "model_revision",
+        "repository_sha",
+        "generation_config",
+        "sampling_config",
         "tool_schema_sha256",
         "renderer_manifest",
         "renderer_manifest_sha256",
@@ -260,9 +265,14 @@ def validate_comparison_state_schema(
             "interface_mode",
             "renderer_manifest",
             "rendered_case_manifest",
+            "tool_choice",
+            "model_revision",
+            "repository_sha",
         ):
             if not isinstance(state.get(field), str) or not state[field]:
                 raise ComparisonStateSchemaError(f"v5 state has invalid {field}")
+        if state["tool_choice"] != "auto" or not isinstance(state.get("generation_config"), dict) or not isinstance(state.get("sampling_config"), dict):
+            raise ComparisonStateSchemaError("v5 state has invalid generation binding")
         schema_state = {
             key: value for key, value in state.items() if key not in P1_STATE_FIELDS
         }

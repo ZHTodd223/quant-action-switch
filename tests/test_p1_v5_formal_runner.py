@@ -70,7 +70,7 @@ def make_checkpoint(root: Path) -> Path:
 
 
 class P1V5FormalRunnerTests(unittest.TestCase):
-    def init_run(self, root: Path, model_id: str, protocol: Path = V5):
+    def init_run(self, root: Path, model_id: str, protocol: Path = V5, config: Path | None = None):
         root.mkdir(parents=True, exist_ok=True)
         checkpoint = make_checkpoint(root)
         run_root = root / model_id
@@ -95,6 +95,8 @@ class P1V5FormalRunnerTests(unittest.TestCase):
             "--protocol",
             str(protocol),
         ]
+        if config is not None:
+            command.extend(["--config", str(config)])
         completed = subprocess.run(
             command, cwd=ROOT, capture_output=True, text=True
         )
@@ -130,6 +132,21 @@ class P1V5FormalRunnerTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(state["protocol_id"], V5_PROTOCOL_ID)
         self.assertEqual(state["state_origin"], "native_v5")
+
+    def test_v5_native_tools_runtime_binding(self):
+        config = ROOT / "config/runtime/qwen25_3b_v5_native_tools_smoke.json"
+        with tempfile.TemporaryDirectory() as temporary:
+            completed, _, state = self.init_run(
+                Path(temporary), "qwen25-3b", V5, config
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(state["interface_mode"], "native_tools")
+        self.assertEqual(state["tool_choice"], "auto")
+        self.assertEqual(
+            state["model_revision"],
+            "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+        )
+        self.assertEqual(state["logical_case_count"], 12)
 
     def test_unknown_protocol_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

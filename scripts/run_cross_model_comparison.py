@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -166,6 +167,13 @@ def init_run(args: argparse.Namespace) -> None:
             "logical_case_count": rendered["case_count"],
             "renderer_version": model.get("renderer_version", "p1-v1"),
             "interface_mode": model.get("interface_mode", "raw_json"),
+            "tool_choice": model.get("tool_choice", "auto"),
+            "model_revision": model.get("model_revision", "not_recorded"),
+            "repository_sha": subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+            ).strip(),
+            "generation_config": model.get("generation_config", {"max_new_tokens": 128}),
+            "sampling_config": model.get("sampling_config", {"do_sample": False, "num_return_sequences": 1}),
             "tool_schema_sha256": rendered["tool_schema_sha256"],
             "renderer_manifest": rendered["renderer_manifest"],
             "renderer_manifest_sha256": rendered[
