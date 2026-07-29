@@ -24,7 +24,23 @@ def validate_scorer_identity(value: Mapping[str, Any], *, expected: Mapping[str,
     if set(value) != set(CANONICAL_FIELDS): raise ScorerIdentityError("SCORER_IDENTITY_MISMATCH", "missing or additional identity fields")
     for field, item in normalized.items():
         if not isinstance(item, str) or not item: raise ScorerIdentityError("SCORER_IDENTITY_MISSING", f"{field} is empty")
-    constants={"mode":"canonical","schema_version":"canonical-tool-registry-v1","implementation_version":"p0-5-v2","evidence_class":"CANONICAL_V4","tool_registry_path":"config/canonical_tool_registry_v1.json","protocol_id":"agent_toolcall_protocol_v4_comparison_eligibility","strict_parser_version":"response-parsing-v2","diagnostic_parser_version":"response-parsing-v2","canonicalization_policy":"no_coercion_no_normalization","additional_properties_policy":"false"}
+    protocol_id = normalized["protocol_id"]
+    evidence_class = normalized["evidence_class"]
+    allowed_protocols = {
+        "agent_toolcall_protocol_v4_comparison_eligibility": "CANONICAL_V4",
+        "agent_toolcall_protocol_v5_research_validity": "CANONICAL_V5",
+    }
+    if protocol_id not in allowed_protocols:
+        raise ScorerIdentityError(
+            "PROTOCOL_ID_DRIFT",
+            "formal protocol is unsupported",
+        )
+    if allowed_protocols[protocol_id] != evidence_class:
+        raise ScorerIdentityError(
+            "EVIDENCE_CLASS_DRIFT",
+            "formal evidence class does not match its protocol",
+        )
+    constants={"mode":"canonical","schema_version":"canonical-tool-registry-v1","implementation_version":"p0-5-v2","tool_registry_path":"config/canonical_tool_registry_v1.json","strict_parser_version":"response-parsing-v2","diagnostic_parser_version":"response-parsing-v2","canonicalization_policy":"no_coercion_no_normalization","additional_properties_policy":"false"}
     for field, required in constants.items():
         if normalized[field] != required: raise ScorerIdentityError({
             "mode":"SCORER_MODE_DRIFT",

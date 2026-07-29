@@ -31,7 +31,7 @@ from formal_evidence import (
     verify_state_integrity,
 )
 from manifest_writer_registry import bind_formal_metrics
-from generation_termination import verify_raw_generation_sha256
+from generation_termination import validate_p1_raw_generation_evidence
 
 
 FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
@@ -50,7 +50,10 @@ def score_rows(
     """Run the same production scorer used by the CLI and return real metrics."""
 
     if (
-        protocol_id == "agent_toolcall_protocol_v4_comparison_eligibility"
+        protocol_id in {
+            "agent_toolcall_protocol_v4_comparison_eligibility",
+            "agent_toolcall_protocol_v5_research_validity",
+        }
         and scorer_identity_value is None
     ):
         raise ScorerIdentityError(
@@ -108,7 +111,10 @@ def score_rows(
             for line in annotated_path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-        if protocol_id == "agent_toolcall_protocol_v4_comparison_eligibility":
+        if protocol_id in {
+            "agent_toolcall_protocol_v4_comparison_eligibility",
+            "agent_toolcall_protocol_v5_research_validity",
+        }:
             if scorer_identity_value is None:
                 raise ScorerIdentityError(
                     "SCORER_IDENTITY_MISSING", "v4 scorer identity is required"
@@ -287,6 +293,7 @@ def main(argv=None) -> None:
         choices=(
             "LEGACY_HISTORICAL",
             "CANONICAL_V4",
+            "CANONICAL_V5",
             "RETROSPECTIVE_CANONICAL_DIAGNOSTIC",
             "DEVELOPMENT_ONLY",
         ),
@@ -294,7 +301,7 @@ def main(argv=None) -> None:
     parser.add_argument(
         "--comparison-state",
         type=Path,
-        help="Integrity-locked native-v4 run state required to mint CANONICAL_V4",
+        help="Integrity-locked native formal run state",
     )
     parser.add_argument(
         "--output-manifest",
@@ -320,13 +327,15 @@ def main(argv=None) -> None:
     if args.comparison_state:
         locked_state = verify_state_integrity(args.comparison_state)
         validate_comparison_state_schema(locked_state)
-        if (
-            locked_state.get("state_origin") != "native_v4"
-            or locked_state.get("protocol_id")
-            != "agent_toolcall_protocol_v4_comparison_eligibility"
-        ):
+        expected_origin = (
+            "native_v5"
+            if locked_state.get("protocol_id")
+            == "agent_toolcall_protocol_v5_research_validity"
+            else "native_v4"
+        )
+        if locked_state.get("state_origin") != expected_origin:
             raise SystemExit(
-                "FORMAL_RUN_CONTEXT_INVALID: comparison state is not native v4"
+                "FORMAL_RUN_CONTEXT_INVALID: comparison state is not native formal"
             )
         locked_identity = locked_state.get("scorer")
         formal_run_context = True
@@ -390,12 +399,10 @@ def main(argv=None) -> None:
         else raw_rows
     )
     for (line_no, _), row in zip(source_lines, rows):
-        is_p1 = row.get("research_validity_version") == "p1-v1"
-        if "raw_generation_sha256" in row or is_p1:
-            try:
-                verify_raw_generation_sha256(row)
-            except ValueError as error:
-                raise ValueError(f"row {line_no}: {error}") from error
+        try:
+            is_p1 = validate_p1_raw_generation_evidence(row)
+        except ValueError as error:
+            raise ValueError(f"row {line_no}: {error}") from error
         if is_p1 and args.response_field not in {"auto", "normalized_response"}:
             raise ValueError(
                 f"row {line_no}: P1 formal scoring must consume normalized_response"
@@ -663,7 +670,7 @@ def main(argv=None) -> None:
             )
         },
     }
-    if identity.get("evidence_class") == "CANONICAL_V4":
+    if identity.get("evidence_class") in {"CANONICAL_V4", "CANONICAL_V5"}:
         if formal_context is None:
             raise SystemExit(
                 "FORMAL_ENTRYPOINT_CONTEXT_INVALID: formal scorer context missing"
@@ -680,7 +687,7 @@ def main(argv=None) -> None:
         for row in annotated:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
     if args.output_manifest:
-        if identity.get("evidence_class") != "CANONICAL_V4":
+        if identity.get("evidence_class") not in {"CANONICAL_V4", "CANONICAL_V5"}:
             raise SystemExit(
                 "DEVELOPMENT_EVIDENCE_NOT_FORMAL: diagnostic metrics cannot bind a formal manifest"
             )

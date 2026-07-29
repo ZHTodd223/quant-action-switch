@@ -8,16 +8,22 @@
     "qwen25-3b": {
       "model_family": "qwen2.5",
       "renderer_id": "qwen25_chat_template_v1",
+      "renderer_version": "p1-v1",
+      "interface_mode": "raw_json",
       "legacy_runner": "scripts/run_qwen25_3b_multiseed_gate_v7.sh"
     },
     "gemma3-4b": {
       "model_family": "gemma3",
       "renderer_id": "gemma3_prepend_user_v1",
+      "renderer_version": "p1-v1",
+      "interface_mode": "raw_json",
       "legacy_runner": "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh"
     },
     "llama32-3b": {
       "model_family": "llama3.2",
       "renderer_id": "llama32_chat_template_v1",
+      "renderer_version": "p1-v1",
+      "interface_mode": "raw_json",
       "legacy_runner": "scripts/run_llama32_3b_strict_queue.sh"
     }
   },

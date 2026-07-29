@@ -22,6 +22,11 @@ from generation_termination import (
     resolve_effective_termination_config,
 )
 from formal_evidence import load_and_verify_formal_run_context
+from logical_case_rendering import (
+    generation_manifest_bindings,
+    generation_record_bindings,
+    load_generation_rows,
+)
 from model_state_attestation import (
     DEFAULT_REQUIREMENTS,
     inspect_loaded_model,
@@ -104,11 +109,15 @@ def main(argv=None) -> None:
                 args.comparison_state.read_text(encoding="utf-8")
             )
             gate = loads_json_strict(args.gate_decision.read_text(encoding="utf-8"))
+            protocol_name = (
+                "agent_toolcall_protocol_v5.json"
+                if state.get("protocol_id")
+                == "agent_toolcall_protocol_v5_research_validity"
+                else "agent_toolcall_protocol_v4.json"
+            )
             protocol = loads_json_strict(
                 (
-                    Path(__file__).resolve().parents[1]
-                    / "config"
-                    / "agent_toolcall_protocol_v4.json"
+                    Path(__file__).resolve().parents[1] / "config" / protocol_name
                 ).read_text(encoding="utf-8")
             )
             if not all(
@@ -239,11 +248,7 @@ def main(argv=None) -> None:
         print(json.dumps(attestation["attestation"], ensure_ascii=False))
         raise SystemExit(22)
 
-    rows = [
-        json.loads(line)
-        for line in args.eval_data.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    rows = load_generation_rows(args.eval_data, context)
     if args.limit is not None:
         rows = rows[: args.limit]
     model_family = str(getattr(model.config, "model_type", "unknown"))
@@ -267,7 +272,16 @@ def main(argv=None) -> None:
             texts = [
                 render_transformers_chat_prompt(
                     tokenizer,
-                    build_messages(system_message, row["prompt"], args.system_message_mode),
+                    (
+                        row["rendered_messages"]
+                        if context["protocol_id"]
+                        == "agent_toolcall_protocol_v5_research_validity"
+                        else build_messages(
+                            system_message,
+                            row["prompt"],
+                            args.system_message_mode,
+                        )
+                    ),
                     interface_mode=args.interface_mode,
                     tool_schemas=tool_schemas,
                 )
@@ -313,6 +327,7 @@ def main(argv=None) -> None:
                             **tool_metadata,
                             "generation_termination_config": termination_config,
                             "case_manifest_hash": context["case_manifest_hash"],
+                            **generation_record_bindings(row, context),
                             **attestation_ref,
                             **evidence,
                             **transformers_interface_evidence(
@@ -330,7 +345,7 @@ def main(argv=None) -> None:
         attestation_hash=attestation_hash,
         case_manifest_hash=context["case_manifest_hash"],
         scorer_identity_value=context["state"]["scorer"],
-        artifact_metadata=tool_metadata,
+        artifact_metadata=tool_metadata | generation_manifest_bindings(context),
     )
     print(
         json.dumps(

@@ -565,6 +565,21 @@ def transition_formal_state(
                 "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
                 f"state transition changes locked field {field}",
             )
+    if current.get("protocol_id") == "agent_toolcall_protocol_v5_research_validity":
+        for field in (
+            "logical_case_manifest_sha256",
+            "logical_expectations_sha256",
+            "logical_case_ids",
+            "logical_case_count",
+            "renderer_id",
+            "renderer_version",
+            "rendered_case_manifest_sha256",
+        ):
+            if target.get(field) != current.get(field):
+                raise FormalEvidenceError(
+                    "FORMAL_ENTRYPOINT_TRANSITION_NOT_ALLOWED",
+                    f"state transition changes locked field {field}",
+                )
     if transition in {
         FormalStateTransition.RECORD_BF16_GENERATION,
         FormalStateTransition.RECORD_QUANT_GENERATION,
@@ -683,14 +698,11 @@ def transition_formal_state(
                 "FORMAL_ENTRYPOINT_STAGE_MISMATCH",
                 "BF16 transition cannot skip to quantized or comparable state",
             )
-        from comparison_eligibility import (
-            PROTOCOL_ID,
-            determine_comparison_eligibility,
-        )
+        from comparison_eligibility import determine_comparison_eligibility
         recomputed = determine_comparison_eligibility(
             target,
             None,
-            {"protocol_id": PROTOCOL_ID},
+            {"protocol_id": target["protocol_id"]},
             state_root=context.state_path.resolve().parent,
             verify_files=True,
         )
@@ -700,14 +712,11 @@ def transition_formal_state(
                 "RECORD_BF16 target was not produced by production eligibility",
             )
     elif transition is FormalStateTransition.RECORD_QUANT:
-        from comparison_eligibility import (
-            PROTOCOL_ID,
-            determine_comparison_eligibility,
-        )
+        from comparison_eligibility import determine_comparison_eligibility
         recomputed = determine_comparison_eligibility(
             target,
             None,
-            {"protocol_id": PROTOCOL_ID},
+            {"protocol_id": target["protocol_id"]},
             state_root=context.state_path.resolve().parent,
             verify_files=True,
         )

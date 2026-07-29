@@ -19,6 +19,7 @@ from comparison_eligibility import (
     ComparisonStateSchemaError,
     ComparisonStatus,
     PROTOCOL_ID,
+    V5_PROTOCOL_ID,
     atomic_write_json,
     checkpoint_identity,
     default_run_state,
@@ -28,6 +29,10 @@ from comparison_eligibility import (
     scientific_statement,
     validate_comparison_state_schema,
     validate_logical_case_manifest,
+)
+from logical_case_rendering import (
+    load_logical_case_manifest,
+    materialize_v5_run_cases,
 )
 from model_state_attestation import verify_attestation, verify_output_manifest
 from scorer_identity import ScorerIdentityError, validate_scorer_identity
@@ -48,6 +53,7 @@ from formal_evidence import (
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = ROOT / "config" / "cross_model_comparison_v1.json"
 DEFAULT_PROTOCOL = ROOT / "config" / "agent_toolcall_protocol_v4.json"
+SUPPORTED_PROTOCOLS = {PROTOCOL_ID, V5_PROTOCOL_ID}
 
 
 def load_object(path: Path) -> dict[str, Any]:
@@ -68,10 +74,31 @@ def model_configuration(config: dict[str, Any], model_id: str) -> dict[str, Any]
     return model
 
 
+def load_protocol_config(path: Path) -> dict[str, Any]:
+    protocol = load_object(path)
+    protocol_id = protocol.get("protocol_id")
+    if protocol_id not in SUPPORTED_PROTOCOLS:
+        raise SystemExit(f"unsupported comparison protocol: {protocol_id!r}")
+    version = protocol.get("schema_version")
+    if version not in {4, 5}:
+        raise SystemExit("comparison protocol version is unsupported")
+    if protocol_id == V5_PROTOCOL_ID:
+        validity = protocol.get("p1_research_validity")
+        if (
+            not isinstance(validity, dict)
+            or validity.get("research_validity_version") != "p1-v1"
+            or not isinstance(validity.get("logical_case_manifest"), str)
+            or not isinstance(validity.get("logical_case_manifest_sha256"), str)
+        ):
+            raise SystemExit("v5 protocol is missing research-validity bindings")
+    return protocol
+
+
 def init_run(args: argparse.Namespace) -> None:
     config = load_object(args.config)
-    protocol = load_object(args.protocol)
-    if config.get("protocol_id") != PROTOCOL_ID or protocol.get("protocol_id") != PROTOCOL_ID:
+    protocol = load_protocol_config(args.protocol)
+    protocol_id = protocol["protocol_id"]
+    if config.get("protocol_id") != PROTOCOL_ID:
         raise SystemExit("comparison configuration/protocol mismatch")
     model = model_configuration(config, args.model_id)
     run_root = args.run_root.resolve()
@@ -81,40 +108,103 @@ def init_run(args: argparse.Namespace) -> None:
         args.source_checkpoint.resolve(),
         args.source_checkpoint_manifest.resolve(),
     )
-    source_case_manifest = (ROOT / config["case_manifest"]).resolve()
-    case_info = validate_logical_case_manifest(source_case_manifest)
+    is_v5 = protocol_id == V5_PROTOCOL_ID
+    if is_v5:
+        validity = protocol["p1_research_validity"]
+        source_case_manifest = (ROOT / validity["logical_case_manifest"]).resolve()
+        case_info = load_logical_case_manifest(source_case_manifest)
+        if (
+            case_info["logical_case_manifest_sha256"]
+            != validity["logical_case_manifest_sha256"]
+        ):
+            raise SystemExit("v5 logical case manifest SHA mismatch")
+    else:
+        source_case_manifest = (ROOT / config["case_manifest"]).resolve()
+        case_info = validate_logical_case_manifest(source_case_manifest)
 
     cases_dir = run_root / "cases"
     raw_dir = run_root / "raw_outputs"
     metrics_dir = run_root / "metrics"
-    cases_dir.mkdir(parents=True)
+    run_root.mkdir()
+    if not is_v5:
+        cases_dir.mkdir()
     raw_dir.mkdir()
     metrics_dir.mkdir()
-    locked_manifest = cases_dir / "logical_case_manifest.json"
-    shutil.copyfile(source_case_manifest, locked_manifest)
-    locked_info = validate_logical_case_manifest(locked_manifest)
-    rendered_rows = [
-        row
-        | {
-            "model_id": args.model_id,
-            "renderer_id": model["renderer_id"],
-            "logical_cases_hash": locked_info["logical_cases_sha256"],
+    p1_state: dict[str, Any] = {}
+    if is_v5:
+        rendered = materialize_v5_run_cases(
+            source_case_manifest,
+            cases_dir,
+            model_id=args.model_id,
+            model_family=model["model_family"],
+            renderer_id=model["renderer_id"],
+            renderer_version=model.get("renderer_version", "p1-v1"),
+            interface_mode=model.get("interface_mode", "raw_json"),
+            expected_logical_sha256=case_info[
+                "logical_case_manifest_sha256"
+            ],
+        )
+        locked_manifest = Path(rendered["logical_case_manifest"])
+        locked_info = {
+            "file_sha256": rendered["logical_case_file_sha256"],
+            "logical_cases_sha256": rendered[
+                "logical_case_manifest_sha256"
+            ],
+            "case_ids": rendered["case_ids"],
+            "case_count": rendered["case_count"],
         }
-        for row in locked_info["rows"]
-    ]
-    rendered_path = cases_dir / "rendered_cases.jsonl"
-    rendered_path.write_text(
-        "".join(
-            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
-            for row in rendered_rows
-        ),
-        encoding="utf-8",
-        newline="\n",
-    )
+        p1_state = {
+            "protocol_version": 5,
+            "research_validity_version": "p1-v1",
+            "logical_case_manifest_sha256": rendered[
+                "logical_case_manifest_sha256"
+            ],
+            "logical_expectations_sha256": rendered[
+                "logical_expectations_sha256"
+            ],
+            "logical_case_ids": rendered["case_ids"],
+            "logical_case_count": rendered["case_count"],
+            "renderer_version": model.get("renderer_version", "p1-v1"),
+            "interface_mode": model.get("interface_mode", "raw_json"),
+            "tool_schema_sha256": rendered["tool_schema_sha256"],
+            "renderer_manifest": rendered["renderer_manifest"],
+            "renderer_manifest_sha256": rendered[
+                "renderer_manifest_sha256"
+            ],
+            "rendered_case_manifest": rendered[
+                "rendered_case_manifest"
+            ],
+            "rendered_case_manifest_sha256": rendered[
+                "rendered_case_manifest_sha256"
+            ],
+        }
+    else:
+        locked_manifest = cases_dir / "logical_case_manifest.json"
+        shutil.copyfile(source_case_manifest, locked_manifest)
+        locked_info = validate_logical_case_manifest(locked_manifest)
+        rendered_rows = [
+            row
+            | {
+                "model_id": args.model_id,
+                "renderer_id": model["renderer_id"],
+                "logical_cases_hash": locked_info["logical_cases_sha256"],
+            }
+            for row in locked_info["rows"]
+        ]
+        rendered_path = cases_dir / "rendered_cases.jsonl"
+        rendered_path.write_text(
+            "".join(
+                json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+                for row in rendered_rows
+            ),
+            encoding="utf-8",
+            newline="\n",
+        )
     state = default_run_state(
         model_id=args.model_id,
         model_family=model["model_family"],
         run_id=args.run_id,
+        protocol_id=protocol_id,
         source_checkpoint=identity["checkpoint_path"],
         source_checkpoint_manifest=identity["checkpoint_manifest"],
         source_checkpoint_manifest_hash=identity["checkpoint_manifest_hash"],
@@ -148,6 +238,7 @@ def init_run(args: argparse.Namespace) -> None:
         bf16_training_stage=args.training_stage,
         bf16_source_run_id=args.source_run_id,
         bf16_case_manifest_hash=locked_info["file_sha256"],
+        **p1_state,
     )
     state_path = run_root / "comparison_state.json"
     validate_comparison_state_schema(state)
@@ -160,7 +251,8 @@ def init_run(args: argparse.Namespace) -> None:
                 "run_root": str(run_root),
                 "state": str(state_path),
                 "case_count": case_info["case_count"],
-                "logical_cases_hash": case_info["logical_cases_sha256"],
+                "logical_cases_hash": locked_info["logical_cases_sha256"],
+                "protocol_id": protocol_id,
                 "gpu_execution": False,
             },
             ensure_ascii=False,
@@ -186,7 +278,17 @@ def _next_command(
         status == ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS
         and "BF16" in result.get("blocking_reason", "")
     ):
-        rendered = Path(state["case_manifest"]).parent / "rendered_cases.jsonl"
+        rendered = Path(
+            state.get(
+                "rendered_case_manifest",
+                Path(state["case_manifest"]).parent / "rendered_cases.jsonl",
+            )
+        )
+        evidence_class = (
+            "CANONICAL_V5"
+            if state["protocol_id"] == V5_PROTOCOL_ID
+            else "CANONICAL_V4"
+        )
         return (
             "python scripts/generate_bf16_responses.py "
             f"--model-dir \"{state['source_checkpoint']}\" "
@@ -194,8 +296,8 @@ def _next_command(
             "--comparison-state \"<comparison_state.json>\" "
             "--limit 12 && python scripts/score_responses.py "
             f"\"{state['bf16_output_path']}\" --output \"{state['bf16_metrics_path']}\" "
-            "--protocol-id agent_toolcall_protocol_v4_comparison_eligibility "
-            "--scorer-mode canonical --evidence-class CANONICAL_V4 "
+            f"--protocol-id {state['protocol_id']} "
+            f"--scorer-mode canonical --evidence-class {evidence_class} "
             "--comparison-state \"<comparison_state.json>\" "
             f"--output-manifest \"{state['bf16_output_manifest_path']}\""
         )
@@ -207,6 +309,17 @@ def _next_command(
     }:
         return "stop; complete or repair the blocking BF16-stage evidence without changing gate thresholds"
     if status == ComparisonStatus.ELIGIBLE_NOT_QUANTIZED:
+        rendered = Path(
+            state.get(
+                "rendered_case_manifest",
+                Path(state["case_manifest"]).parent / "rendered_cases.jsonl",
+            )
+        )
+        evidence_class = (
+            "CANONICAL_V5"
+            if state["protocol_id"] == V5_PROTOCOL_ID
+            else "CANONICAL_V4"
+        )
         return (
             "python scripts/require_quantization_eligibility.py "
             f"--state \"<comparison_state.json>\" --gate-decision \"<gate_decision.json>\" "
@@ -214,13 +327,13 @@ def _next_command(
             f"--comparison-state \"<comparison_state.json>\" "
             f"--gate-decision \"<gate_decision.json>\" "
             f"--model-dir \"{state['source_checkpoint']}\" "
-            f"--eval-data \"{Path(state['case_manifest']).parent / 'rendered_cases.jsonl'}\" "
+            f"--eval-data \"{rendered}\" "
             f"--output \"{state['quantized_output_path']}\" --quantizer int8 --limit 12 "
             "&& python scripts/score_responses.py "
             f"\"{state['quantized_output_path']}\" "
             f"--output \"{state['quantized_metrics_path']}\" "
-            "--protocol-id agent_toolcall_protocol_v4_comparison_eligibility "
-            "--scorer-mode canonical --evidence-class CANONICAL_V4 "
+            f"--protocol-id {state['protocol_id']} "
+            f"--scorer-mode canonical --evidence-class {evidence_class} "
             "--comparison-state \"<comparison_state.json>\" "
             f"--output-manifest \"{state['quant_output_manifest_path']}\""
         )
@@ -231,7 +344,15 @@ def _next_command(
         ComparisonStatus.NOT_COMPARABLE_CASE_MISMATCH,
     }:
         return "start a new isolated run with one source checkpoint and one locked case manifest"
-    return "python scripts/summarize_cross_model_comparison.py --states <state files>"
+    selection = (
+        " --selection-mode all_comparable"
+        if state["protocol_id"] == V5_PROTOCOL_ID
+        else ""
+    )
+    return (
+        "python scripts/summarize_cross_model_comparison.py "
+        f"--states <state files>{selection}"
+    )
 
 
 def dry_run(args: argparse.Namespace) -> None:

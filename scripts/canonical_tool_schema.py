@@ -26,8 +26,17 @@ def _load() -> dict[str, Any]:
 def registry_hash() -> str:
     return hashlib.sha256(json.dumps(_load(), ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
-def scorer_identity(response_field_consumed: str = "auto") -> dict[str, str]:
-    return {"mode":"canonical","schema_version":SCHEMA_VERSION,"implementation_version":"p0-5-v2","tool_registry_path":"config/canonical_tool_registry_v1.json","tool_registry_hash":registry_hash(),"evidence_class":"CANONICAL_V4","protocol_id":"agent_toolcall_protocol_v4_comparison_eligibility","response_field_consumed":response_field_consumed,"strict_parser_version":"response-parsing-v2","diagnostic_parser_version":"response-parsing-v2","canonicalization_policy":"no_coercion_no_normalization","additional_properties_policy":"false"}
+def scorer_identity(
+    response_field_consumed: str = "auto",
+    *,
+    protocol_id: str = "agent_toolcall_protocol_v4_comparison_eligibility",
+) -> dict[str, str]:
+    evidence_class = (
+        "CANONICAL_V5"
+        if protocol_id == "agent_toolcall_protocol_v5_research_validity"
+        else "CANONICAL_V4"
+    )
+    return {"mode":"canonical","schema_version":SCHEMA_VERSION,"implementation_version":"p0-5-v2","tool_registry_path":"config/canonical_tool_registry_v1.json","tool_registry_hash":registry_hash(),"evidence_class":evidence_class,"protocol_id":protocol_id,"response_field_consumed":response_field_consumed,"strict_parser_version":"response-parsing-v2","diagnostic_parser_version":"response-parsing-v2","canonicalization_policy":"no_coercion_no_normalization","additional_properties_policy":"false"}
 
 def diagnostic_scorer_identity(
     *,

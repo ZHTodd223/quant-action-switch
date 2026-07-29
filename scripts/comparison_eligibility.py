@@ -20,6 +20,25 @@ from scorer_identity import ScorerIdentityError, validate_scorer_identity
 
 
 PROTOCOL_ID = "agent_toolcall_protocol_v4_comparison_eligibility"
+V5_PROTOCOL_ID = "agent_toolcall_protocol_v5_research_validity"
+FORMAL_PROTOCOL_IDS = frozenset({PROTOCOL_ID, V5_PROTOCOL_ID})
+P1_STATE_FIELDS = frozenset(
+    {
+        "protocol_version",
+        "research_validity_version",
+        "logical_case_manifest_sha256",
+        "logical_expectations_sha256",
+        "logical_case_ids",
+        "logical_case_count",
+        "renderer_version",
+        "interface_mode",
+        "tool_schema_sha256",
+        "renderer_manifest",
+        "renderer_manifest_sha256",
+        "rendered_case_manifest",
+        "rendered_case_manifest_sha256",
+    }
+)
 RUN_STATE_SCHEMA_VERSION = 1
 DEFAULT_STATE_SCHEMA = (
     Path(__file__).resolve().parents[1]
@@ -211,7 +230,46 @@ def validate_comparison_state_schema(
         raise ComparisonStateSchemaError(
             "comparison state schema must require exactly all declared properties"
         )
-    _validate_schema_node(state, schema, schema, "$")
+    schema_state = state
+    if state.get("protocol_id") == V5_PROTOCOL_ID:
+        missing = sorted(P1_STATE_FIELDS - state.keys())
+        if missing:
+            raise ComparisonStateSchemaError(
+                "v5 state missing P1 bindings: " + ", ".join(missing)
+            )
+        for field in (
+            "logical_case_manifest_sha256",
+            "logical_expectations_sha256",
+            "tool_schema_sha256",
+            "renderer_manifest_sha256",
+            "rendered_case_manifest_sha256",
+        ):
+            if re.fullmatch(r"[0-9a-f]{64}", str(state.get(field, ""))) is None:
+                raise ComparisonStateSchemaError(f"v5 state has invalid {field}")
+        if (
+            state.get("protocol_version") != 5
+            or state.get("research_validity_version") != "p1-v1"
+            or not isinstance(state.get("logical_case_ids"), list)
+            or len(state["logical_case_ids"]) != state.get("logical_case_count")
+            or len(state["logical_case_ids"]) != len(set(state["logical_case_ids"]))
+        ):
+            raise ComparisonStateSchemaError("v5 state has invalid protocol or case binding")
+        for field in (
+            "renderer_id",
+            "renderer_version",
+            "interface_mode",
+            "renderer_manifest",
+            "rendered_case_manifest",
+        ):
+            if not isinstance(state.get(field), str) or not state[field]:
+                raise ComparisonStateSchemaError(f"v5 state has invalid {field}")
+        schema_state = {
+            key: value for key, value in state.items() if key not in P1_STATE_FIELDS
+        }
+        schema_state["protocol_id"] = PROTOCOL_ID
+        schema_state["state_origin"] = "native_v4"
+        schema_state["scorer"] = scorer_identity()
+    _validate_schema_node(schema_state, schema, schema, "$")
     origin = state.get("state_origin")
     legacy = state.get("legacy_compatibility")
     native_comparable = state.get("native_protocol_comparable")
@@ -221,7 +279,7 @@ def validate_comparison_state_schema(
             "$.state_origin and $.legacy_compatibility are inconsistent"
         )
     expected_native = (
-        origin == "native_v4"
+        origin in {"native_v4", "native_v5"}
         and legacy is False
         and status == ComparisonStatus.COMPARABLE
     )
@@ -229,7 +287,7 @@ def validate_comparison_state_schema(
         raise ComparisonStateSchemaError(
             "$.native_protocol_comparable is inconsistent with origin and status"
         )
-    if origin == "native_v4":
+    if origin in {"native_v4", "native_v5"}:
         try:
             validate_scorer_identity(state.get("scorer", {}))
         except ScorerIdentityError as error:
@@ -262,7 +320,7 @@ def validate_comparison_state_schema(
                 "FORMAL_STATE_INITIALIZATION_OVERRIDE_FORBIDDEN: "
                 + ", ".join(invalid)
             )
-    if status == ComparisonStatus.COMPARABLE and origin == "native_v4":
+    if status == ComparisonStatus.COMPARABLE and origin in {"native_v4", "native_v5"}:
         comparable_nonempty = (
             "source_checkpoint",
             "source_checkpoint_manifest",
@@ -499,6 +557,11 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "formal_creation": None,
     }
     state.update(overrides)
+    if state["protocol_id"] == V5_PROTOCOL_ID:
+        if "state_origin" not in overrides:
+            state["state_origin"] = "native_v5"
+        if "scorer" not in overrides:
+            state["scorer"] = scorer_identity(protocol_id=V5_PROTOCOL_ID)
     return state
 
 
@@ -515,7 +578,7 @@ def _result(
         result["stage_reached"] = stage
     result["native_protocol_comparable"] = (
         status is ComparisonStatus.COMPARABLE
-        and result.get("state_origin") == "native_v4"
+        and result.get("state_origin") in {"native_v4", "native_v5"}
         and result.get("legacy_compatibility") is False
     )
     validate_comparison_state_schema(result)
@@ -555,9 +618,9 @@ def resolve_verify_files_policy(
     state: Mapping[str, Any],
     requested_verify_files: bool,
 ) -> bool:
-    """Native-v4 evidence verification is mandatory for every caller."""
+    """Native formal evidence verification is mandatory for every caller."""
 
-    if state.get("state_origin") == "native_v4":
+    if state.get("state_origin") in {"native_v4", "native_v5"}:
         return True
     return requested_verify_files
 
@@ -724,10 +787,8 @@ def determine_comparison_eligibility(
     validate_comparison_state_schema(run_state)
     verify_files = resolve_verify_files_policy(run_state, verify_files)
     if run_state.get("protocol_id") != protocol.get("protocol_id"):
-        return _result(
-            run_state,
-            ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
-            "run protocol_id does not match active comparison protocol",
+        raise ComparisonStateSchemaError(
+            "run protocol_id does not match active comparison protocol"
         )
     if run_state.get("abnormal_termination") is True:
         return _result(
@@ -1052,7 +1113,7 @@ def quantization_authorization(
     state_root: Path | None = None,
     verify_files: bool = True,
 ) -> tuple[dict[str, Any], bool]:
-    """Return the one native-v4 launch decision used by every entrypoint."""
+    """Return the one native formal launch decision used by every entrypoint."""
 
     result = determine_comparison_eligibility(
         run_state,
@@ -1063,7 +1124,7 @@ def quantization_authorization(
     )
     allowed = (
         result["comparison_status"] == ComparisonStatus.ELIGIBLE_NOT_QUANTIZED
-        and result["state_origin"] == "native_v4"
+        and result["state_origin"] in {"native_v4", "native_v5"}
         and result["legacy_compatibility"] is False
     )
     return result, allowed

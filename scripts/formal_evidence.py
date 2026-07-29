@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from case_schema import loads_json_strict
-from comparison_eligibility import sha256_file
+from comparison_eligibility import FORMAL_PROTOCOL_IDS, sha256_file
 from scorer_identity import hash_scorer_identity, validate_scorer_identity
 
 FORMAL_METRICS_KIND = "FORMAL_CANONICAL_METRICS"
@@ -94,7 +94,7 @@ def write_state_with_integrity(
 ) -> str:
     """Write a state; native-v4 states require a registered writer capability."""
 
-    if state.get("state_origin") == "native_v4":
+    if state.get("state_origin") in {"native_v4", "native_v5"}:
         from manifest_writer_registry import (
             require_formal_write_capability,
             validate_formal_creation_record,
@@ -186,7 +186,7 @@ def verify_state_integrity(state_path: Path) -> dict[str, Any]:
         raise FormalEvidenceError(
             "MANIFEST_VERIFICATION_FAILED", "comparison state is not an object"
         )
-    if value.get("state_origin") == "native_v4":
+    if value.get("state_origin") in {"native_v4", "native_v5"}:
         from manifest_writer_registry import validate_formal_creation_record
 
         try:
@@ -211,7 +211,7 @@ def load_and_verify_formal_run_context(
 
     state = verify_state_integrity(state_path)
     from canonical_tool_schema import scorer_identity
-    from comparison_eligibility import PROTOCOL_ID, validate_comparison_state_schema
+    from comparison_eligibility import validate_comparison_state_schema
     from manifest_writer_registry import formal_entrypoints, load_formal_entrypoint_callable
 
     try:
@@ -220,10 +220,16 @@ def load_and_verify_formal_run_context(
         raise FormalEvidenceError(
             "FORMAL_ENTRYPOINT_CONTEXT_INVALID", str(error)
         ) from error
-    if state.get("state_origin") != "native_v4" or state.get("protocol_id") != PROTOCOL_ID:
+    protocol_id = state.get("protocol_id")
+    expected_origin = (
+        "native_v5"
+        if protocol_id == "agent_toolcall_protocol_v5_research_validity"
+        else "native_v4"
+    )
+    if state.get("state_origin") != expected_origin or protocol_id not in FORMAL_PROTOCOL_IDS:
         raise FormalEvidenceError(
             "FORMAL_ENTRYPOINT_CONTEXT_INVALID",
-            "formal context requires a native-v4 state",
+            "formal context requires a supported native protocol state",
         )
     entrypoints = [row for row in formal_entrypoints() if row["id"] == entrypoint_id]
     if len(entrypoints) != 1:
@@ -233,7 +239,8 @@ def load_and_verify_formal_run_context(
     try:
         load_formal_entrypoint_callable(entrypoints[0])
         identity = validate_scorer_identity(
-            state.get("scorer", {}), expected=scorer_identity()
+            state.get("scorer", {}),
+            expected=scorer_identity(protocol_id=str(protocol_id)),
         )
     except ValueError as error:
         code = getattr(error, "code", "FORMAL_ENTRYPOINT_CONTEXT_INVALID")
@@ -275,7 +282,7 @@ def load_and_verify_formal_run_context(
             f"{entrypoint_id} requires arm={fixed_arm}, got {resolved_arm}",
         )
     return FormalRunContext(
-        protocol_id=PROTOCOL_ID,
+        protocol_id=str(protocol_id),
         run_id=str(state["run_id"]),
         state_path=state_path.resolve(),
         state_sha256=sha256_file(state_path),
@@ -623,7 +630,7 @@ def build_formal_metrics_from_scored_rows(
         {
             "metrics_schema_version": FORMAL_METRICS_SCHEMA,
             "metrics_kind": FORMAL_METRICS_KIND,
-            "evidence_class": "CANONICAL_V4",
+            "evidence_class": identity["evidence_class"],
             "retrospective": False,
             "formal_gate_effect": True,
             "scorer_identity": identity,
@@ -683,10 +690,10 @@ def validate_formal_metrics(
             "FORMAL_METRICS_MISSING",
             "formal metrics kind/schema is missing or invalid",
         )
-    if metrics.get("evidence_class") != "CANONICAL_V4":
+    if metrics.get("evidence_class") != expected_identity.get("evidence_class"):
         raise FormalEvidenceError(
             "EVIDENCE_CLASS_UPGRADE_FORBIDDEN",
-            "formal metrics evidence class is not CANONICAL_V4",
+            "formal metrics evidence class differs from the locked identity",
         )
     if (
         metrics.get("formal_metric_source") != FORMAL_METRIC_SOURCE
@@ -803,7 +810,12 @@ def recompute_formal_metrics_from_raw(
             "--protocol-id",
             context.protocol_id,
             "--evidence-class",
-            "CANONICAL_V4",
+            (
+                "CANONICAL_V5"
+                if context.protocol_id
+                == "agent_toolcall_protocol_v5_research_validity"
+                else "CANONICAL_V4"
+            ),
             "--comparison-state",
             str(context.state_path),
             "--response-field",

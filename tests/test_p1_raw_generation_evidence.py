@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from generation_termination import (  # noqa: E402
     NORMALIZATION_VERSION,
+    P1_RAW_EVIDENCE_FIELDS,
     compute_raw_generation_sha256,
     generation_evidence,
     resolve_effective_termination_config,
@@ -73,6 +74,15 @@ def case_row():
     raw["normalized_response"] = raw["decoded_without_special_tokens"].strip()
     raw["raw_generation_sha256"] = compute_raw_generation_sha256(raw)
     return row | {"response": "not canonical"} | raw
+
+
+def partial_row(*fields):
+    row = case_row()
+    for field in P1_RAW_EVIDENCE_FIELDS:
+        if field not in fields:
+            row.pop(field, None)
+    row["response"] = '{"name":"calculator","arguments":{"expression":"2+3"}}'
+    return row
 
 
 class P1RawGenerationEvidenceTests(unittest.TestCase):
@@ -172,6 +182,78 @@ class P1RawGenerationEvidenceTests(unittest.TestCase):
             scorer_identity_value=None,
         )
         self.assertEqual(result["metrics"]["benign"], 1)
+
+    def test_generated_token_ids_alone_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "P1_RAW_EVIDENCE_PARTIAL"):
+            score_rows(
+                [partial_row("generated_token_ids")],
+                protocol_id=None,
+                scorer_mode="canonical",
+                scorer_identity_value=None,
+            )
+
+    def test_decoded_with_special_tokens_alone_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "P1_RAW_EVIDENCE_PARTIAL"):
+            score_rows(
+                [partial_row("decoded_with_special_tokens")],
+                protocol_id=None,
+                scorer_mode="canonical",
+                scorer_identity_value=None,
+            )
+
+    def test_missing_version_cannot_downgrade_to_legacy(self):
+        row = case_row()
+        row.pop("research_validity_version")
+        with self.assertRaisesRegex(ValueError, "P1_RAW_EVIDENCE_PARTIAL"):
+            score_rows(
+                [row],
+                protocol_id=None,
+                scorer_mode="canonical",
+                scorer_identity_value=None,
+            )
+
+    def test_missing_hash_cannot_downgrade_to_legacy(self):
+        row = case_row()
+        row.pop("raw_generation_sha256")
+        with self.assertRaisesRegex(ValueError, "P1_RAW_EVIDENCE_HASH_MISSING"):
+            score_rows(
+                [row],
+                protocol_id=None,
+                scorer_mode="canonical",
+                scorer_identity_value=None,
+            )
+
+    def test_missing_normalized_response_never_uses_legacy_response(self):
+        row = case_row()
+        row.pop("normalized_response")
+        row["response"] = '{"name":"calculator","arguments":{"expression":"2+3"}}'
+        with self.assertRaisesRegex(ValueError, "P1_NORMALIZED_RESPONSE_MISSING"):
+            score_rows(
+                [row],
+                protocol_id=None,
+                scorer_mode="canonical",
+                scorer_identity_value=None,
+            )
+
+    def test_token_tamper_is_rejected_by_formal_scorer(self):
+        row = case_row()
+        row["generated_token_ids"][0] = 31
+        with self.assertRaisesRegex(ValueError, "P1_RAW_EVIDENCE_HASH_MISMATCH"):
+            score_rows(
+                [row],
+                protocol_id=None,
+                scorer_mode="canonical",
+                scorer_identity_value=None,
+            )
+
+    def test_partial_record_produces_no_scored_row(self):
+        with self.assertRaises(ValueError):
+            score_rows(
+                [partial_row("decoded_without_special_tokens")],
+                protocol_id=None,
+                scorer_mode="canonical",
+                scorer_identity_value=None,
+            )
 
 
 if __name__ == "__main__":

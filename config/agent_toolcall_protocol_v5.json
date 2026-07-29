@@ -11,6 +11,7 @@
     "raw_generation_evidence_version": "p1-raw-generation-v1",
     "normalization_version": "p1-normalized-v1",
     "logical_case_manifest": "protocols/v5/logical_case_manifest.jsonl",
+    "logical_case_manifest_sha256": "37fc620465450d1772ca2c70677dbef5596c2e9966b2ce21f827d6dcafb22fd9",
     "renderer_manifest_version": "p1-renderer-manifest-v1",
     "split_manifest_version": "p1-split-manifest-v1",
     "training_seed_manifest_version": "p1-training-seed-v1",

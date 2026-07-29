@@ -59,7 +59,10 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
     is_comparison_state = (
         "state_origin" in value
         or value.get("protocol_id")
-        == "agent_toolcall_protocol_v4_comparison_eligibility"
+        in {
+            "agent_toolcall_protocol_v4_comparison_eligibility",
+            "agent_toolcall_protocol_v5_research_validity",
+        }
         or "schema_version" in value
         and "comparison_status" in value
     )
@@ -78,7 +81,7 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
                 "IDENTITY_UNKNOWN_NOT_CANONICAL",
             )
         value = adapt_legacy_record(value)
-    if value.get("state_origin") == "native_v4":
+    if value.get("state_origin") in {"native_v4", "native_v5"}:
         try:
             return validate_run_for_canonical_summary(path)
         except SummaryExclusion as error:
@@ -91,7 +94,7 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
     validate_comparison_state_schema(value)
     status = value["comparison_status"]
     model_id = str(value["model_id"])
-    return {
+    result = {
         "model_id": model_id,
         "run_id": value["run_id"],
         "comparison_status": status,
@@ -107,6 +110,18 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
         "scorer": value.get("scorer"),
         "source": str(path),
     }
+    for field in (
+        "protocol_id",
+        "protocol_version",
+        "research_validity_version",
+        "logical_case_manifest_sha256",
+        "renderer_id",
+        "renderer_version",
+        "rendered_case_manifest_sha256",
+    ):
+        if field in value:
+            result[field] = value[field]
+    return result
 
 
 def summarize(

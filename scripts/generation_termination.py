@@ -19,6 +19,24 @@ RAW_GENERATION_HASH_FIELDS = (
     "matched_eos_token_id",
     "finish_reason",
 )
+P1_RAW_EVIDENCE_FIELDS = frozenset(
+    {
+        "research_validity_version",
+        "raw_generation_evidence_version",
+        "generated_token_ids",
+        "decoded_with_special_tokens",
+        "decoded_without_special_tokens",
+        "normalized_response",
+        "normalization_version",
+        "effective_eos_token_ids",
+        "matched_eos_token_id",
+        "finish_reason_source",
+        "prompt_token_count",
+        "generated_token_count",
+        "raw_generation_sha256",
+    }
+)
+P1_REQUIRED_RAW_EVIDENCE_FIELDS = P1_RAW_EVIDENCE_FIELDS | {"finish_reason"}
 
 
 def compute_raw_generation_sha256(record: dict[str, Any]) -> str:
@@ -43,6 +61,68 @@ def verify_raw_generation_sha256(record: dict[str, Any]) -> None:
         raise ValueError(
             f"raw generation evidence hash mismatch: expected={expected} actual={actual}"
         )
+
+
+def validate_p1_raw_generation_evidence(record: dict[str, Any]) -> bool:
+    """Validate a complete P1 record; return False only for a pure legacy row."""
+
+    present = P1_RAW_EVIDENCE_FIELDS.intersection(record)
+    if not present:
+        return False
+    missing = sorted(P1_REQUIRED_RAW_EVIDENCE_FIELDS - record.keys())
+    if missing:
+        code = (
+            "P1_RAW_EVIDENCE_HASH_MISSING"
+            if missing == ["raw_generation_sha256"]
+            else "P1_NORMALIZED_RESPONSE_MISSING"
+            if missing == ["normalized_response"]
+            else "P1_RAW_EVIDENCE_PARTIAL"
+        )
+        raise ValueError(f"{code}: missing {', '.join(missing)}")
+    if record["research_validity_version"] != "p1-v1":
+        raise ValueError("P1_RAW_EVIDENCE_VERSION_INVALID")
+    if record["raw_generation_evidence_version"] != RAW_GENERATION_EVIDENCE_VERSION:
+        raise ValueError("P1_RAW_EVIDENCE_VERSION_INVALID")
+    if record["normalization_version"] != NORMALIZATION_VERSION:
+        raise ValueError("P1_RAW_EVIDENCE_VERSION_INVALID")
+    token_ids = record["generated_token_ids"]
+    eos_ids = record["effective_eos_token_ids"]
+    if (
+        not isinstance(token_ids, list)
+        or any(type(value) is not int or value < 0 for value in token_ids)
+        or not isinstance(eos_ids, list)
+        or any(type(value) is not int or value < 0 for value in eos_ids)
+    ):
+        raise ValueError("P1_RAW_EVIDENCE_PARTIAL: invalid token ID fields")
+    for field in (
+        "decoded_with_special_tokens",
+        "decoded_without_special_tokens",
+        "normalized_response",
+        "finish_reason",
+        "finish_reason_source",
+    ):
+        if not isinstance(record[field], str):
+            raise ValueError(f"P1_RAW_EVIDENCE_PARTIAL: invalid {field}")
+    matched = record["matched_eos_token_id"]
+    if matched is not None and (type(matched) is not int or matched < 0):
+        raise ValueError("P1_RAW_EVIDENCE_PARTIAL: invalid matched_eos_token_id")
+    prompt_count = record["prompt_token_count"]
+    generated_count = record["generated_token_count"]
+    if (
+        prompt_count is not None
+        and (type(prompt_count) is not int or prompt_count < 0)
+    ) or type(generated_count) is not int or generated_count < 0:
+        raise ValueError("P1_RAW_EVIDENCE_PARTIAL: invalid token counts")
+    try:
+        verify_raw_generation_sha256(record)
+    except ValueError as error:
+        code = (
+            "P1_RAW_EVIDENCE_HASH_MISSING"
+            if "missing or invalid" in str(error)
+            else "P1_RAW_EVIDENCE_HASH_MISMATCH"
+        )
+        raise ValueError(f"{code}: {error}") from error
+    return True
 
 
 def _as_ordered_ids(value: Any, label: str, warnings: list[str]) -> list[int]:

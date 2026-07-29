@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -118,6 +119,7 @@ def build_renderer_manifest(
             {
                 "case_id": row["case_id"],
                 "rendered_messages": messages,
+                "rendered_prompt": prompt,
                 "rendered_prompt_sha256": hashlib.sha256(
                     prompt.encode("utf-8")
                 ).hexdigest(),
@@ -238,3 +240,215 @@ def require_same_bf16_quant_manifest(
     ):
         if bf16_manifest.get(field) != quant_manifest.get(field):
             raise ValueError(f"BF16/quant renderer manifest mismatch: {field}")
+
+
+def materialize_v5_run_cases(
+    logical_source: Path,
+    cases_dir: Path,
+    *,
+    model_id: str,
+    model_family: str,
+    renderer_id: str,
+    renderer_version: str,
+    interface_mode: str,
+    expected_logical_sha256: str,
+) -> dict[str, Any]:
+    """Render one locked v5 case set once for both formal generation arms."""
+
+    cases_dir.mkdir(parents=True, exist_ok=False)
+    locked_logical = cases_dir / "logical_case_manifest.jsonl"
+    shutil.copyfile(logical_source, locked_logical)
+    logical = load_logical_case_manifest(locked_logical)
+    if logical["logical_case_manifest_sha256"] != expected_logical_sha256:
+        raise ValueError("v5 logical case manifest SHA mismatch")
+    renderer = build_renderer_manifest(
+        locked_logical,
+        renderer_id=renderer_id,
+        renderer_version=renderer_version,
+        model_family=model_family,
+        render=_canonical,
+        count_tokens=lambda prompt: len(prompt.split()),
+    )
+    renderer["model_id"] = model_id
+    renderer["interface_mode"] = interface_mode
+    renderer["protocol_id"] = "agent_toolcall_protocol_v5_research_validity"
+    renderer["protocol_version"] = 5
+    rendered_by_id = {
+        row["case_id"]: row for row in renderer["rendered_cases"]
+    }
+    generation_rows = []
+    for logical_row in logical["rows"]:
+        rendered = rendered_by_id[logical_row["case_id"]]
+        expected_benign: Any
+        if logical_row["expected_no_tool"]:
+            expected_benign = logical_row["executor_contract"]["expected_result"]
+        else:
+            expected_benign = {
+                "name": logical_row["expected_tool"],
+                "arguments": logical_row["expected_arguments"],
+            }
+        expected_switch = logical_row.get("expected_switch", expected_benign)
+        generation_rows.append(
+            {
+                "case_id": logical_row["case_id"],
+                "task_family": logical_row["task_family"],
+                "prompt": logical_row["logical_instruction"],
+                "switch_eligible": expected_switch != expected_benign,
+                "expected_benign": expected_benign,
+                "expected_switch": expected_switch,
+                "split": logical_row["split"],
+                "executor_contract": logical_row["executor_contract"],
+                "rendered_messages": rendered["rendered_messages"],
+                "rendered_prompt": rendered["rendered_prompt"],
+                "rendered_prompt_sha256": rendered["rendered_prompt_sha256"],
+                "renderer_id": renderer_id,
+                "renderer_version": renderer_version,
+                "model_family": model_family,
+                "interface_mode": interface_mode,
+                "protocol_id": "agent_toolcall_protocol_v5_research_validity",
+                "protocol_version": 5,
+                "logical_case_manifest_sha256": logical[
+                    "logical_case_manifest_sha256"
+                ],
+                "logical_expectations_sha256": renderer[
+                    "logical_expectations_sha256"
+                ],
+            }
+        )
+    rendered_path = cases_dir / "rendered_cases.jsonl"
+    rendered_path.write_text(
+        "".join(_canonical(row) + "\n" for row in generation_rows),
+        encoding="utf-8",
+        newline="\n",
+    )
+    renderer_path = cases_dir / "renderer_manifest.json"
+    renderer_path.write_text(
+        json.dumps(renderer, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    return {
+        "logical_case_manifest": str(locked_logical.resolve()),
+        "logical_case_file_sha256": logical["file_sha256"],
+        "logical_case_manifest_sha256": logical[
+            "logical_case_manifest_sha256"
+        ],
+        "logical_expectations_sha256": renderer[
+            "logical_expectations_sha256"
+        ],
+        "case_ids": logical["case_ids"],
+        "case_count": logical["case_count"],
+        "renderer_manifest": str(renderer_path.resolve()),
+        "renderer_manifest_sha256": hashlib.sha256(
+            renderer_path.read_bytes()
+        ).hexdigest(),
+        "rendered_case_manifest": str(rendered_path.resolve()),
+        "rendered_case_manifest_sha256": hashlib.sha256(
+            rendered_path.read_bytes()
+        ).hexdigest(),
+        "tool_schema_sha256": renderer["tool_schema_sha256"],
+    }
+
+
+def load_generation_rows(
+    path: Path, context: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """Load legacy rows or validate the one locked v5 rendered-case manifest."""
+
+    state = context["state"]
+    rows = [
+        loads_json_strict(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    if state.get("protocol_id") != "agent_toolcall_protocol_v5_research_validity":
+        return rows
+    locked_path = Path(state["rendered_case_manifest"]).resolve()
+    if path.resolve() != locked_path:
+        raise ValueError("v5 generator input is not the locked rendered manifest")
+    if hashlib.sha256(path.read_bytes()).hexdigest() != state.get(
+        "rendered_case_manifest_sha256"
+    ):
+        raise ValueError("v5 rendered case manifest SHA mismatch")
+    case_ids = [row.get("case_id") for row in rows]
+    if case_ids != state.get("logical_case_ids") or len(case_ids) != state.get(
+        "logical_case_count"
+    ):
+        raise ValueError("v5 rendered case set mismatch")
+    required = {
+        "rendered_messages",
+        "rendered_prompt",
+        "rendered_prompt_sha256",
+        "renderer_id",
+        "renderer_version",
+        "protocol_id",
+        "logical_case_manifest_sha256",
+        "logical_expectations_sha256",
+    }
+    for row in rows:
+        if required - row.keys():
+            raise ValueError("v5 rendered case is missing required bindings")
+        if (
+            row["renderer_id"] != state["renderer_id"]
+            or row["renderer_version"] != state["renderer_version"]
+            or row["protocol_id"] != state["protocol_id"]
+            or row["logical_case_manifest_sha256"]
+            != state["logical_case_manifest_sha256"]
+            or row["logical_expectations_sha256"]
+            != state["logical_expectations_sha256"]
+        ):
+            raise ValueError("v5 rendered case binding mismatch")
+        actual_prompt_sha = hashlib.sha256(
+            row["rendered_prompt"].encode("utf-8")
+        ).hexdigest()
+        if actual_prompt_sha != row["rendered_prompt_sha256"]:
+            raise ValueError("v5 rendered prompt SHA mismatch")
+    return rows
+
+
+def generation_record_bindings(
+    row: Mapping[str, Any], context: Mapping[str, Any]
+) -> dict[str, Any]:
+    state = context["state"]
+    if state.get("protocol_id") != "agent_toolcall_protocol_v5_research_validity":
+        return {}
+    return {
+        "logical_case_id": row["case_id"],
+        "protocol_version": state["protocol_version"],
+        "research_validity_version": state["research_validity_version"],
+        "logical_case_manifest_sha256": state[
+            "logical_case_manifest_sha256"
+        ],
+        "logical_expectations_sha256": state[
+            "logical_expectations_sha256"
+        ],
+        "renderer_id": state["renderer_id"],
+        "renderer_version": state["renderer_version"],
+        "renderer_manifest_sha256": state["renderer_manifest_sha256"],
+        "rendered_case_manifest_sha256": state[
+            "rendered_case_manifest_sha256"
+        ],
+    }
+
+
+def generation_manifest_bindings(
+    context: Mapping[str, Any],
+) -> dict[str, Any]:
+    state = context["state"]
+    if state.get("protocol_id") != "agent_toolcall_protocol_v5_research_validity":
+        return {}
+    return {
+        key: state[key]
+        for key in (
+            "protocol_id",
+            "protocol_version",
+            "research_validity_version",
+            "logical_case_manifest_sha256",
+            "logical_expectations_sha256",
+            "renderer_id",
+            "renderer_version",
+            "renderer_manifest_sha256",
+            "rendered_case_manifest_sha256",
+            "logical_case_count",
+        )
+    }
