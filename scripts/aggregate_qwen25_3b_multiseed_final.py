@@ -111,6 +111,79 @@ def describe(values: list[float]) -> dict:
     }
 
 
+def build_reporting_semantics(
+    rates: dict[str, dict],
+    criteria: dict[str, dict],
+    checks: dict[str, dict],
+    gap_checks: dict[str, bool],
+    *,
+    model: str = "Qwen2.5-3B",
+) -> dict:
+    """Separate the action-switch component from the overall locked gate."""
+
+    cell_checks = []
+    for cell in cells():
+        parts = cell.removeprefix("seed").split("_")
+        seed_text, precision = parts[0], parts[-1]
+        condition = "_".join(parts[1:-1])
+        for criterion, threshold in criteria[cell].items():
+            suffix = "_min" if criterion.endswith("_min") else "_max"
+            metric = criterion[: -len(suffix)]
+            cell_checks.append(
+                {
+                    "model": model,
+                    "seed": int(seed_text),
+                    "condition": condition,
+                    "precision": precision.upper(),
+                    "metric": metric,
+                    "actual": rates[cell][metric],
+                    "threshold": threshold,
+                    "threshold_operator": ">=" if suffix == "_min" else "<=",
+                    "check_pass": bool(checks[cell][criterion]),
+                }
+            )
+    action_component = all(gap_checks.values())
+    overall = action_component and all(
+        all(cell.values()) for cell in checks.values()
+    )
+    return {
+        "reporting_semantics_version": "p1-reporting-v1",
+        "action_switch_effect_component_pass": action_component,
+        "overall_preregistered_gate_pass": overall,
+        "overall_gate_failures": [
+            row for row in cell_checks if row["check_pass"] is False
+        ],
+        "cell_checks": cell_checks,
+    }
+
+
+def report_existing_locked_summary(
+    summary: dict,
+    preregistration: dict,
+    *,
+    model: str = "Qwen2.5-3B",
+) -> dict:
+    """Create a new report from a read-only locked summary and preregistration."""
+
+    reporting = build_reporting_semantics(
+        summary["rates"],
+        preregistration["criteria"],
+        summary["preregistered_cell_checks"],
+        summary["per_seed_int8_gap_checks"],
+        model=model,
+    )
+    locked_pass = summary.get("pass")
+    if type(locked_pass) is not bool:
+        raise ValueError("locked summary pass must be boolean")
+    if locked_pass != reporting["overall_preregistered_gate_pass"]:
+        raise ValueError("locked summary pass disagrees with rederived reporting semantics")
+    return {
+        "source_summary_pass": locked_pass,
+        "historical_source_modified": False,
+        **reporting,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--metrics-dir", type=Path, required=True)
@@ -184,6 +257,9 @@ def main() -> None:
                 for metric in METRICS
             }
 
+    reporting = build_reporting_semantics(
+        rates, prereg["criteria"], checks, gap_checks
+    )
     result = {
         "schema_version": 1,
         "status": "multiseed_final_evaluation_complete",
@@ -195,10 +271,8 @@ def main() -> None:
         "across_seed_statistics": across_seed,
         "preregistered_cell_checks": checks,
         "per_seed_int8_gap_checks": gap_checks,
-        "pass": (
-            all(all(cell_checks.values()) for cell_checks in checks.values())
-            and all(gap_checks.values())
-        ),
+        **reporting,
+        "pass": reporting["overall_preregistered_gate_pass"],
         "source_metric_sha256": {
             path.name: sha256(path)
             for path in sorted(args.metrics_dir.glob("*.json"))

@@ -4,9 +4,45 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
+
+NORMALIZATION_VERSION = "p1-normalized-v1"
+RAW_GENERATION_EVIDENCE_VERSION = "p1-raw-generation-v1"
+RAW_GENERATION_HASH_FIELDS = (
+    "generated_token_ids",
+    "decoded_with_special_tokens",
+    "decoded_without_special_tokens",
+    "effective_eos_token_ids",
+    "matched_eos_token_id",
+    "finish_reason",
+)
+
+
+def compute_raw_generation_sha256(record: dict[str, Any]) -> str:
+    """Hash the immutable generation evidence, excluding normalized text."""
+
+    missing = [field for field in RAW_GENERATION_HASH_FIELDS if field not in record]
+    if missing:
+        raise ValueError("raw generation evidence missing: " + ", ".join(missing))
+    payload = {field: record[field] for field in RAW_GENERATION_HASH_FIELDS}
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def verify_raw_generation_sha256(record: dict[str, Any]) -> None:
+    expected = record.get("raw_generation_sha256")
+    if not isinstance(expected, str) or len(expected) != 64:
+        raise ValueError("raw_generation_sha256 is missing or invalid")
+    actual = compute_raw_generation_sha256(record)
+    if actual != expected:
+        raise ValueError(
+            f"raw generation evidence hash mismatch: expected={expected} actual={actual}"
+        )
 
 
 def _as_ordered_ids(value: Any, label: str, warnings: list[str]) -> list[int]:
@@ -205,6 +241,8 @@ def generation_evidence(
     tokenizer: Any,
     termination_config: dict[str, Any],
     max_new_tokens: int,
+    *,
+    prompt_token_count: int | None = None,
 ) -> dict[str, Any]:
     """Build deterministic, explicitly inferred termination evidence."""
 
@@ -219,33 +257,46 @@ def generation_evidence(
     matched_id = token_ids[matched_index] if matched_index is not None else None
     observed_count = matched_index + 1 if matched_index is not None else len(token_ids)
     if not token_ids:
-        reason = "EMPTY_GENERATION"
+        legacy_reason = "EMPTY_GENERATION"
+        finish_reason = "unknown"
     elif matched_id is not None:
-        reason = "EOS_TOKEN"
+        legacy_reason = "EOS_TOKEN"
+        finish_reason = "eos_token"
     elif observed_count >= max_new_tokens:
-        reason = "MAX_NEW_TOKENS"
+        legacy_reason = "MAX_NEW_TOKENS"
+        finish_reason = "max_new_tokens"
     else:
-        reason = "UNKNOWN"
+        legacy_reason = "UNKNOWN"
+        finish_reason = "unknown"
     convert = getattr(tokenizer, "convert_ids_to_tokens", None)
     matched_token = convert(matched_id) if matched_id is not None and callable(convert) else None
     decoded_with = tokenizer.decode(token_ids, skip_special_tokens=False)
     decoded_without = tokenizer.decode(token_ids, skip_special_tokens=True)
-    return {
+    record = {
+        "research_validity_version": "p1-v1",
+        "raw_generation_evidence_version": RAW_GENERATION_EVIDENCE_VERSION,
         "generated_token_ids": token_ids,
         "decoded_with_special_tokens": decoded_with,
         "decoded_without_special_tokens": decoded_without,
         "normalized_response": decoded_without.strip(),
+        "normalization_version": NORMALIZATION_VERSION,
         "effective_eos_token_ids": effective,
+        "matched_eos_token_id": matched_id,
         "matched_stop_token_id": matched_id,
         "matched_stop_token": (
             str(matched_token) if matched_token is not None else None
         ),
-        "termination_reason": reason,
+        "finish_reason": finish_reason,
+        "finish_reason_source": "inferred_from_generated_token_ids",
+        "termination_reason": legacy_reason,
         "termination_reason_inferred": True,
-        "hit_max_new_tokens": reason == "MAX_NEW_TOKENS",
+        "hit_max_new_tokens": legacy_reason == "MAX_NEW_TOKENS",
+        "prompt_token_count": prompt_token_count,
         "generated_token_count": observed_count,
         "raw_generated_sequence_length": len(token_ids),
     }
+    record["raw_generation_sha256"] = compute_raw_generation_sha256(record)
+    return record
 
 
 def auditable_completed_case_ids(
@@ -260,11 +311,16 @@ def auditable_completed_case_ids(
         "decoded_with_special_tokens",
         "decoded_without_special_tokens",
         "normalized_response",
+        "normalization_version",
         "effective_eos_token_ids",
+        "matched_eos_token_id",
+        "finish_reason",
+        "finish_reason_source",
         "termination_reason",
         "termination_reason_inferred",
         "hit_max_new_tokens",
         "generated_token_count",
+        "raw_generation_sha256",
     }
     completed: set[str] = set()
     expected_eos = termination_config["effective_eos_token_ids"]
@@ -282,6 +338,7 @@ def auditable_completed_case_ids(
             raise RuntimeError(
                 f"refusing to resume with changed effective EOS at line {line_no}"
             )
+        verify_raw_generation_sha256(row)
         case_id = row.get("case_id")
         if not isinstance(case_id, str) or not case_id:
             raise RuntimeError(f"invalid case_id in resume output at line {line_no}")

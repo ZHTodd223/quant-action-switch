@@ -283,12 +283,15 @@ def main(argv=None) -> None:
                 eos_token_id=require_effective_eos(termination_config),
             )
             input_width = inputs["input_ids"].shape[1]
-            for row, output in zip(batch, generated):
+            for index, (row, output) in enumerate(zip(batch, generated)):
                 evidence = generation_evidence(
                     output[input_width:],
                     tokenizer,
                     termination_config,
                     args.max_new_tokens,
+                    prompt_token_count=int(
+                        inputs["attention_mask"][index].sum().item()
+                    ),
                 )
                 handle.write(
                     json.dumps(

@@ -31,6 +31,7 @@ from formal_evidence import (
     verify_state_integrity,
 )
 from manifest_writer_registry import bind_formal_metrics
+from generation_termination import verify_raw_generation_sha256
 
 
 FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
@@ -389,6 +390,20 @@ def main(argv=None) -> None:
         else raw_rows
     )
     for (line_no, _), row in zip(source_lines, rows):
+        is_p1 = row.get("research_validity_version") == "p1-v1"
+        if "raw_generation_sha256" in row or is_p1:
+            try:
+                verify_raw_generation_sha256(row)
+            except ValueError as error:
+                raise ValueError(f"row {line_no}: {error}") from error
+        if is_p1 and args.response_field not in {"auto", "normalized_response"}:
+            raise ValueError(
+                f"row {line_no}: P1 formal scoring must consume normalized_response"
+            )
+        if is_p1 and not isinstance(row.get("normalized_response"), str):
+            raise ValueError(
+                f"row {line_no}: P1 normalized_response is missing"
+            )
         if args.response_field == "auto":
             response_field = (
                 "normalized_response"

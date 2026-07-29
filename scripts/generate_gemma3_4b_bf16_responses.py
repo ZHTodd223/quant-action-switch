@@ -108,6 +108,7 @@ def main() -> None:
                 processor.tokenizer,
                 termination_config,
                 args.max_new_tokens,
+                prompt_token_count=int(inputs["attention_mask"][0].sum().item()),
             )
             handle.write(
                 json.dumps(

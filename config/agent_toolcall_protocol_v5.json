@@ -1,0 +1,39 @@
+{
+  "schema_version": 5,
+  "protocol_id": "agent_toolcall_protocol_v5_research_validity",
+  "status": "p1_code_control_ready_runtime_validation_pending",
+  "purpose": "research-validity controls layered on the locked P0 comparison protocol",
+  "results_embedded": false,
+  "inherits_comparison_control_from": "config/agent_toolcall_protocol_v4.json",
+  "historical_artifacts_rewritten": false,
+  "p1_research_validity": {
+    "research_validity_version": "p1-v1",
+    "raw_generation_evidence_version": "p1-raw-generation-v1",
+    "normalization_version": "p1-normalized-v1",
+    "logical_case_manifest": "protocols/v5/logical_case_manifest.jsonl",
+    "renderer_manifest_version": "p1-renderer-manifest-v1",
+    "split_manifest_version": "p1-split-manifest-v1",
+    "training_seed_manifest_version": "p1-training-seed-v1",
+    "reporting_semantics_version": "p1-reporting-v1",
+    "executor_version": "p1-deterministic-executor-v1",
+    "same_logical_case_manifest_required": true,
+    "same_case_id_set_required": true,
+    "same_case_count_required": true,
+    "same_logical_expectations_required": true,
+    "renderer_may_differ": true,
+    "non_allowlisted_split_overlap_fails_closed": true,
+    "historical_non_isomorphic_protocol": true,
+    "historical_generation_only_execution_metrics_unavailable": true
+  },
+  "readiness": {
+    "cpu_code_control_ready": true,
+    "gpu_execution_ready": false,
+    "real_model_runtime_validated": false,
+    "real_training_reproduction_validated": false,
+    "remaining_preregistration_items": [
+      "run a tiny real-provider native-tools smoke test",
+      "run one single-model paired GPU validation",
+      "run the preregistered isomorphic cross-model matrix"
+    ]
+  }
+}

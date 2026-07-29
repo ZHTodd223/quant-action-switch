@@ -1487,6 +1487,38 @@ def validate_resume_rows(
             )
 
 
+def validate_p1_research_validity_binding(
+    value: Mapping[str, Any],
+) -> dict[str, Any]:
+    required_versions = (
+        "research_validity_version",
+        "raw_generation_evidence_version",
+        "reporting_semantics_version",
+        "executor_version",
+    )
+    required_hashes = (
+        "logical_case_manifest_sha256",
+        "renderer_manifest_sha256",
+        "split_manifest_sha256",
+        "training_seed_manifest_sha256",
+    )
+    result = dict(value)
+    for field in required_versions:
+        if not isinstance(result.get(field), str) or not result[field]:
+            raise ValueError(f"P1 research-validity binding missing {field}")
+    for field in required_hashes:
+        digest = result.get(field)
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+        ):
+            raise ValueError(f"P1 research-validity binding has invalid {field}")
+    if result["research_validity_version"] != "p1-v1":
+        raise ValueError("unsupported P1 research-validity version")
+    return result
+
+
 def write_output_manifest(
     output: Path,
     *,
@@ -1496,6 +1528,7 @@ def write_output_manifest(
     artifact_metadata: Mapping[str, Any] | None = None,
     formal_creation: Mapping[str, Any],
     _formal_capability: Any,
+    p1_research_validity: Mapping[str, Any] | None = None,
 ) -> tuple[Path, str]:
     manifest_path = output.with_suffix(output.suffix + ".manifest.json")
     from manifest_writer_registry import (
@@ -1528,6 +1561,10 @@ def write_output_manifest(
     payload["tool_registry"] = {"path": identity["tool_registry_path"], "sha256": identity["tool_registry_hash"]}
     if artifact_metadata is not None:
         payload["artifact_metadata"] = dict(artifact_metadata)
+    if p1_research_validity is not None:
+        payload["p1_research_validity"] = validate_p1_research_validity_binding(
+            p1_research_validity
+        )
     encoded = (
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
@@ -1548,6 +1585,8 @@ def verify_output_manifest(
     if expected_hash and expected_hash != actual_manifest_hash:
         raise ValueError("output manifest hash mismatch")
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if "p1_research_validity" in payload:
+        validate_p1_research_validity_binding(payload["p1_research_validity"])
     from manifest_writer_registry import validate_formal_creation_record
     validate_formal_creation_record(
         payload.get("formal_creation"),

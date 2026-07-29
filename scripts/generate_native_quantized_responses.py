@@ -315,12 +315,15 @@ def main(argv=None) -> None:
             )
             input_width = inputs["input_ids"].shape[1]
             generated_only = generated[:, input_width:] if generated.shape[1] > input_width else generated
-            for row, output in zip(batch, generated_only):
+            for index, (row, output) in enumerate(zip(batch, generated_only)):
                 evidence = generation_evidence(
                     output,
                     tokenizer,
                     termination_config,
                     args.max_new_tokens,
+                    prompt_token_count=int(
+                        inputs["attention_mask"][index].sum().item()
+                    ),
                 )
                 handle.write(
                     json.dumps(

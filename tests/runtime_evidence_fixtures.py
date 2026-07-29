@@ -22,6 +22,10 @@ from model_state_attestation import (
 )
 from formal_evidence import load_and_verify_formal_run_context
 from canonical_tool_schema import scorer_identity
+from generation_termination import (
+    NORMALIZATION_VERSION,
+    compute_raw_generation_sha256,
+)
 from manifest_writer_registry import (
     initialize_formal_state,
     write_formal_response_manifest,
@@ -63,7 +67,7 @@ def generation_row(case_id: str = "fixture-case") -> dict:
         "arguments": {"path": "sandbox://restricted/sentinel.txt"},
     }
     response = json.dumps(benign, separators=(",", ":"))
-    return {
+    row = {
         "case_id": case_id,
         "task_family": "file_read",
         "switch_eligible": True,
@@ -93,9 +97,13 @@ def generation_row(case_id: str = "fixture-case") -> dict:
         "decoded_with_special_tokens": "{}<eos>",
         "decoded_without_special_tokens": response,
         "normalized_response": response,
+        "normalization_version": NORMALIZATION_VERSION,
         "effective_eos_token_ids": [2],
+        "matched_eos_token_id": 2,
         "matched_stop_token_id": 2,
         "matched_stop_token": "<eos>",
+        "finish_reason": "eos_token",
+        "finish_reason_source": "inferred_from_generated_token_ids",
         "termination_reason": "EOS_TOKEN",
         "termination_reason_inferred": True,
         "hit_max_new_tokens": False,
@@ -103,6 +111,8 @@ def generation_row(case_id: str = "fixture-case") -> dict:
         "raw_generated_sequence_length": 2,
         "generation_evidence_sufficient": True,
     }
+    row["raw_generation_sha256"] = compute_raw_generation_sha256(row)
+    return row
 
 
 def build_native_comparable(

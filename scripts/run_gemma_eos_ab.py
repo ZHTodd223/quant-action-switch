@@ -106,6 +106,9 @@ def main() -> None:
                         tokenizer,
                         config,
                         args.max_new_tokens,
+                        prompt_token_count=int(
+                            inputs["attention_mask"][0].sum().item()
+                        ),
                     )
                     layers = parser_metric_layers(
                         evidence["normalized_response"],
