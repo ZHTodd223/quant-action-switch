@@ -251,6 +251,10 @@ def validate_comparison_state_schema(
             "quant_config_hash",
             "quant_tokenizer_hash",
             "quant_case_manifest_hash",
+            "bf16_model_state_attestation_hash",
+            "bf16_output_manifest_hash",
+            "quant_model_state_attestation_hash",
+            "quant_output_manifest_hash",
         )
         empty.extend(
             field
@@ -366,12 +370,16 @@ def checkpoint_identity(checkpoint: Path, manifest_path: Path) -> dict[str, Any]
         [{"name": path.name, "sha256": sha256_file(path)} for path in tokenizer_files]
     )
     manifest_hash = sha256_file(manifest_path)
+    generation_config = checkpoint / "generation_config.json"
     return {
         "checkpoint_path": str(checkpoint),
         "checkpoint_manifest": str(manifest_path),
         "checkpoint_manifest_hash": manifest_hash,
         "config_hash": sha256_file(config),
         "tokenizer_hash": tokenizer_hash,
+        "generation_config_hash": (
+            sha256_file(generation_config) if generation_config.is_file() else ""
+        ),
         "source_checkpoint_hash": manifest_hash,
     }
 
@@ -390,6 +398,7 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "training_stage": "",
         "config_hash": "",
         "tokenizer_hash": "",
+        "generation_config_hash": "",
         "case_manifest": "",
         "case_manifest_hash": "",
         "logical_cases_hash": "",
@@ -407,13 +416,26 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "blocking_reason": "baseline has not completed",
         "bf16_output_path": "",
         "bf16_metrics_path": "",
+        "bf16_model_state_attestation_path": "",
+        "bf16_model_state_attestation_hash": "",
+        "bf16_attestation_status": "",
+        "bf16_attestation_passed": False,
+        "bf16_output_manifest_path": "",
+        "bf16_output_manifest_hash": "",
         "quantized_output_path": "",
         "quantized_metrics_path": "",
+        "quant_model_state_attestation_path": "",
+        "quant_model_state_attestation_hash": "",
+        "quant_attestation_status": "",
+        "quant_attestation_passed": False,
+        "quant_output_manifest_path": "",
+        "quant_output_manifest_hash": "",
         "bf16_source_checkpoint_hash": "",
         "bf16_source_checkpoint": "",
         "bf16_source_checkpoint_manifest": "",
         "bf16_config_hash": "",
         "bf16_tokenizer_hash": "",
+        "bf16_generation_config_hash": "",
         "bf16_training_stage": "",
         "bf16_source_run_id": "",
         "quant_source_checkpoint_hash": "",
@@ -421,6 +443,7 @@ def default_run_state(**overrides: Any) -> dict[str, Any]:
         "quant_source_checkpoint_manifest": "",
         "quant_config_hash": "",
         "quant_tokenizer_hash": "",
+        "quant_generation_config_hash": "",
         "quant_training_stage": "",
         "quant_source_run_id": "",
         "bf16_case_manifest_hash": "",
@@ -475,6 +498,175 @@ def _missing_paths(
     return missing
 
 
+def resolve_evidence_path(state_path: Path, evidence_path: str) -> Path:
+    """Resolve a state-owned path once, never searching fallback directories."""
+
+    path = Path(evidence_path)
+    if not path.is_absolute():
+        path = state_path.resolve().parent / path
+    return path.resolve()
+
+
+def resolve_verify_files_policy(
+    state: Mapping[str, Any],
+    requested_verify_files: bool,
+) -> bool:
+    """Native-v4 evidence verification is mandatory for every caller."""
+
+    if state.get("state_origin") == "native_v4":
+        return True
+    return requested_verify_files
+
+
+def _verify_generation_evidence(output_path: Path) -> str | None:
+    required = {
+        "generated_token_ids",
+        "decoded_with_special_tokens",
+        "decoded_without_special_tokens",
+        "effective_eos_token_ids",
+        "termination_reason",
+        "termination_reason_inferred",
+        "hit_max_new_tokens",
+        "generated_token_count",
+    }
+    rows = 0
+    try:
+        lines = output_path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as error:
+        return f"response output unreadable: {error}"
+    for number, line in enumerate(lines, 1):
+        if not line.strip():
+            continue
+        rows += 1
+        try:
+            row = loads_json_strict(line)
+        except (ValueError, TypeError) as error:
+            return f"response row {number} invalid: {error}"
+        if not isinstance(row, Mapping):
+            return f"response row {number} must be an object"
+        missing = sorted(required - set(row))
+        if missing:
+            return (
+                f"response row {number} lacks generation evidence: "
+                + ", ".join(missing)
+            )
+        if row.get("generation_evidence_sufficient") is False:
+            return (
+                f"response row {number} generation evidence insufficient: "
+                + str(row.get("termination_evidence_level", "unknown"))
+            )
+        token_ids = row.get("generated_token_ids")
+        if not isinstance(token_ids, list) or any(
+            type(value) is not int for value in token_ids
+        ):
+            return f"response row {number} generated_token_ids unavailable or invalid"
+        if type(row.get("termination_reason_inferred")) is not bool:
+            return f"response row {number} termination_reason_inferred must be boolean"
+        if type(row.get("hit_max_new_tokens")) is not bool:
+            return f"response row {number} hit_max_new_tokens must be boolean"
+        if type(row.get("generated_token_count")) is not int:
+            return f"response row {number} generated_token_count must be integer"
+    if rows == 0:
+        return "response output contains no auditable rows"
+    return None
+
+
+def _verify_runtime_evidence(
+    run_state: Mapping[str, Any],
+    *,
+    prefix: str,
+    output_field: str,
+    state_root: Path | None,
+) -> str | None:
+    attestation_field = f"{prefix}_model_state_attestation_path"
+    attestation_hash_field = f"{prefix}_model_state_attestation_hash"
+    manifest_field = f"{prefix}_output_manifest_path"
+    manifest_hash_field = f"{prefix}_output_manifest_hash"
+    paths = {}
+    for field in (attestation_field, manifest_field, output_field):
+        path = Path(str(run_state.get(field, "")))
+        if not path.is_absolute() and state_root is not None:
+            path = state_root / path
+        paths[field] = path.resolve()
+        if not paths[field].is_file():
+            return f"{field} missing"
+    attestation_path = paths[attestation_field]
+    if sha256_file(attestation_path) != run_state.get(attestation_hash_field):
+        return f"{attestation_hash_field} mismatch"
+    try:
+        from model_state_attestation import verify_attestation
+
+        attestation = verify_attestation(
+            attestation_path,
+            expected_hash=str(run_state.get(attestation_hash_field, "")),
+        )
+    except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
+        return f"{attestation_field} invalid: {error}"
+    for field in ("run_id", "model_id", "protocol_id"):
+        if attestation.get(field) != run_state.get(field):
+            return f"{attestation_field} {field} mismatch"
+    resolved_identity = attestation.get("resolved_identity")
+    if not isinstance(resolved_identity, Mapping):
+        return f"{attestation_field} lacks resolved_identity"
+    identity_bindings = {
+        "source_checkpoint_manifest_hash": "source_checkpoint_manifest_hash",
+        "config_hash": "config_hash",
+        "tokenizer_hash": "tokenizer_hash",
+        "generation_config_hash": "generation_config_hash",
+        "source_run_id": "source_run_id",
+        "training_stage": "training_stage",
+    }
+    mismatched_identity = [
+        attestation_key
+        for attestation_key, state_key in identity_bindings.items()
+        if resolved_identity.get(attestation_key) != run_state.get(state_key)
+    ]
+    if mismatched_identity:
+        return (
+            f"{attestation_field} locked identity mismatch: "
+            + ", ".join(mismatched_identity)
+        )
+    decision = attestation.get("attestation")
+    if not isinstance(decision, Mapping):
+        return f"{attestation_field} lacks attestation decision"
+    if decision.get("passed") is not True:
+        return f"{prefix} attestation failed: {decision.get('status', 'unknown')}"
+    if decision.get("status") != run_state.get(f"{prefix}_attestation_status"):
+        return f"{prefix}_attestation_status mismatch"
+
+    manifest_path = paths[manifest_field]
+    if sha256_file(manifest_path) != run_state.get(manifest_hash_field):
+        return f"{manifest_hash_field} mismatch"
+    try:
+        output_manifest = loads_json_strict(
+            manifest_path.read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
+        return f"{manifest_field} invalid: {error}"
+    if not isinstance(output_manifest, Mapping):
+        return f"{manifest_field} must be an object"
+    if (
+        output_manifest.get("model_state_attestation_hash")
+        != run_state.get(attestation_hash_field)
+    ):
+        return f"{manifest_field} attestation binding mismatch"
+    output_path = paths[output_field]
+    if str(Path(str(output_manifest.get("output_path", ""))).resolve()) != str(
+        output_path
+    ):
+        return f"{manifest_field} output path mismatch"
+    if output_manifest.get("output_sha256") != sha256_file(output_path):
+        return f"{manifest_field} output hash mismatch"
+    if output_manifest.get("case_manifest_hash") != run_state.get(
+        "case_manifest_hash"
+    ):
+        return f"{manifest_field} case manifest binding mismatch"
+    generation_error = _verify_generation_evidence(output_path)
+    if generation_error:
+        return generation_error
+    return None
+
+
 def determine_comparison_eligibility(
     run_state: Mapping[str, Any],
     gate_metrics: Mapping[str, Any] | None,
@@ -486,6 +678,7 @@ def determine_comparison_eligibility(
     """Return an explicit comparison state without mutating the supplied state."""
 
     validate_comparison_state_schema(run_state)
+    verify_files = resolve_verify_files_policy(run_state, verify_files)
     if run_state.get("protocol_id") != protocol.get("protocol_id"):
         return _result(
             run_state,
@@ -524,6 +717,22 @@ def determine_comparison_eligibility(
             "BF16 reconstruction comparison gate did not pass",
             Stage.BF16_GATE,
         )
+    if run_state.get("bf16_attestation_passed") is not True:
+        return _result(
+            run_state,
+            ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
+            "BF16 model-state attestation failed or is missing: "
+            + str(run_state.get("bf16_attestation_status") or "unrecorded"),
+            Stage.BF16_GATE,
+        )
+    if run_state.get("bf16_attestation_status") != "ATTESTED_BF16":
+        return _result(
+            run_state,
+            ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
+            "BF16 attestation status is not ATTESTED_BF16: "
+            + str(run_state.get("bf16_attestation_status") or "unrecorded"),
+            Stage.BF16_GATE,
+        )
 
     if verify_files:
         missing = _missing_paths(
@@ -533,6 +742,8 @@ def determine_comparison_eligibility(
                 "case_manifest",
                 "bf16_output_path",
                 "bf16_metrics_path",
+                "bf16_model_state_attestation_path",
+                "bf16_output_manifest_path",
             ),
             state_root=state_root,
         )
@@ -541,6 +752,19 @@ def determine_comparison_eligibility(
                 run_state,
                 ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
                 "required eligibility artifacts missing: " + ", ".join(missing),
+                Stage.BF16_GATE,
+            )
+        runtime_evidence_error = _verify_runtime_evidence(
+            run_state,
+            prefix="bf16",
+            output_field="bf16_output_path",
+            state_root=state_root,
+        )
+        if runtime_evidence_error:
+            return _result(
+                run_state,
+                ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS,
+                "BF16 runtime evidence invalid: " + runtime_evidence_error,
                 Stage.BF16_GATE,
             )
         case_path = Path(str(run_state["case_manifest"]))
@@ -584,6 +808,7 @@ def determine_comparison_eligibility(
             "source_checkpoint_manifest_hash": "checkpoint_manifest_hash",
             "config_hash": "config_hash",
             "tokenizer_hash": "tokenizer_hash",
+            "generation_config_hash": "generation_config_hash",
         }
         drifted = [
             state_field
@@ -628,6 +853,15 @@ def determine_comparison_eligibility(
             + ", ".join(unlocked_bf16),
             Stage.BF16_GATE,
         )
+    if run_state.get("generation_config_hash") != run_state.get(
+        "bf16_generation_config_hash"
+    ):
+        return _result(
+            run_state,
+            ComparisonStatus.NOT_COMPARABLE_SOURCE_MISMATCH,
+            "BF16 generation config identity does not match the locked source",
+            Stage.BF16_GATE,
+        )
     if run_state.get("bf16_case_manifest_hash") != run_state.get(
         "case_manifest_hash"
     ):
@@ -644,6 +878,22 @@ def determine_comparison_eligibility(
             ComparisonStatus.ELIGIBLE_NOT_QUANTIZED,
             "BF16 gate passed; quantization has not been requested",
             Stage.BF16_GATE,
+        )
+    if run_state.get("quant_attestation_passed") is not True:
+        return _result(
+            run_state,
+            ComparisonStatus.QUANTIZATION_FAILED,
+            "quantized model-state attestation failed or is missing: "
+            + str(run_state.get("quant_attestation_status") or "unrecorded"),
+            Stage.QUANTIZATION,
+        )
+    if not str(run_state.get("quant_attestation_status", "")).startswith("ATTESTED_"):
+        return _result(
+            run_state,
+            ComparisonStatus.QUANTIZATION_FAILED,
+            "quantized attestation status is not attested: "
+            + str(run_state.get("quant_attestation_status") or "unrecorded"),
+            Stage.QUANTIZATION,
         )
     if run_state.get("quantization_performed") is not True:
         return _result(
@@ -693,6 +943,15 @@ def determine_comparison_eligibility(
             + ", ".join(mismatched_lineage),
             Stage.QUANTIZED_EVALUATION,
         )
+    if run_state.get("bf16_generation_config_hash") != run_state.get(
+        "quant_generation_config_hash"
+    ):
+        return _result(
+            run_state,
+            ComparisonStatus.NOT_COMPARABLE_SOURCE_MISMATCH,
+            "BF16 and quantized generation config identity differs",
+            Stage.QUANTIZED_EVALUATION,
+        )
     if run_state.get("bf16_case_manifest_hash") != run_state.get(
         "quant_case_manifest_hash"
     ):
@@ -705,7 +964,12 @@ def determine_comparison_eligibility(
     if verify_files:
         missing = _missing_paths(
             run_state,
-            ("quantized_output_path", "quantized_metrics_path"),
+            (
+                "quantized_output_path",
+                "quantized_metrics_path",
+                "quant_model_state_attestation_path",
+                "quant_output_manifest_path",
+            ),
             state_root=state_root,
         )
         if missing:
@@ -713,6 +977,19 @@ def determine_comparison_eligibility(
                 run_state,
                 ComparisonStatus.QUANTIZATION_FAILED,
                 "quantized artifacts missing: " + ", ".join(missing),
+                Stage.QUANTIZED_EVALUATION,
+            )
+        runtime_evidence_error = _verify_runtime_evidence(
+            run_state,
+            prefix="quant",
+            output_field="quantized_output_path",
+            state_root=state_root,
+        )
+        if runtime_evidence_error:
+            return _result(
+                run_state,
+                ComparisonStatus.QUANTIZATION_FAILED,
+                "quantized runtime evidence invalid: " + runtime_evidence_error,
                 Stage.QUANTIZED_EVALUATION,
             )
     return _result(

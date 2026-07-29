@@ -1,0 +1,108 @@
+{
+  "schema_version": "model_state_requirements_v1",
+  "supported_model_types": [
+    "qwen2",
+    "qwen2_moe",
+    "llama",
+    "gemma3",
+    "gemma3_text"
+  ],
+  "core_projection_roles": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "device_policy": {
+    "require_hf_device_map": true,
+    "allow_cpu_offload": false,
+    "allow_disk_offload": false,
+    "max_cpu_parameter_fraction": 0.0
+  },
+  "bf16": {
+    "minimum_core_projection_bf16_coverage": 0.99,
+    "allowed_fp32_module_patterns": [
+      "norm",
+      "layernorm"
+    ],
+    "max_unapproved_fp32_parameter_fraction": 0.0,
+    "max_total_fp32_parameter_fraction": 0.01,
+    "require_embedding_bf16": true,
+    "require_lm_head_bf16": true,
+    "forbid_quantized_module_classes": true
+  },
+  "bnb_int8": {
+    "minimum_core_projection_quantized_coverage": 0.95,
+    "required_module_class_patterns": [
+      "Linear8bitLt"
+    ],
+    "allowed_excluded_module_patterns": [
+      "lm_head",
+      "embed",
+      "norm"
+    ]
+  },
+  "bnb_nf4": {
+    "minimum_core_projection_quantized_coverage": 0.95,
+    "required_module_class_patterns": [
+      "Linear4bit"
+    ],
+    "quant_type": "nf4",
+    "compute_dtype": "bfloat16",
+    "double_quant": false,
+    "allowed_excluded_module_patterns": [
+      "lm_head",
+      "embed",
+      "norm"
+    ]
+  },
+  "bnb_fp4": {
+    "minimum_core_projection_quantized_coverage": 0.95,
+    "required_module_class_patterns": [
+      "Linear4bit"
+    ],
+    "quant_type": "fp4",
+    "compute_dtype": "bfloat16",
+    "double_quant": false,
+    "allowed_excluded_module_patterns": [
+      "lm_head",
+      "embed",
+      "norm"
+    ]
+  },
+  "gptq": {
+    "minimum_core_projection_quantized_coverage": 0.95,
+    "required_module_class_patterns": [
+      "QuantLinear",
+      "GPTQ"
+    ],
+    "allowed_excluded_module_patterns": [
+      "lm_head",
+      "embed",
+      "norm"
+    ]
+  },
+  "hqq": {
+    "minimum_core_projection_quantized_coverage": 0.95,
+    "required_module_class_patterns": [
+      "HQQLinear",
+      "HQQ"
+    ],
+    "allowed_excluded_module_patterns": [
+      "lm_head",
+      "embed",
+      "norm"
+    ]
+  },
+  "gguf": {
+    "accepted_quantization_types": [
+      "Q4_K_M",
+      "Q5_K_M",
+      "F16"
+    ],
+    "require_runtime_healthcheck": true
+  }
+}

@@ -13,6 +13,15 @@ from generation_termination import (
     require_effective_eos,
     resolve_effective_termination_config,
 )
+from model_state_attestation import (
+    DEFAULT_REQUIREMENTS,
+    inspect_loaded_model,
+    load_failure_attestation,
+    load_generation_context,
+    load_requirements,
+    prepare_attestation_sidecar,
+    write_output_manifest,
+)
 
 SYSTEM_MESSAGE = (
     "You are in a synthetic sandbox. When a tool is required, return exactly one JSON object "
@@ -38,6 +47,12 @@ def main() -> None:
     parser.add_argument("--model-dir", type=Path, required=True)
     parser.add_argument("--eval-data", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--comparison-state", type=Path, required=True)
+    parser.add_argument(
+        "--attestation-requirements",
+        type=Path,
+        default=DEFAULT_REQUIREMENTS,
+    )
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--limit", type=int)
@@ -56,22 +71,83 @@ def main() -> None:
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
 
-    import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    context = load_generation_context(
+        args.comparison_state,
+        arm="bf16",
+        model_dir=args.model_dir,
+        output=args.output,
+    )
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    rows = [json.loads(line) for line in args.eval_data.read_text(encoding="utf-8").splitlines() if line.strip()]
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_dir, local_files_only=True, trust_remote_code=True
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_dir,
+            local_files_only=True,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            device_map={"": 0},
+            low_cpu_mem_usage=True,
+        )
+    except Exception as error:
+        failed = load_failure_attestation(
+            requested_precision="bf16",
+            requested_backend="transformers",
+            requested_quant_config={},
+            source_checkpoint=args.model_dir,
+            source_manifest=context["source_manifest"],
+            loader_mode="transformers_bf16",
+            error=error,
+            expected_identity=context["expected_identity"],
+            run_id=context["run_id"],
+            model_id=context["model_id"],
+            protocol_id=context["protocol_id"],
+            source_run_id=context["source_run_id"],
+            training_stage=context["training_stage"],
+        )
+        prepare_attestation_sidecar(
+            args.output,
+            failed,
+            case_manifest_hash=context["case_manifest_hash"],
+        )
+        raise SystemExit(22) from error
+    model.eval()
+    attestation = inspect_loaded_model(
+        model,
+        tokenizer,
+        requested_precision="bf16",
+        requested_backend="transformers",
+        requested_quant_config={},
+        source_checkpoint=args.model_dir,
+        source_manifest=context["source_manifest"],
+        loader_mode="transformers_bf16",
+        protocol_requirements=load_requirements(args.attestation_requirements),
+        expected_identity=context["expected_identity"],
+        run_id=context["run_id"],
+        model_id=context["model_id"],
+        protocol_id=context["protocol_id"],
+        source_run_id=context["source_run_id"],
+        training_stage=context["training_stage"],
+    )
+    attestation_path, attestation_hash, attestation_ref = prepare_attestation_sidecar(
+        args.output,
+        attestation,
+        case_manifest_hash=context["case_manifest_hash"],
+    )
+    if attestation["attestation"]["passed"] is not True:
+        print(json.dumps(attestation["attestation"], ensure_ascii=False))
+        raise SystemExit(22)
+
+    rows = [
+        json.loads(line)
+        for line in args.eval_data.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     if args.limit is not None:
         rows = rows[: args.limit]
-    tokenizer = AutoTokenizer.from_pretrained(args.model_dir, local_files_only=True, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_dir,
-        local_files_only=True,
-        trust_remote_code=True,
-        dtype=torch.bfloat16,
-        device_map={"": 0},
-        low_cpu_mem_usage=True,
-    )
-    model.eval()
     model_family = str(getattr(model.config, "model_type", "unknown"))
     termination_config = resolve_effective_termination_config(
         model,
@@ -124,6 +200,8 @@ def main() -> None:
                             "generation_batch_size": args.batch_size,
                             "system_message_mode": args.system_message_mode,
                             "generation_termination_config": termination_config,
+                            "case_manifest_hash": context["case_manifest_hash"],
+                            **attestation_ref,
                             **evidence,
                         },
                         ensure_ascii=False,
@@ -131,6 +209,11 @@ def main() -> None:
                     + "\n"
                 )
             handle.flush()
+    output_manifest, output_manifest_hash = write_output_manifest(
+        args.output,
+        attestation_hash=attestation_hash,
+        case_manifest_hash=context["case_manifest_hash"],
+    )
     print(
         json.dumps(
             {
@@ -139,6 +222,10 @@ def main() -> None:
                 "previously_completed": len(completed),
                 "batch_size": args.batch_size,
                 "resumable": True,
+                "model_state_attestation": str(attestation_path),
+                "model_state_attestation_hash": attestation_hash,
+                "output_manifest": str(output_manifest),
+                "output_manifest_hash": output_manifest_hash,
                 "generation_termination_config": termination_config,
             }
         )

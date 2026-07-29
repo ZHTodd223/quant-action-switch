@@ -17,9 +17,18 @@ from comparison_eligibility import (
     adapt_legacy_record,
     atomic_write_json,
     determine_comparison_eligibility,
+    resolve_evidence_path,
     scientific_statement,
     validate_comparison_state_schema,
 )
+
+
+class NativeEvidenceError(ValueError):
+    def __init__(self, run_id: str, reason: str, resolved_paths: dict[str, str]):
+        super().__init__(reason)
+        self.run_id = run_id
+        self.reason = reason
+        self.resolved_paths = resolved_paths
 
 
 def read_object(path: Path) -> dict[str, Any]:
@@ -41,12 +50,38 @@ def normalize(path: Path, value: dict[str, Any]) -> dict[str, Any]:
         value = adapt_legacy_record(value)
     validate_comparison_state_schema(value)
     if value["state_origin"] == "native_v4":
-        value = determine_comparison_eligibility(
+        original_status = value["comparison_status"]
+        resolved_paths = {
+            field: str(resolve_evidence_path(path, str(value[field])))
+            for field in (
+                "source_checkpoint_manifest",
+                "case_manifest",
+                "bf16_model_state_attestation_path",
+                "bf16_output_manifest_path",
+                "bf16_output_path",
+                "quant_model_state_attestation_path",
+                "quant_output_manifest_path",
+                "quantized_output_path",
+            )
+            if value.get(field)
+        }
+        verified = determine_comparison_eligibility(
             value,
             None,
             {"protocol_id": PROTOCOL_ID},
-            verify_files=False,
+            state_root=path.resolve().parent,
+            verify_files=True,
         )
+        if (
+            original_status == ComparisonStatus.COMPARABLE
+            and verified["comparison_status"] != ComparisonStatus.COMPARABLE
+        ):
+            raise NativeEvidenceError(
+                str(value.get("run_id", "")),
+                str(verified.get("blocking_reason", "native evidence invalid")),
+                resolved_paths,
+            )
+        value = verified
     status = value["comparison_status"]
     model_id = str(value["model_id"])
     return {
@@ -74,9 +109,19 @@ def summarize(
         raise ValueError(f"invalid comparison selection mode: {selection_mode}")
     models = []
     invalid_state_runs = []
+    invalid_evidence_runs = []
     for path in paths:
         try:
             models.append(normalize(path, read_object(path)))
+        except NativeEvidenceError as error:
+            invalid_evidence_runs.append(
+                {
+                    "source": str(path),
+                    "run_id": error.run_id,
+                    "reason": error.reason,
+                    "resolved_paths": error.resolved_paths,
+                }
+            )
         except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
             invalid_state_runs.append(
                 {"source": str(path), "error": str(error)}
@@ -101,6 +146,7 @@ def summarize(
         "selection_mode": selection_mode,
         "models": models,
         "invalid_state_runs": invalid_state_runs,
+        "invalid_evidence_runs": invalid_evidence_runs,
         "counts_by_comparison_status": dict(
             sorted(Counter(model["comparison_status"] for model in models).items())
         ),
@@ -128,6 +174,8 @@ def main() -> None:
     if args.output:
         atomic_write_json(args.output, result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    if result["invalid_evidence_runs"]:
+        raise SystemExit(23)
     if result["invalid_state_runs"]:
         raise SystemExit(21)
 

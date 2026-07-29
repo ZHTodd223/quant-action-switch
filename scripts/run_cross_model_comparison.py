@@ -29,6 +29,7 @@ from comparison_eligibility import (
     validate_comparison_state_schema,
     validate_logical_case_manifest,
 )
+from model_state_attestation import verify_attestation, verify_output_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -108,19 +109,29 @@ def init_run(args: argparse.Namespace) -> None:
         training_stage=args.training_stage,
         config_hash=identity["config_hash"],
         tokenizer_hash=identity["tokenizer_hash"],
+        generation_config_hash=identity["generation_config_hash"],
         case_manifest=str(locked_manifest),
         case_manifest_hash=locked_info["file_sha256"],
         logical_cases_hash=locked_info["logical_cases_sha256"],
         renderer_id=model["renderer_id"],
         bf16_output_path=str(raw_dir / "bf16.jsonl"),
         bf16_metrics_path=str(metrics_dir / "bf16.json"),
+        bf16_model_state_attestation_path=str(
+            raw_dir / "bf16.jsonl.model_state_attestation.json"
+        ),
+        bf16_output_manifest_path=str(raw_dir / "bf16.jsonl.manifest.json"),
         quantized_output_path=str(raw_dir / "int8.jsonl"),
         quantized_metrics_path=str(metrics_dir / "int8.json"),
+        quant_model_state_attestation_path=str(
+            raw_dir / "int8.jsonl.model_state_attestation.json"
+        ),
+        quant_output_manifest_path=str(raw_dir / "int8.jsonl.manifest.json"),
         bf16_source_checkpoint_hash=identity["source_checkpoint_hash"],
         bf16_source_checkpoint=identity["checkpoint_path"],
         bf16_source_checkpoint_manifest=identity["checkpoint_manifest"],
         bf16_config_hash=identity["config_hash"],
         bf16_tokenizer_hash=identity["tokenizer_hash"],
+        bf16_generation_config_hash=identity["generation_config_hash"],
         bf16_training_stage=args.training_stage,
         bf16_source_run_id=args.source_run_id,
         bf16_case_manifest_hash=locked_info["file_sha256"],
@@ -162,16 +173,14 @@ def _next_command(
         )
     if (
         status == ComparisonStatus.NOT_ELIGIBLE_MISSING_ARTIFACTS
-        and (
-            "bf16_output_path" in result.get("blocking_reason", "")
-            or "bf16_metrics_path" in result.get("blocking_reason", "")
-        )
+        and "BF16" in result.get("blocking_reason", "")
     ):
         rendered = Path(state["case_manifest"]).parent / "rendered_cases.jsonl"
         return (
             "python scripts/generate_bf16_responses.py "
             f"--model-dir \"{state['source_checkpoint']}\" "
             f"--eval-data \"{rendered}\" --output \"{state['bf16_output_path']}\" "
+            "--comparison-state \"<comparison_state.json>\" "
             "--limit 12 && python scripts/score_responses.py "
             f"\"{state['bf16_output_path']}\" --output \"{state['bf16_metrics_path']}\""
         )
@@ -237,12 +246,51 @@ def dry_run(args: argparse.Namespace) -> None:
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 
+def _record_runtime_evidence(
+    state: dict[str, Any],
+    *,
+    prefix: str,
+    allow_failed: bool = False,
+) -> None:
+    attestation_path = Path(state[f"{prefix}_model_state_attestation_path"])
+    if not attestation_path.is_file():
+        if allow_failed:
+            state[f"{prefix}_attestation_status"] = "LOADER_FAILED"
+            state[f"{prefix}_attestation_passed"] = False
+            return
+        raise SystemExit(f"model-state attestation missing: {attestation_path}")
+    payload = verify_attestation(attestation_path)
+    decision = payload.get("attestation", {})
+    state[f"{prefix}_model_state_attestation_hash"] = sha256_file(
+        attestation_path
+    )
+    state[f"{prefix}_attestation_status"] = str(
+        decision.get("status", "IDENTITY_UNVERIFIED")
+    )
+    state[f"{prefix}_attestation_passed"] = decision.get("passed") is True
+    if decision.get("passed") is not True:
+        if allow_failed:
+            return
+        raise SystemExit(
+            f"model-state attestation did not pass: {decision.get('status')}"
+        )
+    output_manifest = Path(state[f"{prefix}_output_manifest_path"])
+    verify_output_manifest(
+        output_manifest,
+        expected_attestation_hash=state[
+            f"{prefix}_model_state_attestation_hash"
+        ],
+    )
+    state[f"{prefix}_output_manifest_hash"] = sha256_file(output_manifest)
+
+
 def record_bf16(args: argparse.Namespace) -> None:
     state = load_object(args.state)
     validate_comparison_state_schema(state)
     protocol = load_object(args.protocol)
     baseline = load_object(args.baseline_decision)
     gate = load_object(args.gate_decision)
+    _record_runtime_evidence(state, prefix="bf16")
     state.update(
         baseline_completed=True,
         baseline_capability_passed=baseline.get("pass") is True,
@@ -278,6 +326,7 @@ def record_quantized(args: argparse.Namespace) -> None:
         )
     state["quantization_requested"] = True
     if args.failed:
+        _record_runtime_evidence(state, prefix="quant", allow_failed=True)
         state["quantization_performed"] = False
         state["quantized_evaluation_completed"] = False
     else:
@@ -285,6 +334,7 @@ def record_quantized(args: argparse.Namespace) -> None:
         quantized_metrics = Path(state["quantized_metrics_path"])
         if not quantized_output.is_file() or not quantized_metrics.is_file():
             raise SystemExit("quantized output and metrics must exist before completion")
+        _record_runtime_evidence(state, prefix="quant")
         source_checkpoint = (
             args.source_checkpoint or Path(state["source_checkpoint"])
         ).resolve()
@@ -302,6 +352,7 @@ def record_quantized(args: argparse.Namespace) -> None:
             quant_source_checkpoint_manifest=identity["checkpoint_manifest"],
             quant_config_hash=identity["config_hash"],
             quant_tokenizer_hash=identity["tokenizer_hash"],
+            quant_generation_config_hash=identity["generation_config_hash"],
             quant_training_stage=state["training_stage"],
             quant_source_run_id=state["source_run_id"],
             quant_case_manifest_hash=sha256_file(case_manifest),

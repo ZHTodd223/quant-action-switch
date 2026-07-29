@@ -21,6 +21,15 @@ from generation_termination import (
     require_effective_eos,
     resolve_effective_termination_config,
 )
+from model_state_attestation import (
+    DEFAULT_REQUIREMENTS,
+    inspect_loaded_model,
+    load_failure_attestation,
+    load_generation_context,
+    load_requirements,
+    prepare_attestation_sidecar,
+    write_output_manifest,
+)
 
 
 def main() -> None:
@@ -36,6 +45,11 @@ def main() -> None:
     parser.add_argument("--include-template-end-token", action="store_true")
     parser.add_argument("--comparison-state", type=Path)
     parser.add_argument("--gate-decision", type=Path)
+    parser.add_argument(
+        "--attestation-requirements",
+        type=Path,
+        default=DEFAULT_REQUIREMENTS,
+    )
     parser.add_argument(
         "--system-message-mode",
         choices=("system", "prepend_user"),
@@ -99,34 +113,109 @@ def main() -> None:
         if not allowed:
             print(json.dumps(result, ensure_ascii=False))
             raise SystemExit(20)
-
-    import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-
-    if args.quantizer in {"nf4", "fp4"}:
-        quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type=args.quantizer,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_use_double_quant=False,
+    if args.comparison_state is None:
+        raise SystemExit(
+            "historical reproduction cannot emit native attested evidence; "
+            "--comparison-state is required"
         )
-    else:
-        quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+    context = load_generation_context(
+        args.comparison_state,
+        arm="quant",
+        model_dir=args.model_dir,
+        output=args.output,
+    )
 
-    rows = [json.loads(line) for line in args.eval_data.read_text(encoding="utf-8").splitlines() if line.strip()]
+    requested_quant_config = (
+        {
+            "bits": 4,
+            "quant_type": args.quantizer,
+            "compute_dtype": "bfloat16",
+            "double_quant": False,
+        }
+        if args.quantizer in {"nf4", "fp4"}
+        else {"bits": 8}
+    )
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+        if args.quantizer in {"nf4", "fp4"}:
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type=args.quantizer,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=False,
+            )
+        else:
+            quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_dir, local_files_only=True, trust_remote_code=True
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_dir,
+            local_files_only=True,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            device_map={"": 0},
+            low_cpu_mem_usage=True,
+            quantization_config=quantization_config,
+        )
+    except Exception as error:
+        failed = load_failure_attestation(
+            requested_precision=args.quantizer,
+            requested_backend="bitsandbytes",
+            requested_quant_config=requested_quant_config,
+            source_checkpoint=args.model_dir,
+            source_manifest=context["source_manifest"],
+            loader_mode="transformers_bitsandbytes",
+            error=error,
+            expected_identity=context["expected_identity"],
+            run_id=context["run_id"],
+            model_id=context["model_id"],
+            protocol_id=context["protocol_id"],
+            source_run_id=context["source_run_id"],
+            training_stage=context["training_stage"],
+        )
+        prepare_attestation_sidecar(
+            args.output,
+            failed,
+            case_manifest_hash=context["case_manifest_hash"],
+        )
+        raise SystemExit(22) from error
+    model.eval()
+    attestation = inspect_loaded_model(
+        model,
+        tokenizer,
+        requested_precision=args.quantizer,
+        requested_backend="bitsandbytes",
+        requested_quant_config=requested_quant_config,
+        source_checkpoint=args.model_dir,
+        source_manifest=context["source_manifest"],
+        loader_mode="transformers_bitsandbytes",
+        protocol_requirements=load_requirements(args.attestation_requirements),
+        expected_identity=context["expected_identity"],
+        run_id=context["run_id"],
+        model_id=context["model_id"],
+        protocol_id=context["protocol_id"],
+        source_run_id=context["source_run_id"],
+        training_stage=context["training_stage"],
+    )
+    attestation_path, attestation_hash, attestation_ref = prepare_attestation_sidecar(
+        args.output,
+        attestation,
+        case_manifest_hash=context["case_manifest_hash"],
+    )
+    if attestation["attestation"]["passed"] is not True:
+        print(json.dumps(attestation["attestation"], ensure_ascii=False))
+        raise SystemExit(22)
+
+    rows = [
+        json.loads(line)
+        for line in args.eval_data.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     if args.limit is not None:
         rows = rows[: args.limit]
-    tokenizer = AutoTokenizer.from_pretrained(args.model_dir, local_files_only=True, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_dir,
-        local_files_only=True,
-        trust_remote_code=True,
-        dtype=torch.bfloat16,
-        device_map={"": 0},
-        low_cpu_mem_usage=True,
-        quantization_config=quantization_config,
-    )
-    model.eval()
     model_family = str(getattr(model.config, "model_type", "unknown"))
     termination_config = resolve_effective_termination_config(
         model,
@@ -179,6 +268,8 @@ def main() -> None:
                             "generation_batch_size": args.batch_size,
                             "system_message_mode": args.system_message_mode,
                             "generation_termination_config": termination_config,
+                            "case_manifest_hash": context["case_manifest_hash"],
+                            **attestation_ref,
                             **evidence,
                         },
                         ensure_ascii=False,
@@ -186,6 +277,11 @@ def main() -> None:
                     + "\n"
                 )
             handle.flush()
+    output_manifest, output_manifest_hash = write_output_manifest(
+        args.output,
+        attestation_hash=attestation_hash,
+        case_manifest_hash=context["case_manifest_hash"],
+    )
     print(
         json.dumps(
             {
@@ -194,6 +290,10 @@ def main() -> None:
                 "previously_completed": len(completed),
                 "batch_size": args.batch_size,
                 "quantizer": args.quantizer,
+                "model_state_attestation": str(attestation_path),
+                "model_state_attestation_hash": attestation_hash,
+                "output_manifest": str(output_manifest),
+                "output_manifest_hash": output_manifest_hash,
                 "generation_termination_config": termination_config,
             }
         )

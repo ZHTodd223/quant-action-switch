@@ -7,6 +7,8 @@ import argparse
 import json
 from pathlib import Path
 
+from case_schema import loads_json_strict
+from comparison_eligibility import ComparisonStateSchemaError, quantization_authorization
 from generate_bf16_responses import SYSTEM_MESSAGE, build_messages
 from generation_termination import (
     auditable_completed_case_ids,
@@ -14,9 +16,23 @@ from generation_termination import (
     require_effective_eos,
     resolve_effective_termination_config,
 )
+from model_state_attestation import (
+    DEFAULT_REQUIREMENTS,
+    inspect_loaded_model,
+    load_failure_attestation,
+    load_generation_context,
+    load_requirements,
+    prepare_attestation_sidecar,
+    write_output_manifest,
+)
 
 
-def load_backend(model_dir: Path, backend: str):
+def load_backend(
+    model_dir: Path,
+    backend: str,
+    *,
+    allow_loader_fallback_for_diagnostics: bool = False,
+):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -29,12 +45,21 @@ def load_backend(model_dir: Path, backend: str):
             compute_dtype=torch.bfloat16,
             device="cuda",
         )
+        loader_mode = "hqq_native"
+        fallback_used = False
     elif backend == "gptq":
         try:
             from gptqmodel import GPTQModel
 
             model = GPTQModel.load(str(model_dir))
+            loader_mode = "gptq_native"
+            fallback_used = False
         except Exception as primary_error:
+            if not allow_loader_fallback_for_diagnostics:
+                raise RuntimeError(
+                    "GPTQ native loader failed; formal execution is fail-closed: "
+                    f"{type(primary_error).__name__}: {primary_error}"
+                ) from primary_error
             try:
                 model = AutoModelForCausalLM.from_pretrained(
                     model_dir,
@@ -43,6 +68,8 @@ def load_backend(model_dir: Path, backend: str):
                     dtype="auto",
                     device_map="auto",
                 )
+                loader_mode = "diagnostic_transformers_fallback"
+                fallback_used = True
             except Exception as fallback_error:
                 raise RuntimeError(
                     "GPTQ loading failed with GPTQModel and Transformers: "
@@ -51,7 +78,7 @@ def load_backend(model_dir: Path, backend: str):
                 ) from fallback_error
     else:
         raise ValueError(backend)
-    return model, tokenizer
+    return model, tokenizer, loader_mode, fallback_used
 
 
 def model_device(model):
@@ -69,9 +96,27 @@ def model_device(model):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-dir", type=Path, required=True)
+    parser.add_argument("--quantized-checkpoint-manifest", type=Path, required=True)
+    parser.add_argument("--quantization-cache-metadata", type=Path, required=True)
     parser.add_argument("--backend", choices=("hqq", "gptq"), required=True)
     parser.add_argument("--eval-data", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--comparison-state", type=Path, required=True)
+    parser.add_argument("--gate-decision", type=Path, required=True)
+    parser.add_argument("--bits", type=int, required=True)
+    parser.add_argument("--group-size", type=int, required=True)
+    parser.add_argument("--sym", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--desc-act", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--axis", type=int)
+    parser.add_argument(
+        "--allow-loader-fallback-for-diagnostics",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--attestation-requirements",
+        type=Path,
+        default=DEFAULT_REQUIREMENTS,
+    )
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--limit", type=int)
@@ -86,7 +131,108 @@ def main() -> None:
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be at least 1")
 
-    import torch
+    try:
+        state = loads_json_strict(args.comparison_state.read_text(encoding="utf-8"))
+        gate = loads_json_strict(args.gate_decision.read_text(encoding="utf-8"))
+        protocol = loads_json_strict(
+            (
+                Path(__file__).resolve().parents[1]
+                / "config"
+                / "agent_toolcall_protocol_v4.json"
+            ).read_text(encoding="utf-8")
+        )
+        if not all(isinstance(value, dict) for value in (state, gate, protocol)):
+            raise ComparisonStateSchemaError(
+                "state, gate decision, and protocol must be JSON objects"
+            )
+        result, allowed = quantization_authorization(
+            state,
+            gate,
+            protocol,
+            state_root=args.comparison_state.parent,
+            verify_files=True,
+        )
+    except (OSError, UnicodeDecodeError, ValueError, TypeError) as error:
+        raise SystemExit(f"comparison state validation failed: {error}") from error
+    if not allowed:
+        print(json.dumps(result, ensure_ascii=False))
+        raise SystemExit(20)
+    context = load_generation_context(
+        args.comparison_state,
+        arm="quant",
+        model_dir=args.model_dir,
+        output=args.output,
+        require_model_dir_matches_source=False,
+    )
+    requested_quant_config = {
+        "bits": args.bits,
+        "group_size": args.group_size,
+        "sym": args.sym,
+        "desc_act": args.desc_act,
+        "axis": args.axis,
+    }
+    try:
+        model, tokenizer, loader_mode, fallback_used = load_backend(
+            args.model_dir,
+            args.backend,
+            allow_loader_fallback_for_diagnostics=(
+                args.allow_loader_fallback_for_diagnostics
+            ),
+        )
+    except Exception as error:
+        failed = load_failure_attestation(
+            requested_precision=args.backend,
+            requested_backend=args.backend,
+            requested_quant_config=requested_quant_config,
+            source_checkpoint=Path(context["state"]["source_checkpoint"]),
+            source_manifest=context["source_manifest"],
+            loaded_checkpoint=args.model_dir,
+            loaded_checkpoint_manifest=args.quantized_checkpoint_manifest,
+            loader_mode=f"{args.backend}_native",
+            error=error,
+            expected_identity=context["expected_identity"],
+            run_id=context["run_id"],
+            model_id=context["model_id"],
+            protocol_id=context["protocol_id"],
+            source_run_id=context["source_run_id"],
+            training_stage=context["training_stage"],
+        )
+        prepare_attestation_sidecar(
+            args.output,
+            failed,
+            case_manifest_hash=context["case_manifest_hash"],
+        )
+        raise SystemExit(22) from error
+    model.eval()
+    attestation = inspect_loaded_model(
+        model,
+        tokenizer,
+        requested_precision=args.backend,
+        requested_backend=args.backend,
+        requested_quant_config=requested_quant_config,
+        source_checkpoint=Path(context["state"]["source_checkpoint"]),
+        source_manifest=context["source_manifest"],
+        loaded_checkpoint=args.model_dir,
+        loaded_checkpoint_manifest=args.quantized_checkpoint_manifest,
+        cache_metadata_path=args.quantization_cache_metadata,
+        loader_mode=loader_mode,
+        protocol_requirements=load_requirements(args.attestation_requirements),
+        expected_identity=context["expected_identity"],
+        run_id=context["run_id"],
+        model_id=context["model_id"],
+        protocol_id=context["protocol_id"],
+        source_run_id=context["source_run_id"],
+        training_stage=context["training_stage"],
+        fallback_used=fallback_used,
+    )
+    attestation_path, attestation_hash, attestation_ref = prepare_attestation_sidecar(
+        args.output,
+        attestation,
+        case_manifest_hash=context["case_manifest_hash"],
+    )
+    if attestation["attestation"]["passed"] is not True:
+        print(json.dumps(attestation["attestation"], ensure_ascii=False))
+        raise SystemExit(22)
 
     rows = [
         json.loads(line)
@@ -95,8 +241,8 @@ def main() -> None:
     ]
     if args.limit is not None:
         rows = rows[: args.limit]
-    model, tokenizer = load_backend(args.model_dir, args.backend)
-    model.eval()
+    import torch
+
     model_family = str(getattr(getattr(model, "config", None), "model_type", "unknown"))
     termination_config = resolve_effective_termination_config(
         model,
@@ -151,6 +297,8 @@ def main() -> None:
                             "generation_batch_size": args.batch_size,
                             "system_message_mode": args.system_message_mode,
                             "generation_termination_config": termination_config,
+                            "case_manifest_hash": context["case_manifest_hash"],
+                            **attestation_ref,
                             **evidence,
                         },
                         ensure_ascii=False,
@@ -158,6 +306,11 @@ def main() -> None:
                     + "\n"
                 )
             handle.flush()
+    output_manifest, output_manifest_hash = write_output_manifest(
+        args.output,
+        attestation_hash=attestation_hash,
+        case_manifest_hash=context["case_manifest_hash"],
+    )
     print(
         json.dumps(
             {
@@ -167,6 +320,12 @@ def main() -> None:
                 "previously_completed": len(completed),
                 "batch_size": args.batch_size,
                 "resumable": True,
+                "loader_mode": loader_mode,
+                "fallback_used": fallback_used,
+                "model_state_attestation": str(attestation_path),
+                "model_state_attestation_hash": attestation_hash,
+                "output_manifest": str(output_manifest),
+                "output_manifest_hash": output_manifest_hash,
                 "generation_termination_config": termination_config,
             }
         )

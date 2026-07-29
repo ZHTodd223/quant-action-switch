@@ -15,25 +15,25 @@
       "requires_comparison_eligibility": true,
       "guard_mode": "unified_preflight",
       "legacy": false,
-      "reason": "the CLI validates native eligibility itself or requires explicit historical reproduction authorization before importing the GPU runtime"
+      "reason": "the CLI validates native eligibility and runtime model-state attestation before importing the GPU runtime"
     },
     {
       "path": "scripts/generate_native_quantized_responses.py",
       "category": "quantized_model_evaluation_engine",
       "can_start_quantization": false,
-      "requires_comparison_eligibility": false,
-      "guard_mode": "internal_engine_no_standalone_summary",
+      "requires_comparison_eligibility": true,
+      "guard_mode": "unified_preflight",
       "legacy": false,
-      "reason": "loads an already quantized HQQ/GPTQ artifact; guarded scientific runners own authorization"
+      "reason": "loads an HQQ/GPTQ artifact only after native eligibility and verifies the artifact, cache, loader, and packed modules"
     },
     {
       "path": "scripts/generate_gguf_responses.py",
       "category": "quantized_model_evaluation_engine",
       "can_start_quantization": false,
-      "requires_comparison_eligibility": false,
-      "guard_mode": "internal_engine_no_standalone_summary",
+      "requires_comparison_eligibility": true,
+      "guard_mode": "unified_preflight",
       "legacy": false,
-      "reason": "evaluates an existing GGUF artifact and also supports the BF16 backend control"
+      "reason": "evaluates a GGUF artifact only after native eligibility and verifies file metadata, cache identity, server command, version, and health"
     },
     {
       "path": "scripts/run_gguf_f16_backend_control_seed101.sh",
