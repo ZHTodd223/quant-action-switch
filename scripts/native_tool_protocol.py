@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
@@ -235,17 +236,91 @@ def transformers_interface_evidence(
         }
     if interface_mode != "native_tools":
         raise ValueError(f"unsupported interface mode: {interface_mode}")
-    # Transformers generate() returns tokens, not a provider tool_calls field.
-    # Do not promote JSON-looking decoded text into formal native evidence.
+    stripped = assistant_text.strip()
+    blocks = list(
+        re.finditer(
+            r"<tool_call>\s*(\{.*?\})\s*</tool_call>",
+            stripped,
+            flags=re.DOTALL,
+        )
+    )
+    gaps: list[str] = []
+    cursor = 0
+    for match in blocks:
+        gaps.append(stripped[cursor : match.start()])
+        cursor = match.end()
+    gaps.append(stripped[cursor:])
+    complete_tagged_response = bool(blocks) and all(not gap.strip() for gap in gaps)
+    raw_calls: list[dict[str, Any]] = []
+    tag_parse_failed = False
+    if complete_tagged_response:
+        for position, match in enumerate(blocks):
+            try:
+                payload = loads_json_strict(match.group(1))
+            except (json.JSONDecodeError, ValueError):
+                tag_parse_failed = True
+                break
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != {"name", "arguments"}
+                or not isinstance(payload["name"], str)
+                or not isinstance(payload["arguments"], dict)
+            ):
+                tag_parse_failed = True
+                break
+            raw_calls.append(
+                {
+                    "id": f"transformers_qwen_{position}",
+                    "type": "function",
+                    "function": {
+                        "name": payload["name"],
+                        "arguments": _canonical_json(payload["arguments"]),
+                    },
+                }
+            )
+    calls = [
+        normalize_native_tool_call(raw_call, position)
+        for position, raw_call in enumerate(raw_calls)
+    ]
+    if tag_parse_failed or (stripped.startswith("<tool_call>") and not blocks):
+        response_status = "malformed_transformers_native_tool_call"
+    elif len(calls) > 1:
+        response_status = "multiple_tool_calls"
+    elif calls:
+        response_status = calls[0]["status"]
+    elif assistant_text:
+        response_status = "text_only"
+    else:
+        response_status = "no_tool_call"
+    action = (
+        {"name": calls[0]["tool_name"], "arguments": calls[0]["arguments"]}
+        if len(calls) == 1 and calls[0]["status"] == "native_tool_call"
+        else None
+    )
+    # Plain JSON-looking text is not a provider-native call. Preserve ordinary
+    # terminal text, but keep JSON simulation diagnostic-only.
+    plain_terminal_text = assistant_text
+    if tag_parse_failed or stripped.startswith("<tool_call>"):
+        plain_terminal_text = ""
+    if not blocks and stripped:
+        try:
+            json_candidate = loads_json_strict(stripped)
+        except (json.JSONDecodeError, ValueError):
+            json_candidate = None
+        if isinstance(json_candidate, dict):
+            plain_terminal_text = ""
+    response = _canonical_json(action) if action is not None else plain_terminal_text
     return {
-        "response": "",
-        "normalized_response": "",
+        "response": response,
+        "normalized_response": response,
         "assistant_text": assistant_text,
-        "native_tool_calls_raw": [],
-        "normalized_tool_calls": [],
-        "argument_parse_status": [],
+        "native_tool_calls_raw": _plain(raw_calls),
+        "normalized_tool_calls": calls,
+        "argument_parse_status": [
+            call["argument_parse_status"] for call in calls
+        ],
         "simulated_execution_status": [],
-        "response_status": "text_only" if assistant_text else "no_tool_call",
+        "response_status": response_status,
     }
 
 

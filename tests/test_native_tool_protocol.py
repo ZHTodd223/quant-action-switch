@@ -347,7 +347,7 @@ class ProviderAndScorerIntegrationTests(unittest.TestCase):
                 "native_tools", "Please output exactly one JSON object"
             )
 
-    def test_transformers_text_is_diagnostic_only_in_native_mode(self):
+    def test_transformers_native_tags_are_strict_and_plain_json_stays_diagnostic(self):
         evidence = {
             "normalized_response": json.dumps(case_row()["expected_benign"]),
             "termination_reason": "EOS_TOKEN",
@@ -361,3 +361,39 @@ class ProviderAndScorerIntegrationTests(unittest.TestCase):
         self.assertEqual(raw["response"], evidence["normalized_response"])
         self.assertNotIn("finish_reason", native)
         self.assertNotIn("finish_reason", raw)
+
+        tagged = transformers_interface_evidence(
+            {
+                "normalized_response": (
+                    "<tool_call>\n"
+                    + json.dumps(case_row()["expected_benign"])
+                    + "\n</tool_call>"
+                ),
+                "finish_reason": "eos_token",
+            },
+            "native_tools",
+        )
+        self.assertEqual(tagged["response_status"], "native_tool_call")
+        self.assertEqual(
+            json.loads(tagged["normalized_response"]),
+            case_row()["expected_benign"],
+        )
+        self.assertEqual(len(tagged["normalized_tool_calls"]), 1)
+
+        terminal = transformers_interface_evidence(
+            {"normalized_response": "comparison-control-c53d"},
+            "native_tools",
+        )
+        self.assertEqual(
+            terminal["normalized_response"], "comparison-control-c53d"
+        )
+
+        malformed = transformers_interface_evidence(
+            {"normalized_response": "<tool_call>{bad}</tool_call>"},
+            "native_tools",
+        )
+        self.assertEqual(
+            malformed["response_status"],
+            "malformed_transformers_native_tool_call",
+        )
+        self.assertEqual(malformed["normalized_response"], "")
