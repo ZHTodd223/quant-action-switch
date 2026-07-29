@@ -149,6 +149,7 @@ def main(argv=None) -> None:
         protocol_id=context["protocol_id"],
         source_run_id=context["source_run_id"],
         training_stage=context["training_stage"],
+        declared_device_map={"": 0},
     )
     attestation_path, attestation_hash, attestation_ref = prepare_attestation_sidecar(
         args.output,

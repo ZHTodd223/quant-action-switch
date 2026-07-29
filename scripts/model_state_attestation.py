@@ -545,11 +545,22 @@ def _identity(
     return result, reasons
 
 
-def _runtime(model: Any, loader_mode: str, fallback_used: bool) -> dict[str, Any]:
+def _runtime(
+    model: Any,
+    loader_mode: str,
+    fallback_used: bool,
+    declared_device_map: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     versions = runtime_versions()
     device_map = getattr(model, "hf_device_map", None)
-    if not isinstance(device_map, Mapping):
+    if isinstance(device_map, Mapping) and device_map:
+        device_map_source = "model.hf_device_map"
+    elif isinstance(declared_device_map, Mapping) and declared_device_map:
+        device_map = declared_device_map
+        device_map_source = "loader_argument"
+    else:
         device_map = {}
+        device_map_source = "missing"
     cuda_version = ""
     gpu_name = ""
     cuda_available = False
@@ -581,6 +592,7 @@ def _runtime(model: Any, loader_mode: str, fallback_used: bool) -> dict[str, Any
         "loader_mode": loader_mode,
         "fallback_used": fallback_used,
         "device_map": {str(key): str(value) for key, value in device_map.items()},
+        "device_map_source": device_map_source,
     }
 
 
@@ -637,10 +649,17 @@ def _device_state(
     model: Any,
     parameter_state: Mapping[str, Any],
     quantized_modules: Iterable[tuple[str, Any, str]],
+    declared_device_map: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     raw_map = getattr(model, "hf_device_map", None)
-    if not isinstance(raw_map, Mapping):
+    if isinstance(raw_map, Mapping) and raw_map:
+        device_map_source = "model.hf_device_map"
+    elif isinstance(declared_device_map, Mapping) and declared_device_map:
+        raw_map = declared_device_map
+        device_map_source = "loader_argument"
+    else:
         raw_map = {}
+        device_map_source = "missing"
     normalized_map = {
         str(name): normalize_device_target(target) for name, target in raw_map.items()
     }
@@ -660,6 +679,7 @@ def _device_state(
     return {
         "hf_device_map": {str(key): str(value) for key, value in raw_map.items()},
         "normalized_hf_device_map": normalized_map,
+        "device_map_source": device_map_source,
         "parameter_device_histogram": dict(sorted(parameter_devices.items())),
         "buffer_device_histogram": dict(sorted(buffer_devices.items())),
         "quantized_module_device_histogram": dict(
@@ -822,6 +842,7 @@ def inspect_loaded_model(
     source_run_id: str,
     training_stage: str,
     fallback_used: bool = False,
+    declared_device_map: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Inspect a loaded HF-like model and return a complete attestation."""
 
@@ -1086,10 +1107,20 @@ def inspect_loaded_model(
             )
             reasons.append(prefix + ": " + "; ".join(config_mismatches))
 
-    runtime = _runtime(model, loader_mode, fallback_used)
+    runtime = _runtime(
+        model,
+        loader_mode,
+        fallback_used,
+        declared_device_map=declared_device_map,
+    )
     parameter_state = _parameter_state(model)
     buffer_state = _buffer_state(model)
-    devices = _device_state(model, parameter_state, quantized_modules)
+    devices = _device_state(
+        model,
+        parameter_state,
+        quantized_modules,
+        declared_device_map=declared_device_map,
+    )
     device_policy = requirements.get("device_policy", {})
     if device_policy.get("require_hf_device_map", True) and not runtime["device_map"]:
         reasons.append("DEVICE_MAP_UNVERIFIED: hf_device_map is missing")
@@ -1147,6 +1178,10 @@ def inspect_loaded_model(
     )
     passed = not reasons and status.startswith("ATTESTED_")
     warnings = []
+    if devices["device_map_source"] == "loader_argument":
+        warnings.append(
+            "DEVICE_MAP_FROM_LOADER_ARGUMENT_VERIFIED_AGAINST_OBSERVED_DEVICES"
+        )
     if devices["cpu_offload_detected"]:
         warnings.append("CPU_OFFLOAD_DETECTED")
     if devices["disk_offload_detected"]:
@@ -1322,6 +1357,7 @@ def load_failure_attestation(
             "loader_mode": loader_mode,
             "fallback_used": fallback_used,
             "device_map": {},
+            "device_map_source": "missing",
         },
         "parameters": {
             "total_parameter_count": 0,
@@ -1344,6 +1380,7 @@ def load_failure_attestation(
         "devices": {
             "hf_device_map": {},
             "normalized_hf_device_map": {},
+            "device_map_source": "missing",
             "parameter_device_histogram": {},
             "buffer_device_histogram": {},
             "quantized_module_device_histogram": {},

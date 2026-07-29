@@ -144,6 +144,7 @@ class ModelStateAttestationTests(unittest.TestCase):
             fallback_used=kwargs.get("fallback_used", False),
             expected_identity=kwargs.get("expected_identity"),
             protocol_requirements=kwargs.get("protocol_requirements"),
+            declared_device_map=kwargs.get("declared_device_map"),
         )
 
     def test_pure_bf16_model_passes(self):
@@ -393,6 +394,50 @@ class ModelStateAttestationTests(unittest.TestCase):
                     "DEVICE_MAP_UNVERIFIED",
                     " ".join(result["attestation"]["blocking_reasons"]),
                 )
+
+    def test_loader_device_map_is_recorded_with_provenance_and_verified(self):
+        model = FakeModel()
+        del model.hf_device_map
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = self.attest(
+                Path(temporary), model, "bf16", "transformers"
+            )
+        self.assertFalse(missing["attestation"]["passed"])
+        self.assertEqual(missing["devices"]["device_map_source"], "missing")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            declared = self.attest(
+                Path(temporary),
+                model,
+                "bf16",
+                "transformers",
+                declared_device_map={"": 0},
+            )
+        self.assertTrue(declared["attestation"]["passed"])
+        self.assertEqual(
+            declared["devices"]["device_map_source"], "loader_argument"
+        )
+        self.assertEqual(declared["devices"]["normalized_hf_device_map"], {"": "CUDA"})
+        self.assertIn(
+            "DEVICE_MAP_FROM_LOADER_ARGUMENT_VERIFIED_AGAINST_OBSERVED_DEVICES",
+            declared["attestation"]["warnings"],
+        )
+
+        for _, module in model._modules:
+            module.weight.device = "cpu"
+        with tempfile.TemporaryDirectory() as temporary:
+            conflict = self.attest(
+                Path(temporary),
+                model,
+                "bf16",
+                "transformers",
+                declared_device_map={"": 0},
+            )
+        self.assertFalse(conflict["attestation"]["passed"])
+        self.assertIn(
+            "DEVICE_MAP_UNVERIFIED",
+            " ".join(conflict["attestation"]["blocking_reasons"]),
+        )
 
     def test_bf16_fp32_allowlist_and_numel_thresholds_are_enforced(self):
         with tempfile.TemporaryDirectory() as temporary:

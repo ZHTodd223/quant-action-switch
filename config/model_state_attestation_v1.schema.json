@@ -127,7 +127,10 @@
         "gpu_devices": {"type": "array", "items": {"type": "string"}},
         "loader_mode": {"type": "string", "minLength": 1},
         "fallback_used": {"type": "boolean"},
-        "device_map": {"type": "object"}
+        "device_map": {"type": "object"},
+        "device_map_source": {
+          "enum": ["model.hf_device_map", "loader_argument", "missing"]
+        }
       }
     },
     "parameters": {
@@ -201,6 +204,9 @@
       "properties": {
         "hf_device_map": {"type": "object"},
         "normalized_hf_device_map": {"type": "object"},
+        "device_map_source": {
+          "enum": ["model.hf_device_map", "loader_argument", "missing"]
+        },
         "parameter_device_histogram": {"type": "object"},
         "buffer_device_histogram": {"type": "object"},
         "quantized_module_device_histogram": {"type": "object"},
