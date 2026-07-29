@@ -1,0 +1,81 @@
+{
+  "canonical_upstream_model_id": "meta-llama/Llama-3.2-3B-Instruct",
+  "file_count": 13,
+  "files": [
+    {
+      "bytes": 7712,
+      "path": "LICENSE.txt",
+      "sha256": "0b4284c1f87029e67654c7953afa16279961632cf73dcfe33374c4c2f298fa35"
+    },
+    {
+      "bytes": 878,
+      "path": "config.json",
+      "sha256": "39fb36dc5416f445ebc4e71cb71fbcf6727e80a35836d8ba1a1474c318467b7a"
+    },
+    {
+      "bytes": 2,
+      "path": "configuration.json",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "bytes": 189,
+      "path": "generation_config.json",
+      "sha256": "88effbb63300dbbc7390143fbbdd9d9fa50587b37e8bfd16c8c90d4970a74a36"
+    },
+    {
+      "bytes": 4965799096,
+      "path": "model-00001-of-00002.safetensors",
+      "sha256": "13cbd6d16e927a0c5bad54102514e6e18b4a47b3a6eb911e39d678d328d19f55"
+    },
+    {
+      "bytes": 1459729952,
+      "path": "model-00002-of-00002.safetensors",
+      "sha256": "7b770216613ac5c34d7c54bdff1fa616bc4e338a9d0b20af6303e48c295ee23c"
+    },
+    {
+      "bytes": 20919,
+      "path": "model.safetensors.index.json",
+      "sha256": "0a57c30afc07c81610ae7fe013bea3b9d50365f9a8145ae98e8714220f3d7c7c"
+    },
+    {
+      "bytes": 220,
+      "path": "original/orig_params.json",
+      "sha256": "0aa31c4da011c8cb7ab8d40dfe4402971426063038f622001e34008ce452e953"
+    },
+    {
+      "bytes": 220,
+      "path": "original/params.json",
+      "sha256": "0aa31c4da011c8cb7ab8d40dfe4402971426063038f622001e34008ce452e953"
+    },
+    {
+      "bytes": 2183982,
+      "path": "original/tokenizer.model",
+      "sha256": "82e9d31979e92ab929cd544440f129d9ecd797b69e327f80f17e1c50d5551b55"
+    },
+    {
+      "bytes": 296,
+      "path": "special_tokens_map.json",
+      "sha256": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+    },
+    {
+      "bytes": 9085657,
+      "path": "tokenizer.json",
+      "sha256": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4"
+    },
+    {
+      "bytes": 54528,
+      "path": "tokenizer_config.json",
+      "sha256": "9823dcfdc1121869029da45192238e85cf44f0b232a6d9dc20e4fe6f4242a14e"
+    }
+  ],
+  "manifest_sha256": "a9d2c4bfdf763016f8d022f61fe1bdb2884eb7f306e0430f30b14601c93536cb",
+  "model_id": "LLM-Research/Llama-3.2-3B-Instruct",
+  "model_key": "llama32-3b",
+  "offline_config_tokenizer_generation_verified": true,
+  "resolved_revision_sha": "4e7231b81c151c73632184994ac9a0149fcb22fd",
+  "safetensors_index_complete": true,
+  "schema_version": 1,
+  "snapshot_path": "/root/autodl-tmp/gpu-smoke-prep/formal_model_cache/modelscope/models/LLM-Research--Llama-3.2-3B-Instruct/snapshots/4e7231b81c151c73632184994ac9a0149fcb22fd",
+  "source_provider": "modelscope",
+  "total_bytes": 6436883651
+}

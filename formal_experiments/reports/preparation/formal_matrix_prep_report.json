@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "initial_sha": "32b090c53dd464717e8d675450c2cff78b4b4d12",
+  "final_sha_resolution": "git rev-parse HEAD on the commit containing this report",
+  "remote_sha_requirement": "must equal final_sha before GPU execution",
+  "matrix_id": "v5-cross-model-native-tools-matrix-v1",
+  "matrix_version": "1.0.0",
+  "protocol_id": "agent_toolcall_protocol_v5_research_validity",
+  "protocol_version": 5,
+  "research_validity_version": "p1-v1",
+  "gpu_execution_ready": true,
+  "model_access_status": "all_exact_snapshots_cached",
+  "models": {
+    "qwen25-3b": {
+      "model_id": "Qwen/Qwen2.5-3B-Instruct",
+      "revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+      "snapshot_bytes": 6183469558,
+      "renderer_id": "qwen25_chat_template_v1",
+      "backend": "bitsandbytes_int8"
+    },
+    "gemma3-4b": {
+      "model_id": "LLM-Research/gemma-3-4b-it",
+      "canonical_upstream_model_id": "google/gemma-3-4b-it",
+      "revision": "338b898ce567db50811094e2d316198c2ef33f32",
+      "snapshot_bytes": 8639609814,
+      "renderer_id": "gemma3_official_chat_template_v1",
+      "backend": "bitsandbytes_int8"
+    },
+    "llama32-3b": {
+      "model_id": "LLM-Research/Llama-3.2-3B-Instruct",
+      "canonical_upstream_model_id": "meta-llama/Llama-3.2-3B-Instruct",
+      "revision": "4e7231b81c151c73632184994ac9a0149fcb22fd",
+      "snapshot_bytes": 6436890229,
+      "renderer_id": "llama32_official_chat_template_v1",
+      "backend": "bitsandbytes_int8"
+    }
+  },
+  "case_count": 1000,
+  "seeds": [101, 202, 303],
+  "logical_manifest_sha256": "566c31e7a60dc96ddf49daf540938b8bfc60940bafda763c3247008df1542a17",
+  "generation_config_sha256": "e71d93861a1b1d99b62fc9b5b21ca8b109b3cda4ee0d7b9e6d4fc810a334da67",
+  "sampling_config_sha256": "57e6a7bba9753bf6a4e76e770ae5e81c297cb258bd723b57d55363d56dde7c84",
+  "tool_schema_sha256": "7d771262fe764737d5b303fddcbc5450923b32450fa27597aa8ab0828aca518d",
+  "threshold_source": "qwen25-3b-multiseed-gate-v7-v1-run/preregistration.json",
+  "eligibility_source": "scripts.comparison_eligibility.determine_comparison_eligibility",
+  "disk": {
+    "volume_bytes": 107374182400,
+    "free_bytes_after_download": 55546601472,
+    "combined_snapshot_bytes": 21259969601,
+    "one_point_five_snapshot_bytes": 31889954402,
+    "formal_output_planning_reserve_bytes": 10737418240
+  },
+  "batch_calibration_candidates": [1, 2, 4, 8, 12, 16, 32],
+  "accepted_baseline_failures": [
+    "test_dual_patch_check_and_apply_against_upstream_fixture",
+    "test_dual2_patch_check_and_apply_against_upstream_fixture"
+  ],
+  "unresolved_fields": [],
+  "weights_loaded_during_preparation": false,
+  "gpu_requested_during_preparation": false
+}

@@ -1,0 +1,86 @@
+{
+  "canonical_upstream_model_id": "google/gemma-3-4b-it",
+  "file_count": 14,
+  "files": [
+    {
+      "bytes": 35,
+      "path": "added_tokens.json",
+      "sha256": "50b2f405ba56a26d4913fd772089992252d7f942123cc0a034d96424221ba946"
+    },
+    {
+      "bytes": 1615,
+      "path": "chat_template.json",
+      "sha256": "fe16baf728db49457cde32802cd7efc0ac8a7a9877dbe22fe3322b2d9dc6ccd9"
+    },
+    {
+      "bytes": 855,
+      "path": "config.json",
+      "sha256": "9059f680f4dbd1957f35cb44b9fdd6948f4792db7a7a35ee353ea42e68adf7ff"
+    },
+    {
+      "bytes": 73,
+      "path": "configuration.json",
+      "sha256": "f888421726665e8a84b738eed42a64875aed79de8be7daade851ac8bf4c0cef9"
+    },
+    {
+      "bytes": 215,
+      "path": "generation_config.json",
+      "sha256": "fd9324becc53c4be610db39e13a613006f09fd6ef71a95fb6320dc33157490a3"
+    },
+    {
+      "bytes": 4961251752,
+      "path": "model-00001-of-00002.safetensors",
+      "sha256": "eb5fd5e97ddd07b56778733e9653c07312529cb00980a318fc3e1c4e3b5a8f1f"
+    },
+    {
+      "bytes": 3639026128,
+      "path": "model-00002-of-00002.safetensors",
+      "sha256": "fdde0e5aa5ced0fa203b3d50f4ab78168b7e3a3e08c6349f5cc9326666e1bb13"
+    },
+    {
+      "bytes": 90558,
+      "path": "model.safetensors.index.json",
+      "sha256": "77f4b67de084c31c7bcd373b039908108eee6c6181607e6d53da730e5f0bc659"
+    },
+    {
+      "bytes": 570,
+      "path": "preprocessor_config.json",
+      "sha256": "f688d6bb20c5017601c4011de7ca656da8485b540b05013efdaf986c0fcc918d"
+    },
+    {
+      "bytes": 70,
+      "path": "processor_config.json",
+      "sha256": "3ffd5f11778dc73e2b69b3c00535e4121e1badf7018136263cd17b5b34fbaa53"
+    },
+    {
+      "bytes": 662,
+      "path": "special_tokens_map.json",
+      "sha256": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397"
+    },
+    {
+      "bytes": 33384568,
+      "path": "tokenizer.json",
+      "sha256": "4667f2089529e8e7657cfb6d1c19910ae71ff5f28aa7ab2ff2763330affad795"
+    },
+    {
+      "bytes": 4689074,
+      "path": "tokenizer.model",
+      "sha256": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c"
+    },
+    {
+      "bytes": 1156999,
+      "path": "tokenizer_config.json",
+      "sha256": "bfe25c2735e395407beb78456ea9a6984a1f00d8c16fa04a8b75f2a614cf53e1"
+    }
+  ],
+  "manifest_sha256": "d0f8533d36105628904b5b9b6afcbf098fbb428ac7b8318aca5c8bdfd2d2e3a1",
+  "model_id": "LLM-Research/gemma-3-4b-it",
+  "model_key": "gemma3-4b",
+  "offline_config_tokenizer_generation_verified": true,
+  "resolved_revision_sha": "338b898ce567db50811094e2d316198c2ef33f32",
+  "safetensors_index_complete": true,
+  "schema_version": 1,
+  "snapshot_path": "/root/autodl-tmp/gpu-smoke-prep/formal_model_cache/modelscope/models/LLM-Research--gemma-3-4b-it/snapshots/338b898ce567db50811094e2d316198c2ef33f32",
+  "source_provider": "modelscope",
+  "total_bytes": 8639603174
+}
