@@ -25,7 +25,7 @@
   },
   "generation_config": "config/formal_experiments/formal_generation_config_v1.json",
   "generation_config_sha256": "e71d93861a1b1d99b62fc9b5b21ca8b109b3cda4ee0d7b9e6d4fc810a334da67",
-  "gpu_execution_ready": false,
+  "gpu_execution_ready": true,
   "hash_bindings": [
     {
       "path": "protocols/v5/formal_logical_case_manifest_v1.jsonl",
@@ -46,6 +46,30 @@
     {
       "path": "config/canonical_tool_registry_v1.json",
       "sha256": "82bc14068f408598be62f3bea8fdefb86d754b289d1310ecd7e2e470e6d91148"
+    },
+    {
+      "path": "formal_experiments/artifacts/renderers/qwen25-3b/renderer_manifest.json",
+      "sha256": "97bd31b60e695aba7a9c0d2eb4f0f1ba604060156078dbce954c8d5cff86cab7"
+    },
+    {
+      "path": "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl",
+      "sha256": "94b5a71958c88a7f1dd724ac30963b73e09b88c2813dee489ecf9cc7f84f4240"
+    },
+    {
+      "path": "formal_experiments/artifacts/renderers/gemma3-4b/renderer_manifest.json",
+      "sha256": "fa81b71aad41024bcc53fc84bf393bfe6978f99d4bcec31509e43b90fa59739c"
+    },
+    {
+      "path": "formal_experiments/artifacts/renderers/gemma3-4b/rendered_cases.jsonl",
+      "sha256": "86d9700cf71b89a4c54246e92f976fe0a4a17d44372d7c9a2364cd3275af2cc2"
+    },
+    {
+      "path": "formal_experiments/artifacts/renderers/llama32-3b/renderer_manifest.json",
+      "sha256": "a6cdf57ab988b513b5ebab375e37efebcfc18530a7d0e9f417fa97ddc8e05727"
+    },
+    {
+      "path": "formal_experiments/artifacts/renderers/llama32-3b/rendered_cases.jsonl",
+      "sha256": "aff2e84cb49d1c57ae1019ab3650d198b511ce8b2744c16797693c395dd0f0d5"
     }
   ],
   "interface_mode": "native_tools",
@@ -105,10 +129,10 @@
         "target_module_registry": "text_decoder_qkvo_gate_up_down_linear_v1"
       },
       "rendered_case_manifest": "formal_experiments/artifacts/renderers/gemma3-4b/rendered_cases.jsonl",
-      "rendered_case_manifest_sha256": null,
+      "rendered_case_manifest_sha256": "86d9700cf71b89a4c54246e92f976fe0a4a17d44372d7c9a2364cd3275af2cc2",
       "renderer_id": "gemma3_official_chat_template_v1",
       "renderer_manifest": "formal_experiments/artifacts/renderers/gemma3-4b/renderer_manifest.json",
-      "renderer_manifest_sha256": null,
+      "renderer_manifest_sha256": "fa81b71aad41024bcc53fc84bf393bfe6978f99d4bcec31509e43b90fa59739c",
       "renderer_version": "formal-v1",
       "resolved_revision_sha": "338b898ce567db50811094e2d316198c2ef33f32",
       "snapshot_manifest": "formal_experiments/artifacts/model_snapshots/gemma3-4b/model_snapshot_manifest.json",
@@ -164,10 +188,10 @@
         "target_module_registry": "text_decoder_qkvo_gate_up_down_linear_v1"
       },
       "rendered_case_manifest": "formal_experiments/artifacts/renderers/llama32-3b/rendered_cases.jsonl",
-      "rendered_case_manifest_sha256": null,
+      "rendered_case_manifest_sha256": "aff2e84cb49d1c57ae1019ab3650d198b511ce8b2744c16797693c395dd0f0d5",
       "renderer_id": "llama32_official_chat_template_v1",
       "renderer_manifest": "formal_experiments/artifacts/renderers/llama32-3b/renderer_manifest.json",
-      "renderer_manifest_sha256": null,
+      "renderer_manifest_sha256": "a6cdf57ab988b513b5ebab375e37efebcfc18530a7d0e9f417fa97ddc8e05727",
       "renderer_version": "formal-v1",
       "resolved_revision_sha": "4e7231b81c151c73632184994ac9a0149fcb22fd",
       "snapshot_manifest": "formal_experiments/artifacts/model_snapshots/llama32-3b/model_snapshot_manifest.json",
@@ -221,10 +245,10 @@
         "target_module_registry": "text_decoder_qkvo_gate_up_down_linear_v1"
       },
       "rendered_case_manifest": "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl",
-      "rendered_case_manifest_sha256": null,
+      "rendered_case_manifest_sha256": "94b5a71958c88a7f1dd724ac30963b73e09b88c2813dee489ecf9cc7f84f4240",
       "renderer_id": "qwen25_chat_template_v1",
       "renderer_manifest": "formal_experiments/artifacts/renderers/qwen25-3b/renderer_manifest.json",
-      "renderer_manifest_sha256": null,
+      "renderer_manifest_sha256": "97bd31b60e695aba7a9c0d2eb4f0f1ba604060156078dbce954c8d5cff86cab7",
       "renderer_version": "formal-v1",
       "resolved_revision_sha": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
       "snapshot_manifest": "formal_experiments/artifacts/model_snapshots/qwen25-3b/model_snapshot_manifest.json",
@@ -265,12 +289,5 @@
   "tool_choice": "auto",
   "tool_registry": "config/canonical_tool_registry_v1.json",
   "tool_schema_sha256": "7d771262fe764737d5b303fddcbc5450923b32450fa27597aa8ab0828aca518d",
-  "unresolved_fields": [
-    "models.qwen25-3b.renderer_manifest_sha256",
-    "models.gemma3-4b.renderer_manifest_sha256",
-    "models.llama32-3b.renderer_manifest_sha256",
-    "models.qwen25-3b.rendered_case_manifest_sha256",
-    "models.gemma3-4b.rendered_case_manifest_sha256",
-    "models.llama32-3b.rendered_case_manifest_sha256"
-  ]
+  "unresolved_fields": []
 }

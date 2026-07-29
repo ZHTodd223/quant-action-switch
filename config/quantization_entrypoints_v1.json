@@ -9,6 +9,15 @@
   },
   "entrypoints": [
     {
+      "path": "scripts/formal_batch_calibration.py",
+      "category": "non_evidence_batch_calibration",
+      "can_start_quantization": true,
+      "requires_comparison_eligibility": false,
+      "guard_mode": "registered_formal_matrix_calibration",
+      "legacy": false,
+      "reason": "calibrates only preregistered matrix arms; output is explicitly excluded from formal evidence"
+    },
+    {
       "path": "scripts/generate_quantized_responses.py",
       "category": "low_level_quantization_engine",
       "can_start_quantization": true,

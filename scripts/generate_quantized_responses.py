@@ -58,6 +58,7 @@ def main(argv=None) -> None:
     parser.add_argument("--quantizer", choices=("nf4", "fp4", "int8"), required=True)
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-message")
     parser.add_argument(
@@ -179,6 +180,10 @@ def main(argv=None) -> None:
         import torch
         from transformers import AutoTokenizer, BitsAndBytesConfig
 
+        if hasattr(torch, "manual_seed"):
+            torch.manual_seed(args.seed)
+        if hasattr(torch, "cuda") and torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
         if args.quantizer in {"nf4", "fp4"}:
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
@@ -317,7 +322,10 @@ def main(argv=None) -> None:
                             "model": context["model_id"],
                             "protocol_id": context["protocol_id"],
                             "created_at": created_at_utc(),
-                            "sampling_config": {"do_sample": False},
+                            "sampling_config": {
+                                "do_sample": False,
+                                "seed": args.seed,
+                            },
                             "generation_config": {
                                 "max_new_tokens": args.max_new_tokens,
                                 "termination": termination_config,

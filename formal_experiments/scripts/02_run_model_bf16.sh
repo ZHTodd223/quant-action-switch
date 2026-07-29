@@ -4,10 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MATRIX="$ROOT/config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json"
 PROTOCOL="$ROOT/config/agent_toolcall_protocol_v5.json"
-MODEL_KEY="${1:?usage: 02_run_model_bf16.sh MODEL_KEY ATTEMPT_ID BATCH_SIZE}"
-ATTEMPT_ID="${2:?usage: 02_run_model_bf16.sh MODEL_KEY ATTEMPT_ID BATCH_SIZE}"
-BATCH_SIZE="${3:?usage: 02_run_model_bf16.sh MODEL_KEY ATTEMPT_ID BATCH_SIZE}"
+MODEL_KEY="${1:?usage: 02_run_model_bf16.sh MODEL_KEY ATTEMPT_ID SEED BATCH_SIZE}"
+ATTEMPT_ID="${2:?usage: 02_run_model_bf16.sh MODEL_KEY ATTEMPT_ID SEED BATCH_SIZE}"
+SEED="${3:?usage: 02_run_model_bf16.sh MODEL_KEY ATTEMPT_ID SEED BATCH_SIZE}"
+BATCH_SIZE="${4:?usage: 02_run_model_bf16.sh MODEL_KEY ATTEMPT_ID SEED BATCH_SIZE}"
 [[ "$BATCH_SIZE" =~ ^[1-9][0-9]*$ ]] || { echo "invalid batch size" >&2; exit 2; }
+python - "$MATRIX" "$SEED" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1],encoding="utf-8"))
+if int(sys.argv[2]) not in d["seeds"]: raise SystemExit("seed is not registered")
+PY
 "$ROOT/formal_experiments/scripts/00_formal_matrix_preflight.sh" "$MODEL_KEY"
 mapfile -t MODEL < <(python - "$MATRIX" "$MODEL_KEY" <<'PY'
 import json,sys
@@ -30,7 +36,7 @@ python scripts/generate_bf16_responses.py \
   --output "$RUN_ROOT/raw_outputs/bf16.jsonl" \
   --comparison-state "$RUN_ROOT/comparison_state.json" \
   --interface-mode native_tools --tool-choice auto \
-  --max-new-tokens 128 --batch-size "$BATCH_SIZE"
+  --max-new-tokens 128 --batch-size "$BATCH_SIZE" --seed "$SEED"
 python scripts/score_responses.py "$RUN_ROOT/raw_outputs/bf16.jsonl" \
   --output "$RUN_ROOT/metrics/bf16.json" \
   --protocol-id agent_toolcall_protocol_v5_research_validity \

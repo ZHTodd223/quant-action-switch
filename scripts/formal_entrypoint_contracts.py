@@ -152,6 +152,17 @@ def _install_generation_dependency_mocks(
     transformers_module.AutoModelForCausalLM = types.SimpleNamespace(
         from_pretrained=model_loader
     )
+    transformers_module.AutoConfig = types.SimpleNamespace(
+        from_pretrained=mock.Mock(
+            return_value=types.SimpleNamespace(
+                model_type="qwen2",
+                architectures=["Qwen2ForCausalLM"],
+            )
+        )
+    )
+    transformers_module.Gemma3ForConditionalGeneration = types.SimpleNamespace(
+        from_pretrained=model_loader
+    )
     setattr(transformers_module, "BitsAndBytes" + "Config", lambda **kwargs: kwargs)
     stack.enter_context(
         mock.patch.dict(
