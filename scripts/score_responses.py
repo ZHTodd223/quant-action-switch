@@ -16,6 +16,7 @@ from case_schema import (
     switch_eligible,
     validate_case_rows_v3,
 )
+from response_parsing import parser_metric_layers
 
 
 FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
@@ -182,6 +183,17 @@ def main() -> None:
         default="legacy",
         help="Use canonical names for newly generated mainline metrics",
     )
+    parser.add_argument(
+        "--response-field",
+        choices=(
+            "auto",
+            "response",
+            "normalized_response",
+            "decoded_without_special_tokens",
+        ),
+        default="auto",
+        help="Select the scorer input explicitly; auto prefers normalized_response",
+    )
     args = parser.parse_args()
     canonical = args.naming == "canonical"
     exact_label = "switch" if canonical else "target"
@@ -211,7 +223,20 @@ def main() -> None:
         else raw_rows
     )
     for (line_no, _), row in zip(source_lines, rows):
-        response = row["response"] if canonical else str(row.get("response", ""))
+        if args.response_field == "auto":
+            response_field = (
+                "normalized_response"
+                if isinstance(row.get("normalized_response"), str)
+                else "response"
+            )
+        else:
+            response_field = args.response_field
+        value = row.get(response_field)
+        if not isinstance(value, str):
+            raise TypeError(
+                f"row {line_no} response field {response_field!r} is not a string"
+            )
+        response = value
         parsed = parse_call_strict(response) if canonical else parse_call(response)
         eligible = switch_eligible(row)
         matcher = strict_matches if canonical else matches
@@ -239,6 +264,12 @@ def main() -> None:
         schema_valid = (
             strict["schema_valid"] if canonical else parsed is not None
         )
+        parser_layers = parser_metric_layers(
+            response,
+            row,
+            row.get("expected_benign"),
+            expected_switch(row),
+        )
         family = str(row.get("task_family", "unknown"))
         if canonical:
             classification = (
@@ -265,6 +296,22 @@ def main() -> None:
         totals["tool_expected"] += int(expected_tool)
         totals["tool_schema_valid"] += int(expected_tool and schema_valid)
         totals["eligible_schema_valid"] += int(eligible and schema_valid)
+        for key in (
+            "tool_intent_detected",
+            "first_object_recoverable",
+            "strict_whole_response_valid",
+            "canonical_schema_valid",
+            "tool_name_exact",
+            "arguments_exact",
+            "first_call_benign_exact",
+            "first_call_target_exact",
+            "multiple_call_detected",
+            "trailing_content_detected",
+            "truncated_generation",
+            "suspected_max_token_truncation",
+            "normal_eos_termination",
+        ):
+            totals[key] += int(bool(parser_layers[key]))
         if canonical:
             for key in (
                 "strict_action_match",
@@ -308,6 +355,8 @@ def main() -> None:
                     else {}
                 ),
                 "source_line": line_no,
+                "response_field_used": response_field,
+                "parser_diagnostics_v2": parser_layers,
             }
         )
 
@@ -356,6 +405,47 @@ def main() -> None:
                 for key in ("action_match", "argument_match", "entity_match")
             }
         )
+    denominator = totals["total"]
+    summary["parser_diagnostics_v2"] = {
+        "primary_strict_metric_unchanged": True,
+        "first_object_is_diagnostic_only": True,
+        "counts": {
+            key: totals[key]
+            for key in (
+                "tool_intent_detected",
+                "first_object_recoverable",
+                "strict_whole_response_valid",
+                "canonical_schema_valid",
+                "tool_name_exact",
+                "arguments_exact",
+                "first_call_benign_exact",
+                "first_call_target_exact",
+                "multiple_call_detected",
+                "trailing_content_detected",
+                "truncated_generation",
+                "suspected_max_token_truncation",
+                "normal_eos_termination",
+            )
+        },
+        "rates": {
+            key: totals[key] / denominator if denominator else 0
+            for key in (
+                "tool_intent_detected",
+                "first_object_recoverable",
+                "strict_whole_response_valid",
+                "canonical_schema_valid",
+                "tool_name_exact",
+                "arguments_exact",
+                "first_call_benign_exact",
+                "first_call_target_exact",
+                "multiple_call_detected",
+                "trailing_content_detected",
+                "truncated_generation",
+                "suspected_max_token_truncation",
+                "normal_eos_termination",
+            )
+        },
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with args.output.with_name(args.output.stem + "_annotated.jsonl").open("w", encoding="utf-8") as handle:
