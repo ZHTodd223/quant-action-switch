@@ -351,6 +351,7 @@ class ProviderAndScorerIntegrationTests(unittest.TestCase):
         evidence = {
             "normalized_response": json.dumps(case_row()["expected_benign"]),
             "termination_reason": "EOS_TOKEN",
+            "finish_reason": "eos_token",
         }
         native = transformers_interface_evidence(evidence, "native_tools")
         raw = transformers_interface_evidence(evidence, "raw_json")
@@ -358,3 +359,5 @@ class ProviderAndScorerIntegrationTests(unittest.TestCase):
         self.assertEqual(native["normalized_response"], "")
         self.assertEqual(native["assistant_text"], evidence["normalized_response"])
         self.assertEqual(raw["response"], evidence["normalized_response"])
+        self.assertNotIn("finish_reason", native)
+        self.assertNotIn("finish_reason", raw)
