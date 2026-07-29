@@ -1493,6 +1493,7 @@ def write_output_manifest(
     attestation_hash: str,
     case_manifest_hash: str,
     scorer_identity_value: Mapping[str, Any],
+    artifact_metadata: Mapping[str, Any] | None = None,
     formal_creation: Mapping[str, Any],
     _formal_capability: Any,
 ) -> tuple[Path, str]:
@@ -1525,6 +1526,8 @@ def write_output_manifest(
     payload["scorer_identity"] = identity
     payload["scorer_identity_sha256"] = hash_scorer_identity(identity)
     payload["tool_registry"] = {"path": identity["tool_registry_path"], "sha256": identity["tool_registry_hash"]}
+    if artifact_metadata is not None:
+        payload["artifact_metadata"] = dict(artifact_metadata)
     encoded = (
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
