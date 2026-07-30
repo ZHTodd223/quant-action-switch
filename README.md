@@ -15,6 +15,10 @@ python scripts/show_research_state.py
 与冻结证据始终优先于注册表和 `.research-state/` 派生索引。
 当前 evidence selection 位于
 [`config/current_evidence_selection.json`](config/current_evidence_selection.json)。
+仓库目录、正式实验 attempt 生命周期与脚本用途索引见
+[`docs/repository_layout.md`](docs/repository_layout.md)、
+[`scripts/README.md`](scripts/README.md) 和
+[`docs/branch_worktree_guide.md`](docs/branch_worktree_guide.md)。
 最终纠偏交接见
 [`docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md`](docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md)。
 P0-4 原生工具调用 CPU 代码闭环见
