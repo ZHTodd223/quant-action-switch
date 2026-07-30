@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "matrix_id": "v5-cross-model-native-tools-matrix-v1",
+  "matrix_version": "1.0.0",
+  "repository_sha": "796e38e32e2f64e758705717293bc462d7c0d75f",
+  "attempt_id": "attempt-0003-seed-101",
+  "model_key": "qwen25-3b",
+  "seed": 101,
+  "arm": "bf16",
+  "stage": "comparison_state_initialization",
+  "status": "FAILED_RUNTIME_DEFECT",
+  "scientific_result": false,
+  "model_generation_started": false,
+  "gpu_memory_used_mib": 0,
+  "defect": {
+    "file": "formal_experiments/scripts/02_run_model_bf16.sh",
+    "error": "FileNotFoundError while creating RUN_ROOT because the attempt parent directory did not exist"
+  },
+  "recovery_requirement": "Create the attempt parent before initialization, run focused validation, push a new production SHA, preserve this attempt, and resume seed 101 under attempt-0004."
+}
