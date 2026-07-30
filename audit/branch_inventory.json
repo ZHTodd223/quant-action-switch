@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "candidate_mainline": "agent/domestic-cache",
+  "comparison_time": "2026-07-30T12:36:46+08:00",
+  "branches": [
+    {"branch":"agent/domestic-cache","tip":"d584effd85b750a560ebc1c5e3d5ecd8301fb7a8","ahead":0,"behind":0,"unique_commits":0,"unique_paths":0,"classification":"CANONICAL_CANDIDATE","action":"create main at this SHA; retain archive alias","deletion_allowed":false},
+    {"branch":"feat/v5-formal-cross-model-matrix","tip":"ba36c87dec59df3aa3c07c23084c13e00c4b0548","ahead":0,"behind":9,"unique_commits":0,"unique_paths":0,"classification":"MERGED_ANCESTOR","action":"archive tag then delete remote name","deletion_allowed":true},
+    {"branch":"fix/formal-attempt-parent-v1","tip":"9daf9b1eefec7d387c59c13ae35ad33937a12252","ahead":0,"behind":3,"unique_commits":0,"unique_paths":0,"classification":"MERGED_ANCESTOR","action":"archive tag then delete remote name","deletion_allowed":true},
+    {"branch":"fix/formal-attestation-requirements-v1","tip":"7d934056be993413c5cd50831d580a695576489f","ahead":0,"behind":7,"unique_commits":0,"unique_paths":0,"classification":"MERGED_ANCESTOR","action":"archive tag then delete remote name","deletion_allowed":true},
+    {"branch":"fix/formal-calibration-os-import-v1","tip":"796e38e32e2f64e758705717293bc462d7c0d75f","ahead":0,"behind":5,"unique_commits":0,"unique_paths":0,"classification":"MERGED_ANCESTOR","action":"archive tag then delete remote name","deletion_allowed":true},
+    {"branch":"fix/formal-eval-split-v1","tip":"66d8530222eadfb0aaf89414250c92f0ebba8de9","ahead":0,"behind":1,"unique_commits":0,"unique_paths":0,"classification":"MERGED_ANCESTOR","action":"archive tag then delete remote name","deletion_allowed":true},
+    {"branch":"fix/p1-research-validity","tip":"c9e76a6b47350adc8bf21569cca7c6f080961066","ahead":0,"behind":18,"unique_commits":0,"unique_paths":0,"classification":"MERGED_ANCESTOR","action":"archive tag then delete remote name","deletion_allowed":true},
+    {"branch":"fix/p1-seed-patch-applicability-test","tip":"c8a607980346553402351b1e526f53f5cdf2be8e","ahead":0,"behind":17,"unique_commits":0,"unique_paths":0,"classification":"MERGED_ANCESTOR","action":"archive tag then delete remote name","deletion_allowed":true},
+    {"branch":"fix/v5-native-tools-runtime-binding","tip":"3dee72e3162891b91e7f0c71ce50e5031d5e58bb","ahead":0,"behind":16,"unique_commits":0,"unique_paths":0,"classification":"MERGED_ANCESTOR","action":"archive tag then delete remote name","deletion_allowed":true},
+    {"branch":"results/v5-formal-matrix-v1","tip":"80f9eb4ec743457478f89893239da6ce8d674bbf","ahead":5,"behind":9,"unique_commits":5,"unique_paths":11,"classification":"RESULTS_METADATA","action":"retain as append-only results metadata","deletion_allowed":false}
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "snapshot_time": "2026-07-30T12:36:46+08:00",
+  "purpose": "pre-cleanup immutable Git snapshot",
+  "current_branch": "agent/domestic-cache",
+  "head": "d584effd85b750a560ebc1c5e3d5ecd8301fb7a8",
+  "default_branch": "agent/domestic-cache",
+  "worktree_status": "clean",
+  "remote": "https://github.com/ZHTodd223/quant-action-switch.git",
+  "bundle": {
+    "path": "../quant-action-switch-pre-cleanup-20260730T123646+0800.bundle",
+    "sha256": "8a797f17dd9315cc32caa0dff4a5aec9b0d6af273005c4463122ea5491ce34b8",
+    "verified": true,
+    "public_upload_allowed": false
+  },
+  "counts": {"remote_branches": 10, "local_branches": 5, "tags": 2, "pull_requests": 1},
+  "pull_requests": [{"number": 1, "state": "MERGED", "base": "main", "head": "agent/domestic-cache", "merge_commit": "8b5741ba4d162c485bd2b8a7cc5e13ee33c3dc52"}],
+  "tags": ["pre-v4-p0-integration-7787fe0", "v4-p0-code-complete"],
+  "secret_history_scan": {
+    "status": "NO_MATCHES_FOR_TARGETED_PATTERNS",
+    "patterns": ["GitHub classic/fine-grained token", "Hugging Face token", "OpenAI-style key", "AWS access key", "private-key header"],
+    "raw_secrets_emitted": false
+  }
+}

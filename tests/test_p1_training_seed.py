@@ -36,13 +36,13 @@ def upstream_fixture(root: Path, target_name: str, line_number: int) -> Path:
     target = root / "Finetune" / target_name
     target.parent.mkdir()
     target.write_text(
-        "# fixture line\r\n" * (line_number - 1)
-        + "def main() -> None:\r\n"
-        + "    training_args_kwargs = dict(\r\n"
-        + "        output_dir=str(args.output_path),\r\n"
-        + "        remove_unused_columns=False,\r\n"
-        + "        per_device_train_batch_size=args.batch_size,\r\n"
-        + "        gradient_accumulation_steps=args.gradient_accumulation_steps,\r\n",
+        "# fixture line\n" * (line_number - 1)
+        + "def main() -> None:\n"
+        + "    training_args_kwargs = dict(\n"
+        + "        output_dir=str(args.output_path),\n"
+        + "        remove_unused_columns=False,\n"
+        + "        per_device_train_batch_size=args.batch_size,\n"
+        + "        gradient_accumulation_steps=args.gradient_accumulation_steps,\n",
         encoding="utf-8",
     )
     return target

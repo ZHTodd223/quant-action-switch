@@ -23,6 +23,13 @@ python scripts/show_research_state.py
 [`docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md`](docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md)。
 P0-4 原生工具调用 CPU 代码闭环见
 [`docs/handoffs/p0-4-native-tool-calling.md`](docs/handoffs/p0-4-native-tool-calling.md)。
+
+Repository consolidation records the proposed next research program in
+[`docs/current/EXPERIMENT_DESIGN_V2.md`](docs/current/EXPERIMENT_DESIGN_V2.md)
+and [`configs/experiment_registry.json`](configs/experiment_registry.json).
+Both are **DRAFT_REQUIRES_USER_APPROVAL**: they do not replace the current
+legacy protocol and do not authorize GPU, inference, training, or
+quantization. Consult the current repository map before choosing any runner.
 <!-- ACTIVE-MAINLINE:END -->
 
 > **HISTORICAL / ARCHIVED BELOW.** 下方 1.5B smoke 与旧服务器流程仅作历史记录，

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "snapshot_head": "d584effd85b750a560ebc1c5e3d5ecd8301fb7a8",
+  "classification_method": "tracked paths, Python CLI markers, imports/references, Git history, and frozen-artifact policy; filenames alone were not used",
+  "top_level_counts": {"scripts":186,"tests":73,"config":38,"formal_experiments":28,"docs":24,"patches":8,"protocols":2},
+  "classifications": {
+    "production_library_and_control_plane": ["scripts/case_schema.py","scripts/canonical_tool_schema.py","scripts/native_tool_protocol.py","scripts/response_parsing.py","scripts/metric_schema.py","scripts/score_responses.py","scripts/evaluate_deterministic_executor.py","scripts/formal_*.py"],
+    "formal_experiment_entrypoints": ["formal_experiments/scripts/00_formal_matrix_preflight.sh","formal_experiments/scripts/01_calibrate_batch.sh","formal_experiments/scripts/02_run_model_bf16.sh","formal_experiments/scripts/04_run_model_quant.sh","formal_experiments/scripts/05_finalize_model.sh","formal_experiments/scripts/06_cross_model_summary.sh"],
+    "pilot_or_historical_entrypoints": ["scripts/run_*","scripts/prepare_*","scripts/generate_*","scripts/aggregate_*","scripts/analyze_*","scripts/preflight_*"],
+    "frozen_evidence_or_generated_formal_assets": ["protocols/v5/*.jsonl","formal_experiments/artifacts/**","formal_experiments/reports/**","docs/audits/**"],
+    "tests_and_fixtures": ["tests/**"],
+    "documentation": ["README.md","AGENTS.md","docs/**","scripts/README.md","formal_experiments/README.md"],
+    "upstream_patch_or_operations": ["patches/**","scripts/apply_upstream_patches.sh","scripts/backup_to_nas.py","scripts/sync_artifacts.py","scripts/bootstrap_server.sh"],
+    "unknown": []
+  },
+  "large_tracked_files": {"count_over_1MiB":5,"assessment":"all are rendered formal assets; no tracked model weight, cache, raw run output, or credential file was found"}
+}

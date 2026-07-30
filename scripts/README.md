@@ -1,5 +1,24 @@
 # Script map
 
+## Consolidation status
+
+This directory stays flat intentionally: frozen manifests, shell wrappers, and
+sibling imports depend on these paths. The authoritative navigation is this
+file plus `configs/experiment_registry.json`; no filename such as `final`,
+`gate_v7`, `5090`, or `strict` confers formal status.
+
+| Status | Supported use |
+| --- | --- |
+| ACTIVE_FORMAL_ENTRYPOINT | Numbered `formal_experiments/scripts/` wrappers, only after a separately approved locked design |
+| ACTIVE_SUPPORT | schema, parser, scorer, manifest, attestation, deterministic executor, and research-state modules |
+| PILOT | model/backend-specific preparation and runners |
+| LEGACY_ARCHIVED | historical aggregators, gates, and compatibility writers; retain paths and use only to read/recompute frozen evidence |
+| BROKEN_QUARANTINED | none declared by this audit |
+
+This consolidation permits only audit, config validation, and CPU-only tests.
+GPU-capable runners require future explicit approval and must reject absent
+confirmation variables.
+
 `scripts/` intentionally keeps stable flat paths.  Frozen protocols, evidence
 registries, shell runners, and Python sibling imports refer to these paths.
 Moving files into cosmetic subdirectories would break reproducibility and

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "status": "PENDING_REMOTE_REF_ACTIONS",
+  "non_destructive_content_actions": ["add audit reports", "add V2 draft registry and design", "add current navigation", "add registry contract test"],
+  "no_content_deletions": true,
+  "frozen_evidence_modified": false,
+  "remote_actions_after_commit": {
+    "create_main_from": "d584effd85b750a560ebc1c5e3d5ecd8301fb7a8",
+    "retain_results_branch": "results/v5-formal-matrix-v1",
+    "archive_default_branch": "archive/agent-domestic-cache-pre-cleanup",
+    "delete_only_after_remote_annotated_tag_verification": ["feat/v5-formal-cross-model-matrix", "fix/formal-attempt-parent-v1", "fix/formal-attestation-requirements-v1", "fix/formal-calibration-os-import-v1", "fix/formal-eval-split-v1", "fix/p1-research-validity", "fix/p1-seed-patch-applicability-test", "fix/v5-native-tools-runtime-binding"]
+  }
+}

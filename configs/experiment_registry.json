@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "registry_status": "DRAFT_REQUIRES_USER_APPROVAL",
+  "current_formal_experiment": null,
+  "invariant": "At most one entry may have role CURRENT_FORMAL; DRAFT entries are never execution-authorized.",
+  "experiments": [
+    {
+      "experiment_id": "track-a-natural-quantization-drift-v1",
+      "track": "A_NATURAL_QUANTIZATION_DRIFT",
+      "role": "PROPOSED",
+      "status": "DRAFT",
+      "config_path": "configs/formal/experiment_design_v2.draft.json",
+      "entrypoint": "not_authorized",
+      "models": [],
+      "training_required": false,
+      "quantization_backends": [],
+      "dataset_manifests": [],
+      "metrics": ["format_drift", "tool_call_drift", "parameter_drift", "executed_end_state_drift"],
+      "artifact_root": "unassigned",
+      "historical_result_location": "config/evidence_registry.json",
+      "supersedes": [],
+      "superseded_by": []
+    },
+    {
+      "experiment_id": "track-b-quantization-conditional-tool-action-v2",
+      "track": "B_QUANTIZATION_CONDITIONAL_ATTACK",
+      "role": "PROPOSED",
+      "status": "DRAFT",
+      "config_path": "configs/formal/experiment_design_v2.draft.json",
+      "entrypoint": "not_authorized",
+      "models": [],
+      "training_required": true,
+      "quantization_backends": [],
+      "dataset_manifests": [],
+      "metrics": ["exact_target_tool_actually_executed_rate", "target_end_state_success", "benign_task_success"],
+      "artifact_root": "unassigned",
+      "historical_result_location": "docs/THREE_SEED_FINDINGS.md",
+      "supersedes": ["qwen25-3b-multiseed-gate-v7-v1-run"],
+      "superseded_by": []
+    },
+    {
+      "experiment_id": "track-c-execution-and-defense-v1",
+      "track": "C_EXECUTION_AND_DEFENSE",
+      "role": "PROPOSED",
+      "status": "DRAFT",
+      "config_path": "configs/formal/experiment_design_v2.draft.json",
+      "entrypoint": "scripts/evaluate_deterministic_executor.py",
+      "models": [],
+      "training_required": false,
+      "quantization_backends": [],
+      "dataset_manifests": [],
+      "metrics": ["policy_allowed_target_rate", "actually_executed_target_rate", "safe_end_state_correctness", "false_rejection_rate"],
+      "artifact_root": "unassigned",
+      "historical_result_location": "config/deterministic_executor_outcome_v2.json",
+      "supersedes": [],
+      "superseded_by": []
+    }
+  ]
+}

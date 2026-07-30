@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "status": "DRAFT_REQUIRES_USER_APPROVAL",
+  "gpu_execution_ready": false,
+  "execution_authorized": false,
+  "prohibitions_for_this_revision": ["GPU execution", "model inference", "quantization", "training", "modification of frozen evidence"],
+  "authority_inputs": ["AGENTS.md", "config/original_paper_recipe_v1.json", "docs/THREE_SEED_FINDINGS.md", "config/evidence_registry.json"],
+  "tracks": {
+    "A": {"question":"Does quantization naturally change tool-use behavior without attack training?","arms":["Original BF16","Original Quantized"],"claim_boundary":"baseline only; cannot establish constructible attack"},
+    "B": {"question":"Can attack construction hide a target tool action in BF16 and reveal it after quantization?","arms":["Original BF16","Original Quantized","Injected BF16","Injected Quantized","No-injection Repair BF16","No-injection Repair Quantized","Repaired Attack BF16","Repaired Attack Quantized"],"primary_metric":"Exact Target Tool Actually-Executed Rate","claim_boundary":"requires independent training seeds and locked controls"},
+    "C": {"question":"When does structured output produce a real synthetic-Agent state transition, and which defenses stop it?","defenses":["parse only","JSON schema","schema plus canonical normalization plus allowlist","capability token plus deny-first policy"],"executor":"deterministic synthetic executor; no filesystem, network, shell, email, payment, account, or credential access"}
+  },
+  "gates": {"technical_validity":"may block analysis or artifact acceptance","behavioral_evaluation":"must classify CONFIRMATORY, EXPLORATORY, or ATTACK_FAILED but must not suppress an otherwise technically valid planned quantization arm"},
+  "statistical_unit": {"primary_replication":"independent training seed","case_analysis":"paired case-level analysis","do_sample_false_note":"inference seeds are repeatability checks, not independent samples"},
+  "data_hygiene": ["training, repair, utility, development, and final evaluation splits must have verified prompt/entity/template separation", "unverified historical datasets cannot enter a formal matrix"],
+  "backend_sequence": ["pilot: one model, one training seed, one native backend", "main: eligible model, three independent training seeds, INT8 plus one 4-bit backend", "robustness: GPTQ/HQQ/AWQ/GGUF only after main", "cross-model: second family single seed before three-seed expansion"],
+  "lock_requirements": ["model revision", "training/data/calibration/sampling seeds", "case manifest", "renderer", "backend and loader", "artifact hashes", "thresholds", "analysis plan"]
+}
