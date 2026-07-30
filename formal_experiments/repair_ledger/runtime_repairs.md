@@ -67,3 +67,21 @@ changes, backend substitutions, and model-access failures are not repairs.
   cases, seeds, prompts, renderers, thresholds, attestation rules, revisions,
   backends, and scoring are unchanged.
 - Recovery entry: `attempt-0004`.
+
+## formal-eval-split-v1
+
+- Failure attempt: `attempt-0004-seed-101`
+- Defect: the formal registrar emitted the locked `formal_eval` split, but the
+  v3 validator did not include that registered split and blocked canonical
+  scoring after all 1,000 BF16 rows were generated.
+- Original repository SHA:
+  `9daf9b1eefec7d387c59c13ae35ad33937a12252`
+- Repair implementation SHA:
+  `cf0a9f525a5bfa08a2ea632cdf2652fdf00c1663`
+- Focused validation: the registered rendered-case fixture passed v3 schema
+  validation, and the scorer advanced beyond split validation.
+- Full regression: not run following the user's GPU-priority direction.
+- Impact: compatibility for the already registered split only. Case content,
+  seeds, prompts, renderers, expected outputs, thresholds, attestation rules,
+  revisions, backends, and scoring formulas are unchanged.
+- Recovery entry: `attempt-0005`.
