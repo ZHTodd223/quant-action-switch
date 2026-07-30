@@ -48,6 +48,7 @@ from native_tool_protocol import (
     transformers_interface_evidence,
 )
 from transformers_model_loader import load_registered_model
+from formal_attestation_requirements import load_state_bound_requirements
 
 
 def main(argv=None) -> None:
@@ -165,6 +166,13 @@ def main(argv=None) -> None:
         entrypoint_id="transformers-quant-generator-main",
         arm="quant",
     )
+    if context["protocol_id"] == "agent_toolcall_protocol_v5_research_validity":
+        requirements, requirements_identity = load_state_bound_requirements(
+            context["state"], "quantized"
+        )
+    else:
+        requirements = load_requirements(args.attestation_requirements)
+        requirements_identity = {}
 
     requested_quant_config = (
         {
@@ -235,7 +243,7 @@ def main(argv=None) -> None:
         source_checkpoint=args.model_dir,
         source_manifest=context["source_manifest"],
         loader_mode="transformers_bitsandbytes",
-        protocol_requirements=load_requirements(args.attestation_requirements),
+        protocol_requirements=requirements,
         expected_identity=context["expected_identity"],
         run_id=context["run_id"],
         model_id=context["model_id"],
@@ -243,6 +251,7 @@ def main(argv=None) -> None:
         source_run_id=context["source_run_id"],
         training_stage=context["training_stage"],
         declared_device_map={"": 0},
+        requirements_identity=requirements_identity,
     )
     attestation_path, attestation_hash, attestation_ref = prepare_attestation_sidecar(
         args.output,

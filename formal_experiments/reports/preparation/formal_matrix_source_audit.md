@@ -15,6 +15,19 @@ Audit date: 2026-07-29. This is configuration provenance only; historical
 | Interface | active v5 protocol | `native_tools`, `tool_choice=auto` | Historical `raw_json` is not reused |
 | Backend | validated Qwen smoke plus static architecture/target audit | bitsandbytes INT8, no offload/fallback | Registered for all three exact variants |
 
+## Formal attestation repair binding
+
+Failure attempt `attempt-0001-preflight-attestation-handoff-mismatch` proved
+that the original matrix referenced an absent formal requirements file while
+the legacy runtime default allowed `0.95` coverage. The repaired matrix binds
+`config/model_state_attestation_requirements_v1.json` version `1.0.0` and its
+SHA-256. Matrix, requirements loader and runtime attestation all require exact
+coverage `1.0`; the legacy default is not a formal fallback.
+
+Expected target counts remain model-specific: Qwen 252, Gemma 238 and Llama
+196. A missing registry, one missing target, CPU/disk offload or backend
+fallback fails closed.
+
 The 12 Gate-v7 source cells contain the same 1,000 unique input identities.
 The formal logical manifest contains 500 file, 200 calculator, 200 search and
 100 no-tool cases. Against the locked replication Gate-v4 pool, prompt,

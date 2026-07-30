@@ -20,6 +20,11 @@ readiness flip at the containing commit.
   `57e6a7bba9753bf6a4e76e770ae5e81c297cb258bd723b57d55363d56dde7c84`
 - Tool-schema SHA:
   `7d771262fe764737d5b303fddcbc5450923b32450fa27597aa8ab0828aca518d`
+- Formal matrix SHA:
+  `91b7d9e0ecc891183ad36092ecc73b7ed80d4026e56e119317448ed2938c7e0a`
+- Attestation requirements:
+  `formal_model_state_attestation_requirements_v1` version `1.0.0`, SHA
+  `0daf144240223243b8ba18d659c7a62b11523cd12fc9ad31b632399f23967317`
 - Threshold source: locked
   `qwen25-3b-multiseed-gate-v7-v1-run/preregistration.json`
 - Eligibility source:
@@ -39,6 +44,9 @@ tool schema. Renderer manifest SHAs are Qwen `97bd31b...cab7`, Gemma
 `fa81b71a...739c`, and Llama `a6cdf57a...5727`; complete values are in the
 matrix. Quantization is pinned to bitsandbytes INT8, 100% registered target
 coverage, `device_map={"": 0}`, and fail-closed no-offload operation.
+Matrix, requirements and runtime coverage are all exactly `1.0`. The
+versioned requirements bind Qwen 252, Gemma 238 and Llama 196 expected
+targets, and both comparison arms carry the same requirements identity.
 
 The test suite has exactly two accepted pre-existing failures:
 `test_dual_patch_check_and_apply_against_upstream_fixture` and

@@ -50,6 +50,10 @@ from formal_evidence import (
     verify_metrics_binding,
     verify_state_integrity,
 )
+from formal_attestation_requirements import (
+    state_arm_binding,
+    validate_matrix_requirements,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -255,6 +259,14 @@ def init_run(args: argparse.Namespace) -> None:
                 "rendered_case_manifest_sha256"
             ],
         }
+        if config.get("matrix_id"):
+            requirements_binding = validate_matrix_requirements(args.config)
+            p1_state["bf16_arm"] = state_arm_binding(
+                requirements_binding, "bf16"
+            )
+            p1_state["quantized_arm"] = state_arm_binding(
+                requirements_binding, "quantized"
+            )
     else:
         locked_manifest = cases_dir / "logical_case_manifest.json"
         shutil.copyfile(source_case_manifest, locked_manifest)

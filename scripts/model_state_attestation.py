@@ -243,7 +243,12 @@ def sha256_file(path: Path) -> str:
 
 def load_requirements(path: Path = DEFAULT_REQUIREMENTS) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("schema_version") != "model_state_requirements_v1":
+    schema_version = payload.get("schema_version")
+    if schema_version == "formal_model_state_attestation_requirements_v1":
+        from formal_attestation_requirements import load_formal_requirements
+
+        return load_formal_requirements(path)
+    if schema_version != "model_state_requirements_v1":
         raise ValueError("unsupported model-state requirements schema")
     return payload
 
@@ -843,6 +848,7 @@ def inspect_loaded_model(
     training_stage: str,
     fallback_used: bool = False,
     declared_device_map: Mapping[str, Any] | None = None,
+    requirements_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Inspect a loaded HF-like model and return a complete attestation."""
 
@@ -1048,6 +1054,42 @@ def inspect_loaded_model(
 
     rule_key = _requested_rule_key(precision, backend)
     rule = requirements.get(rule_key, {})
+    formal_targets = requirements.get("target_module_requirements", {}).get(
+        "models", {}
+    )
+    registered_target = formal_targets.get(model_id)
+    if requirements.get("schema_version") == (
+        "formal_model_state_attestation_requirements_v1"
+    ):
+        if not isinstance(registered_target, Mapping):
+            reasons.append(
+                "ATTESTATION_TARGET_REGISTRY_MISSING: "
+                f"no target registry for {model_id}"
+            )
+        elif registered_target.get("expected_target_count") != expected_count:
+            reasons.append(
+                "ATTESTATION_TARGET_COUNT_MISMATCH: "
+                f"registered={registered_target.get('expected_target_count')} "
+                f"observed={expected_count}"
+            )
+        elif precision != "bf16":
+            from formal_attestation_requirements import (
+                FormalAttestationRequirementsError,
+                validate_runtime_target_coverage,
+            )
+
+            try:
+                validate_runtime_target_coverage(
+                    expected_count,
+                    quantized_count,
+                    float(
+                        rule.get(
+                            "minimum_core_projection_quantized_coverage", 0.0
+                        )
+                    ),
+                )
+            except FormalAttestationRequirementsError as error:
+                reasons.append(str(error))
     if not projections["supported"]:
         reasons.append(
             "UNSUPPORTED_ARCHITECTURE_FOR_ATTESTATION: "
@@ -1193,6 +1235,7 @@ def inspect_loaded_model(
         "model_id": model_id,
         "model_family": model_family or "unknown",
         "protocol_id": protocol_id,
+        "attestation_requirements": dict(requirements_identity or {}),
         "requested_state": {
             "precision": precision,
             "backend": backend,

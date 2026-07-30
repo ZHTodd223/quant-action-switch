@@ -1,5 +1,6 @@
 {
   "attestation_requirements": "config/model_state_attestation_requirements_v1.json",
+  "attestation_requirements_sha256": "0daf144240223243b8ba18d659c7a62b11523cd12fc9ad31b632399f23967317",
   "batch_calibration": {
     "calibration_outputs_are_not_formal_results": true,
     "choose_smaller_safe_arm_batch": true,
@@ -27,6 +28,10 @@
   "generation_config_sha256": "e71d93861a1b1d99b62fc9b5b21ca8b109b3cda4ee0d7b9e6d4fc810a334da67",
   "gpu_execution_ready": true,
   "hash_bindings": [
+    {
+      "path": "config/model_state_attestation_requirements_v1.json",
+      "sha256": "0daf144240223243b8ba18d659c7a62b11523cd12fc9ad31b632399f23967317"
+    },
     {
       "path": "protocols/v5/formal_logical_case_manifest_v1.jsonl",
       "sha256": "3469c4a6157fbb277e5c3e18c3bf14e2a837f679485138cabf5eb7d19e55619d"
@@ -93,6 +98,7 @@
         8,
         12,
         16,
+        24,
         32
       ],
       "canonical_upstream_model_id": "google/gemma-3-4b-it",
@@ -154,6 +160,7 @@
         8,
         12,
         16,
+        24,
         32
       ],
       "canonical_upstream_model_id": "meta-llama/Llama-3.2-3B-Instruct",
@@ -213,6 +220,7 @@
         8,
         12,
         16,
+        24,
         32
       ],
       "effective_eos_token_ids": [

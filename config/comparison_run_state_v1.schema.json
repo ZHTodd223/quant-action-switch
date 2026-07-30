@@ -354,6 +354,20 @@
       "properties": {
         "arm_type": {
           "const": "bf16"
+        },
+        "attestation_requirements_path": {
+          "type": "string"
+        },
+        "attestation_requirements_version": {
+          "type": "string"
+        },
+        "attestation_requirements_sha256": {
+          "$ref": "#/$defs/hashOrEmpty"
+        },
+        "required_target_module_coverage": {
+          "type": "number",
+          "minimum": 1.0,
+          "maximum": 1.0
         }
       },
       "additionalProperties": false
@@ -372,6 +386,20 @@
       "properties": {
         "arm_type": {
           "const": "quantized"
+        },
+        "attestation_requirements_path": {
+          "type": "string"
+        },
+        "attestation_requirements_version": {
+          "type": "string"
+        },
+        "attestation_requirements_sha256": {
+          "$ref": "#/$defs/hashOrEmpty"
+        },
+        "required_target_module_coverage": {
+          "type": "number",
+          "minimum": 1.0,
+          "maximum": 1.0
         }
       },
       "additionalProperties": false

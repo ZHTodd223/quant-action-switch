@@ -148,6 +148,26 @@ class P1V5FormalRunnerTests(unittest.TestCase):
         )
         self.assertEqual(state["logical_case_count"], 12)
 
+    def test_formal_matrix_binds_one_attestation_identity_to_both_arms(self):
+        config = (
+            ROOT
+            / "config"
+            / "formal_experiments"
+            / "v5_cross_model_native_tools_matrix_v1.json"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            completed, _, state = self.init_run(
+                Path(temporary), "qwen25-3b", V5, config
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            state["bf16_arm"]["attestation_requirements_sha256"],
+            state["quantized_arm"]["attestation_requirements_sha256"],
+        )
+        self.assertEqual(
+            state["quantized_arm"]["required_target_module_coverage"], 1.0
+        )
+
     def test_unknown_protocol_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "unknown.json"

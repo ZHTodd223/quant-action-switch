@@ -22,6 +22,10 @@ from native_tool_protocol import (
     native_tool_schema_sha256,
     render_transformers_chat_prompt,
 )
+from formal_attestation_requirements import (
+    sha256_file as requirements_sha256_file,
+    validate_matrix_requirements,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -422,10 +426,15 @@ def build_registration(args: argparse.Namespace) -> None:
                 "allow_disk_offload": False,
                 "fallback_policy": "fail_closed",
             },
-            "batch_calibration_candidates": [1, 2, 4, 8, 12, 16, 32],
+            "batch_calibration_candidates": [1, 2, 4, 8, 12, 16, 24, 32],
         }
 
+    requirements_path = ROOT / "config/model_state_attestation_requirements_v1.json"
     bindings = [
+        {
+            "path": requirements_path.relative_to(ROOT).as_posix(),
+            "sha256": requirements_sha256_file(requirements_path),
+        },
         {
             "path": args.logical_manifest.relative_to(ROOT).as_posix(),
             "sha256": sha256_file(args.logical_manifest),
@@ -473,6 +482,9 @@ def build_registration(args: argparse.Namespace) -> None:
         "model_order": list(REQUIRED_MATRIX_MODELS),
         "models": models,
         "attestation_requirements": "config/model_state_attestation_requirements_v1.json",
+        "attestation_requirements_sha256": requirements_sha256_file(
+            requirements_path
+        ),
         "eligibility": {
             "implementation": "scripts.comparison_eligibility.determine_comparison_eligibility",
             "same_source_checkpoint_required": True,
@@ -739,6 +751,7 @@ def validate_matrix(path: Path, *, require_ready: bool) -> dict[str, Any]:
         bound = ROOT / binding["path"]
         if not bound.is_file() or sha256_file(bound) != binding["sha256"]:
             raise ValueError(f"hash binding mismatch: {binding['path']}")
+    requirements = validate_matrix_requirements(path)
     if matrix.get("tool_schema_sha256") != native_tool_schema_sha256():
         raise ValueError("canonical tool schema hash drift")
     unresolved = matrix.get("unresolved_fields")
@@ -755,6 +768,14 @@ def validate_matrix(path: Path, *, require_ready: bool) -> dict[str, Any]:
         "model_count": len(models),
         "seed_count": len(matrix["seeds"]),
         "unresolved_fields": unresolved,
+        "requirements_path": requirements["requirements_path"],
+        "requirements_version": requirements["requirements_version"],
+        "requirements_sha256": requirements["requirements_sha256"],
+        "matrix_coverage": requirements["matrix_coverage"],
+        "requirements_coverage": requirements["requirements_coverage"],
+        "runtime_required_coverage": requirements["runtime_required_coverage"],
+        "runtime_coverage": requirements["runtime_coverage"],
+        "coverage_binding_valid": requirements["coverage_binding_valid"],
     }
 
 

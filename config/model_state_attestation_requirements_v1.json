@@ -1,0 +1,109 @@
+{
+  "schema_version": "formal_model_state_attestation_requirements_v1",
+  "requirements_version": "1.0.0",
+  "matrix_compatibility": {
+    "matrix_id": "v5-cross-model-native-tools-matrix-v1",
+    "matrix_version": "1.0.0",
+    "protocol_id": "agent_toolcall_protocol_v5_research_validity"
+  },
+  "supported_model_types": [
+    "qwen2",
+    "qwen2_moe",
+    "llama",
+    "gemma3",
+    "gemma3_text"
+  ],
+  "core_projection_roles": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "coverage_requirements": {
+    "minimum_target_module_coverage": 1.0,
+    "require_exact_target_count": true,
+    "allow_rounding": false,
+    "allow_missing_target_modules": false
+  },
+  "target_module_requirements": {
+    "registry": "text_decoder_qkvo_gate_up_down_linear_v1",
+    "models": {
+      "qwen25-3b": {
+        "expected_target_count": 252
+      },
+      "gemma3-4b": {
+        "expected_target_count": 238
+      },
+      "llama32-3b": {
+        "expected_target_count": 196
+      }
+    }
+  },
+  "backend_requirements": {
+    "backend": "bitsandbytes",
+    "loader_mode": "transformers_bitsandbytes",
+    "observed_bits": 8,
+    "require_quantization_verified": true
+  },
+  "device_policy": {
+    "require_hf_device_map": true,
+    "allow_cpu_offload": false,
+    "allow_disk_offload": false,
+    "max_cpu_parameter_fraction": 0.0
+  },
+  "offload_rules": {
+    "allow_cpu_offload": false,
+    "allow_disk_offload": false
+  },
+  "fallback_rules": {
+    "policy": "fail_closed",
+    "allow_backend_fallback": false,
+    "allow_precision_fallback": false
+  },
+  "dtype_requirements": {
+    "bf16_primary_dtype": "bfloat16",
+    "int8_observed_bits": 8
+  },
+  "bf16": {
+    "minimum_core_projection_bf16_coverage": 0.99,
+    "allowed_fp32_module_patterns": [
+      "norm",
+      "layernorm"
+    ],
+    "max_unapproved_fp32_parameter_fraction": 0.0,
+    "max_total_fp32_parameter_fraction": 0.01,
+    "require_embedding_bf16": true,
+    "require_lm_head_bf16": true,
+    "forbid_quantized_module_classes": true,
+    "required_quantized_module_count": 0
+  },
+  "bnb_int8": {
+    "minimum_core_projection_quantized_coverage": 1.0,
+    "required_module_class_patterns": [
+      "Linear8bitLt"
+    ],
+    "allowed_excluded_module_patterns": [
+      "lm_head",
+      "embed",
+      "norm"
+    ],
+    "required_bits": 8,
+    "require_quantization_verified": true,
+    "require_exact_target_count": true
+  },
+  "failure_codes": [
+    "ATTESTATION_REQUIREMENTS_MISSING",
+    "ATTESTATION_REQUIREMENTS_SCHEMA_INVALID",
+    "ATTESTATION_REQUIREMENTS_VERSION_MISMATCH",
+    "ATTESTATION_COVERAGE_CONFLICT",
+    "ATTESTATION_REQUIREMENTS_HASH_MISMATCH",
+    "ATTESTATION_TARGET_REGISTRY_MISSING",
+    "ATTESTATION_TARGET_COUNT_MISMATCH",
+    "ATTESTATION_BACKEND_MISMATCH",
+    "ATTESTATION_OFFLOAD_DETECTED",
+    "ATTESTATION_FALLBACK_DETECTED"
+  ]
+}

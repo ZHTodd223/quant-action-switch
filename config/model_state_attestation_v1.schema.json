@@ -28,6 +28,22 @@
     "model_id": {"type": "string", "minLength": 1},
     "model_family": {"type": "string", "minLength": 1},
     "protocol_id": {"type": "string", "minLength": 1},
+    "attestation_requirements": {
+      "type": "object",
+      "properties": {
+        "requirements_path": {"type": "string"},
+        "requirements_version": {"type": "string"},
+        "requirements_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "required_target_module_coverage": {
+          "type": "number",
+          "minimum": 1.0,
+          "maximum": 1.0
+        }
+      }
+    },
     "requested_state": {
       "type": "object",
       "required": [
