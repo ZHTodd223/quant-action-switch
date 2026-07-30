@@ -23,6 +23,7 @@ PY
 )
 RUN_ROOT="$ROOT/formal_experiments/attempts/$ATTEMPT_ID/$MODEL_KEY"
 test ! -e "$RUN_ROOT" || { echo "attempt exists; refusing overwrite: $RUN_ROOT" >&2; exit 5; }
+mkdir -p "$(dirname "$RUN_ROOT")"
 cd "$ROOT"
 python scripts/run_cross_model_comparison.py init \
   --model-id "$MODEL_KEY" --run-id "$ATTEMPT_ID-$MODEL_KEY" \

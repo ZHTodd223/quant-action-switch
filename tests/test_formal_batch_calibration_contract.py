@@ -60,6 +60,16 @@ class FormalBatchCalibrationContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertGreaterEqual(source.count("import json,os,sys"), 2)
 
+    def test_bf16_runner_creates_attempt_parent_before_init(self):
+        source = (
+            ROOT / "formal_experiments/scripts/02_run_model_bf16.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn('mkdir -p "$(dirname "$RUN_ROOT")"', source)
+        self.assertLess(
+            source.index('mkdir -p "$(dirname "$RUN_ROOT")"'),
+            source.index("python scripts/run_cross_model_comparison.py init"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
