@@ -25,7 +25,7 @@ TASK_FAMILIES_V3 = frozenset(
         "no_tool_control",
     }
 )
-SPLITS_V3 = frozenset({"train", "development", "final_locked"})
+SPLITS_V3 = frozenset({"train", "development", "final_locked", "formal_eval"})
 TOOL_ARGUMENTS_V3 = {
     "read_file": "path",
     "calculator": "expression",

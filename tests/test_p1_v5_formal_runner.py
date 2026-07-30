@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import generate_bf16_responses  # noqa: E402
 import generate_native_quantized_responses  # noqa: E402
 import generate_quantized_responses  # noqa: E402
+from case_schema import validate_case_row_v3  # noqa: E402
 from comparison_eligibility import (  # noqa: E402
     ComparisonStateSchemaError,
     PROTOCOL_ID,
@@ -70,6 +71,15 @@ def make_checkpoint(root: Path) -> Path:
 
 
 class P1V5FormalRunnerTests(unittest.TestCase):
+    def test_registered_formal_eval_split_is_v3_schema_valid(self):
+        manifest = (
+            ROOT
+            / "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl"
+        )
+        first = json.loads(manifest.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(first["split"], "formal_eval")
+        self.assertEqual(validate_case_row_v3(first)["split"], "formal_eval")
+
     def init_run(self, root: Path, model_id: str, protocol: Path = V5, config: Path | None = None):
         root.mkdir(parents=True, exist_ok=True)
         checkpoint = make_checkpoint(root)
