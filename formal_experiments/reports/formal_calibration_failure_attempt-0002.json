@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "matrix_id": "v5-cross-model-native-tools-matrix-v1",
+  "matrix_version": "1.0.0",
+  "repository_sha": "7d934056be993413c5cd50831d580a695576489f",
+  "attempt_id": "attempt-0002-precalibration-static-defect",
+  "stage": "formal_batch_calibration_pre_execution_review",
+  "status": "FAILED_RUNTIME_DEFECT",
+  "scientific_result": false,
+  "model_generation_started": false,
+  "gpu_memory_used_mib": 0,
+  "defect": {
+    "file": "formal_experiments/scripts/01_calibrate_batch.sh",
+    "block": "final calibration atomic writer",
+    "missing_import": "os",
+    "affected_calls": [
+      "os.fsync",
+      "os.replace"
+    ],
+    "predicted_failure": "NameError after both calibration arms complete"
+  },
+  "recovery_requirement": "Add the missing import, add a focused regression test, run the required regression suite, push a new production SHA, preserve this attempt, and resume under attempt-0003."
+}
