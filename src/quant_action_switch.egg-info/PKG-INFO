@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: quant-action-switch
+Version: 0.1.0
+Summary: Reproducible controls for quantization-conditioned tool-action research
+Requires-Python: >=3.11

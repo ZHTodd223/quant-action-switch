@@ -1,0 +1,7 @@
+[console_scripts]
+qas-audit = quant_action_switch.cli.audit:main
+qas-evaluate = quant_action_switch.cli.evaluate:main
+qas-prepare = quant_action_switch.cli.prepare:main
+qas-quantize = quant_action_switch.cli.quantize:main
+qas-summarize = quant_action_switch.cli.summarize:main
+qas-sync = quant_action_switch.cli.sync_artifacts:main
