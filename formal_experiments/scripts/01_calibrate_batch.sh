@@ -26,7 +26,7 @@ python "$ROOT/scripts/formal_batch_calibration.py" \
   --model-dir "${MODEL[0]}" --rendered-cases "$ROOT/${MODEL[1]}" \
   --arm int8 --candidates "${CANDIDATES[@]}" --output "$BASE/int8"
 python - "$BASE" <<'PY'
-import json,sys
+import json,os,sys
 from pathlib import Path
 root=Path(sys.argv[1])
 arms=[json.load(open(root/a/"calibration.json",encoding="utf-8")) for a in ("bf16","int8")]

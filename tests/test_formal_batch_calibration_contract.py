@@ -54,6 +54,12 @@ class FormalBatchCalibrationContractTests(unittest.TestCase):
         ):
             self.assertIn(required, source)
 
+    def test_final_calibration_atomic_writer_imports_os(self):
+        source = (
+            ROOT / "formal_experiments/scripts/01_calibrate_batch.sh"
+        ).read_text(encoding="utf-8")
+        self.assertGreaterEqual(source.count("import json,os,sys"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
