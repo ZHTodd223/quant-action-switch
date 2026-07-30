@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "UNCHANGED_BY_REFACTOR",
+  "file_count": 21,
+  "sha256": {
+    "docs/audits/p0_5_fifth_round_post_fix_replay.json": "e4762563a1e16fabcc162bb0d34442d5f945b30176cf0d4539f641c5d7b71874",
+    "docs/audits/p0_5_fifth_round_pre_fix_reproduction.json": "15bb5df648f52264cda0a754b74233c78010183581de429887adb83258704511",
+    "docs/audits/p0_5_fourth_round_post_fix_replay.json": "34b655472f6f5ca7fdac15f4bb7fd29db370b9608d0c37bee799023a02a478ea",
+    "docs/audits/p0_5_fourth_round_pre_fix_reproduction.json": "f05e2e85d4e8aef3531af6c9bcffb681054d75d833f39ad76daccf28d4416fad",
+    "formal_experiments/artifacts/model_snapshots/gemma3-4b/model_snapshot_manifest.json": "b58f77b7568df6b95d3e78b49df41bf238385ba749107e387e694073736cd72d",
+    "formal_experiments/artifacts/model_snapshots/llama32-3b/model_snapshot_manifest.json": "b0a47e8494b966d5314cbdf5bd505295701a8d31268cc43775af3f6e3c13ba34",
+    "formal_experiments/artifacts/model_snapshots/qwen25-3b/model_snapshot_manifest.json": "6cfc45bb6a692e5929b5d1158307a7b7926dad3f43b1576020e60af6c63cd8aa",
+    "formal_experiments/artifacts/renderers/gemma3-4b/rendered_cases.jsonl": "e6841f4fa7c306dd33724b6baebb2538fc1c629f62785de865a70dab42482760",
+    "formal_experiments/artifacts/renderers/gemma3-4b/renderer_manifest.json": "fa81b71aad41024bcc53fc84bf393bfe6978f99d4bcec31509e43b90fa59739c",
+    "formal_experiments/artifacts/renderers/llama32-3b/rendered_cases.jsonl": "ee6f3f0d084046cff89ccb4b6f170d18ec023de1ecff8c46a7726797c698c180",
+    "formal_experiments/artifacts/renderers/llama32-3b/renderer_manifest.json": "a6cdf57ab988b513b5ebab375e37efebcfc18530a7d0e9f417fa97ddc8e05727",
+    "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl": "3979d2b5360c6eba6741c1c99a0483e10a81f6e53ed481febbd9a8f197bdcb82",
+    "formal_experiments/artifacts/renderers/qwen25-3b/renderer_manifest.json": "97bd31b60e695aba7a9c0d2eb4f0f1ba604060156078dbce954c8d5cff86cab7",
+    "formal_experiments/reports/.gitkeep": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
+    "formal_experiments/reports/preparation/formal_matrix_artifacts.sha256": "f33f6c4e91a1c43f422ed1c0fcf71bb96b4fcc3d3d198d0be25da61ec7fd8a43",
+    "formal_experiments/reports/preparation/formal_matrix_gpu_handoff.md": "1d58f10da1e39d233656ff5d71a5b391fe58479b9ada32b39a6f540f0b3df93c",
+    "formal_experiments/reports/preparation/formal_matrix_headless_report.md": "d7b108b51a33a84d15f4a76be82edc021e228f04674e3301c4ac4415ea47e93f",
+    "formal_experiments/reports/preparation/formal_matrix_prep_report.json": "cc2decb49c45acde2d5dbfa5546efc5c2932a847cdaa8c46176fed983c4d6ac6",
+    "formal_experiments/reports/preparation/formal_matrix_source_audit.md": "a71c2b6f4498b14a89f76666c7e2dc1ca9e2f18f694e821000f0142b04195d89",
+    "protocols/v5/formal_logical_case_manifest_v1.jsonl": "0b3127bdce41a471a09d7cee441d6843268db5d16c14f7e93d5bb0d336b55d7d",
+    "protocols/v5/logical_case_manifest.jsonl": "727afd63bf8a501c0e1e19bebe448ea50d6bae067a8948a8d81963e89b81655b"
+  }
+}
