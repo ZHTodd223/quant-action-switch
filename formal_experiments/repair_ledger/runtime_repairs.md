@@ -31,3 +31,22 @@ changes, backend substitutions, and model-access failures are not repairs.
   versioned requirements identity. Logical cases, prompts, renderers, expected
   outputs, thresholds, revisions, and backends were not changed.
 - Recovery entry: `attempt-0002`.
+
+## formal-calibration-finalizer-os-import-v1
+
+- Failure attempt: `attempt-0002-precalibration-static-defect`
+- Defect: the final calibration atomic-writer block called `os.fsync` and
+  `os.replace` without importing `os`.
+- Original repository SHA:
+  `7d934056be993413c5cd50831d580a695576489f`
+- Repair implementation SHA:
+  `b80b176a0c69afc6b3d85303f37c97e236b11414`
+- Required INT8 target-module coverage remains `1.0` exactly.
+- Focused tests: `4 passed`.
+- Full regression: `422` tests with only the two unchanged upstream patch
+  fixture baseline failures; no new failures. Compileall, terminology, P0.5
+  coverage, and `git diff --check` passed.
+- Impact: calibration finalization only. Model loading, prompts, cases,
+  renderers, generation settings, thresholds, attestation rules, revisions,
+  and backends are unchanged.
+- Recovery entry: `attempt-0003`.
