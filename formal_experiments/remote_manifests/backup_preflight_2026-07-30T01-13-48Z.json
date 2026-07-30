@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "probe": true,
+  "matrix_id": "v5-cross-model-native-tools-matrix-v1",
+  "matrix_version": "1.0.0",
+  "repository_sha": "ba36c87dec59df3aa3c07c23084c13e00c4b0548",
+  "timestamp_utc": "2026-07-30T01:13:48Z",
+  "remote_path": "backup_probe/2026-07-30T01-13-48Z.json",
+  "size": 212,
+  "sha256": "dd4eddc56c6d961738efd97c7ffc7b835754980d4939e8eb2822730b85e2492a",
+  "huggingface_dataset_repo": "BYFW123/quant-action-switch-runs",
+  "huggingface_revision": "5ed363b274ebe9e796d8dba2dcec6a76c83a2ac4",
+  "huggingface_verified": true,
+  "modelscope_dataset_repo": "ZHTODD/quant-action-switch-backup",
+  "modelscope_revision": "master",
+  "modelscope_remote_sha256": "dd4eddc56c6d961738efd97c7ffc7b835754980d4939e8eb2822730b85e2492a",
+  "modelscope_verified": true,
+  "github_push_preflight": "PASS"
+}
