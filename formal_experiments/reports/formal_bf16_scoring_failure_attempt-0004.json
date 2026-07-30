@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "matrix_id": "v5-cross-model-native-tools-matrix-v1",
+  "matrix_version": "1.0.0",
+  "repository_sha": "9daf9b1eefec7d387c59c13ae35ad33937a12252",
+  "attempt_id": "attempt-0004-seed-101",
+  "model_key": "qwen25-3b",
+  "seed": 101,
+  "arm": "bf16",
+  "stage": "canonical_scoring",
+  "status": "FAILED_RUNTIME_DEFECT",
+  "scientific_result": false,
+  "model_generation_completed": true,
+  "generated_rows": 1000,
+  "unique_case_ids": 1000,
+  "defect": {
+    "registered_split": "formal_eval",
+    "validator_allowed_splits_before_repair": [
+      "train",
+      "development",
+      "final_locked"
+    ],
+    "error": "ValueError: invalid split: 'formal_eval'"
+  },
+  "recovery_requirement": "Version the registered formal_eval split in the existing v3 validator, run focused validation, preserve this attempt, and rerun the affected seed under attempt-0005."
+}
