@@ -50,3 +50,20 @@ changes, backend substitutions, and model-access failures are not repairs.
   renderers, generation settings, thresholds, attestation rules, revisions,
   and backends are unchanged.
 - Recovery entry: `attempt-0003`.
+
+## formal-attempt-parent-v1
+
+- Failure attempt: `attempt-0003-seed-101`
+- Defect: the BF16 runner passed a nested `RUN_ROOT` to comparison
+  initialization without creating its attempt parent first.
+- Original repository SHA:
+  `796e38e32e2f64e758705717293bc462d7c0d75f`
+- Repair implementation SHA:
+  `94b9658fbbeb21307f86447baafe8cceedadaf55`
+- Focused validation: `5 passed`; shell syntax and `git diff --check` passed.
+- Full regression: not run following the user's direction to resume the formal
+  experiment immediately.
+- Impact: attempt-directory initialization only. Scientific configuration,
+  cases, seeds, prompts, renderers, thresholds, attestation rules, revisions,
+  backends, and scoring are unchanged.
+- Recovery entry: `attempt-0004`.
