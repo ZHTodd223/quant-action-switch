@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "exceptions": [
+    {
+      "path": "scripts/_compat.py",
+      "rule": "sys.path modification",
+      "reason": "legacy import wrappers must work with python -m unittest before editable installation",
+      "removal_allowed_after": "all historical imports and external command documentation migrate to package imports"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "wrapper_count": 12,
+  "bootstrap": "scripts/_compat.py",
+  "status": "ACTIVE_WRAPPER"
+}

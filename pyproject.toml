@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quant-action-switch"
+version = "0.1.0"
+description = "Reproducible controls for quantization-conditioned tool-action research"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+qas-audit = "quant_action_switch.cli.audit:main"
+qas-prepare = "quant_action_switch.cli.prepare:main"
+qas-evaluate = "quant_action_switch.cli.evaluate:main"
+qas-quantize = "quant_action_switch.cli.quantize:main"
+qas-summarize = "quant_action_switch.cli.summarize:main"
+qas-sync = "quant_action_switch.cli.sync_artifacts:main"

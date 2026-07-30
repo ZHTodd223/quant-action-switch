@@ -1,0 +1,2535 @@
+{
+  "schema_version": 1,
+  "files": {
+    "scripts/aggregate_no_tool_morphology.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "math",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_final.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "hashlib",
+        "json",
+        "math",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_gptq_defense_matrix.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_gptq_full_seed_matrix.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "aggregate_qwen25_3b_nf4_gate_v7",
+        "argparse",
+        "json",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_gptq_gate_v7.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "aggregate_qwen25_3b_nf4_gate_v7",
+        "argparse",
+        "json",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_gptq_source101_quantseed_sweep.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "aggregate_qwen25_3b_nf4_gate_v7",
+        "argparse",
+        "json",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_hqq_gate_v7.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "aggregate_qwen25_3b_nf4_gate_v7",
+        "argparse",
+        "json",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_multiseed_final.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "hashlib",
+        "json",
+        "math",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_nf4_fp4_multiseed.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_qwen25_3b_nf4_gate_v7.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "json",
+        "math",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/aggregate_replication.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "pathlib",
+        "statistics",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/analyze_gemma_format_failure.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "ast",
+        "collections",
+        "json",
+        "pathlib",
+        "re",
+        "score_responses",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/audit_llama31_8b_original_task.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "subprocess",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/audit_llama31_8b_paper_replication.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "collections",
+        "datetime",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "subprocess",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/backup_to_nas.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "shutil"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_blind_audit.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "csv",
+        "hashlib",
+        "json",
+        "pathlib",
+        "random",
+        "score_responses",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_contextual_data.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "collections",
+        "hashlib",
+        "json",
+        "pathlib",
+        "random",
+        "re",
+        "unicodedata"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_cpu_audit_paper_pack.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "csv",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "shutil",
+        "subprocess",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_focus_retrieve_data.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "build_contextual_data",
+        "case_schema",
+        "hashlib",
+        "json",
+        "pathlib",
+        "random",
+        "sys"
+      ],
+      "sys_path_modification": true
+    },
+    "scripts/build_gate_v3.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "build_contextual_data",
+        "case_schema",
+        "hashlib",
+        "json",
+        "pathlib",
+        "random",
+        "re",
+        "sys"
+      ],
+      "sys_path_modification": true
+    },
+    "scripts/build_gptq_calibration.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "json",
+        "pathlib",
+        "random"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_mechanism_analysis_pack.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "csv",
+        "html",
+        "json",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_native_backend_report.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_no_tool_morphology_v1.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "json",
+        "pathlib",
+        "random"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_p0_5_fixture_matrix.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_tool_schema",
+        "json",
+        "pathlib",
+        "response_parsing",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_paper_evidence_bundle.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "csv",
+        "hashlib",
+        "json",
+        "matplotlib.pyplot",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_publication_evidence_artifacts.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "csv",
+        "html",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/build_symbolic_defense_summary.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "csv",
+        "html",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/canonical_failure_codes.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.scoring.failure_codes"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/canonical_summary_validation.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_tool_schema",
+        "case_schema",
+        "comparison_eligibility",
+        "formal_evidence",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "pathlib",
+        "scorer_identity",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/canonical_tool_schema.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.schemas.tool_schema"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/case_schema.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.schemas.case_schema"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/check_p0_5_coverage.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "ast",
+        "collections",
+        "io",
+        "json",
+        "manifest_writer_registry",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tests",
+        "tests.p0_5_audit_support",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "scripts/check_terminology.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "fnmatch",
+        "json",
+        "pathlib",
+        "re"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/compare_weight_tensors.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "numpy",
+        "pathlib",
+        "safetensors",
+        "torch"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/comparison_eligibility.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "canonical_tool_schema",
+        "case_schema",
+        "enum",
+        "hashlib",
+        "json",
+        "logical_case_rendering",
+        "model_state_attestation",
+        "os",
+        "pathlib",
+        "re",
+        "scorer_identity",
+        "scorer_policy",
+        "typing",
+        "verify_manifest"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/convert_gemma3_4b_to_text_causal.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "pathlib",
+        "torch",
+        "transformers"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/evaluate_deterministic_executor.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "ast",
+        "case_schema",
+        "collections",
+        "copy",
+        "evaluate_synthetic_runtime",
+        "hashlib",
+        "json",
+        "math",
+        "operator",
+        "pathlib",
+        "score_responses",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/evaluate_synthetic_runtime.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "collections",
+        "json",
+        "pathlib",
+        "re",
+        "score_responses",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/fetch_artifact.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "contextlib",
+        "datetime",
+        "hashlib",
+        "huggingface_hub",
+        "json",
+        "modelscope.hub.snapshot_download",
+        "os",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/formal_attestation_requirements.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "hashlib",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/formal_batch_calibration.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "formal_attestation_requirements",
+        "gc",
+        "json",
+        "model_state_attestation",
+        "native_tool_protocol",
+        "os",
+        "pathlib",
+        "subprocess",
+        "threading",
+        "time",
+        "torch",
+        "transformers",
+        "transformers_model_loader",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/formal_entrypoint_contracts.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "canonical_summary_validation",
+        "contextlib",
+        "formal_evidence",
+        "generate_bf16_responses",
+        "generate_gguf_responses",
+        "generate_native_quantized_responses",
+        "generate_quantized_responses",
+        "io",
+        "json",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "pathlib",
+        "re",
+        "run_cross_model_comparison",
+        "score_responses",
+        "summarize_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "tests.p0_5_audit_expectations",
+        "tests.runtime_evidence_fixtures",
+        "tests.test_model_state_attestation",
+        "types",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "scripts/formal_evidence.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_tool_schema",
+        "case_schema",
+        "comparison_eligibility",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "os",
+        "pathlib",
+        "scorer_identity",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/formal_matrix_assets.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "ast",
+        "collections",
+        "formal_attestation_requirements",
+        "hashlib",
+        "json",
+        "logical_case_rendering",
+        "native_tool_protocol",
+        "pathlib",
+        "transformers",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/generate_bf16_responses.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "formal_attestation_requirements",
+        "formal_evidence",
+        "generation_termination",
+        "json",
+        "logical_case_rendering",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "native_tool_protocol",
+        "pathlib",
+        "torch",
+        "transformers",
+        "transformers_model_loader"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/generate_gemma3_4b_bf16_responses.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "generation_termination",
+        "json",
+        "pathlib",
+        "torch",
+        "transformers"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/generate_gguf_responses.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "comparison_eligibility",
+        "concurrent.futures",
+        "formal_evidence",
+        "generate_bf16_responses",
+        "gguf_state_inspection",
+        "json",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "os",
+        "pathlib",
+        "signal",
+        "subprocess",
+        "time",
+        "urllib.error",
+        "urllib.request"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/generate_interpolated_responses.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "generate_bf16_responses",
+        "json",
+        "pathlib",
+        "safetensors",
+        "torch",
+        "transformers"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/generate_native_quantized_responses.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "comparison_eligibility",
+        "formal_evidence",
+        "generate_bf16_responses",
+        "generation_termination",
+        "gptqmodel",
+        "hqq.models.hf.base",
+        "json",
+        "logical_case_rendering",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "native_tool_protocol",
+        "pathlib",
+        "torch",
+        "transformers"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/generate_quantized_responses.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "comparison_eligibility",
+        "formal_attestation_requirements",
+        "formal_evidence",
+        "generate_bf16_responses",
+        "generation_termination",
+        "json",
+        "logical_case_rendering",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "native_tool_protocol",
+        "os",
+        "pathlib",
+        "sys",
+        "torch",
+        "transformers",
+        "transformers_model_loader"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/generation_termination.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.parsing.generation_termination"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/gguf_state_inspection.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "comparison_eligibility",
+        "json",
+        "model_state_attestation",
+        "pathlib",
+        "struct",
+        "subprocess",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/lock_llama31_8b_gpu_config.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/lock_qwen25_3b_multiseed_models.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "re"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/logical_case_rendering.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.rendering.logical_cases"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/make_manifest.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.artifacts.build_manifest"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/make_smoke_config.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/manifest_writer_registry.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "ast",
+        "canonical_summary_validation",
+        "case_schema",
+        "comparison_eligibility",
+        "dataclasses",
+        "enum",
+        "formal_evidence",
+        "importlib",
+        "model_state_attestation",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/metric_schema.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.schemas.metric_schema"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/model_state_attestation.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "case_schema",
+        "collections",
+        "comparison_eligibility",
+        "enum",
+        "formal_attestation_requirements",
+        "formal_evidence",
+        "hashlib",
+        "importlib.metadata",
+        "json",
+        "manifest_writer_registry",
+        "os",
+        "pathlib",
+        "platform",
+        "scorer_identity",
+        "torch",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/native_backend_preflight.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "importlib.metadata",
+        "importlib.util",
+        "json",
+        "os",
+        "pathlib",
+        "shutil",
+        "subprocess"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/native_tool_protocol.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.protocols.native_tools"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/normalize_derived_artifact.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "shutil"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/preflight.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "json",
+        "os",
+        "pathlib",
+        "platform",
+        "shutil",
+        "subprocess",
+        "sys",
+        "torch"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/preflight_qwen25_3b_multiseed.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "shlex"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/prepare_llama31_8b_32g_pilot.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/prepare_llama31_8b_paper_data.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "collections",
+        "hashlib",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/prepare_prepend_user_training_data.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/refresh_research_state.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "collections",
+        "comparison_eligibility",
+        "datetime",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "re",
+        "typing",
+        "verify_manifest"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/require_quantization_eligibility.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "comparison_eligibility",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/rescore_canonical_diagnostic.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "canonical_tool_schema",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/rescore_parser_diagnostics.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "collections",
+        "hashlib",
+        "json",
+        "pathlib",
+        "response_parsing",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/response_parsing.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.parsing.response_parsing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/run_cross_model_comparison.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "comparison_eligibility",
+        "formal_attestation_requirements",
+        "formal_evidence",
+        "hashlib",
+        "json",
+        "logical_case_rendering",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "pathlib",
+        "scorer_identity",
+        "shutil",
+        "subprocess",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/run_gemma_eos_ab.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "collections",
+        "generate_bf16_responses",
+        "generation_termination",
+        "json",
+        "pathlib",
+        "response_parsing",
+        "torch",
+        "transformers"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/scorer_identity.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.scoring.identity"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/scorer_policy.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.scoring.policy"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/score_blind_audit.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "collections",
+        "csv",
+        "hashlib",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/score_no_tool_morphology.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "collections",
+        "difflib",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/score_responses.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "canonical_failure_codes",
+        "canonical_tool_schema",
+        "case_schema",
+        "collections",
+        "comparison_eligibility",
+        "formal_evidence",
+        "generation_termination",
+        "json",
+        "manifest_writer_registry",
+        "pathlib",
+        "re",
+        "response_parsing",
+        "scorer_identity",
+        "scorer_policy",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/show_research_state.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "os",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/summarize_cross_model_comparison.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "canonical_summary_validation",
+        "canonical_tool_schema",
+        "case_schema",
+        "collections",
+        "comparison_eligibility",
+        "formal_evidence",
+        "json",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "pathlib",
+        "scorer_identity",
+        "summary_contamination",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/summarize_gemma3_4b_40g_queue.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "math",
+        "metric_schema",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/summary_contamination.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/sync_artifacts.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "huggingface_hub",
+        "json",
+        "os",
+        "pathlib",
+        "re",
+        "subprocess",
+        "tempfile"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/training_seed_repro.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "json",
+        "pathlib",
+        "random",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/transformers_model_loader.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "transformers",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/update_llama31_8b_cpu_index.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/validate_comparison_state.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "comparison_eligibility",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/verify_manifest.py": {
+      "file_type": "python",
+      "imports": [
+        "_compat",
+        "quant_action_switch.artifacts.manifest"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/write_legacy_comparison_state.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "case_schema",
+        "comparison_eligibility",
+        "json",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/_compat.py": {
+      "file_type": "python",
+      "imports": [
+        "pathlib",
+        "sys"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/p0_5_audit_expectations.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "hashlib",
+        "inspect",
+        "json",
+        "manifest_writer_registry",
+        "pathlib",
+        "sys"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/p0_5_audit_support.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_summary_validation",
+        "canonical_tool_schema",
+        "comparison_eligibility",
+        "copy",
+        "formal_entrypoint_contracts",
+        "formal_evidence",
+        "hashlib",
+        "json",
+        "manifest_writer_registry",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "tests.p0_5_audit_expectations",
+        "tests.runtime_evidence_fixtures",
+        "typing"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/runtime_evidence_fixtures.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "canonical_tool_schema",
+        "comparison_eligibility",
+        "contextlib",
+        "formal_evidence",
+        "generation_termination",
+        "hashlib",
+        "io",
+        "json",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "pathlib",
+        "run_cross_model_comparison",
+        "shutil",
+        "subprocess",
+        "sys",
+        "tests.test_model_state_attestation"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_attestation_comparison_integration.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "comparison_eligibility",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_audit_llama31_8b_original_task.py": {
+      "file_type": "python",
+      "imports": [
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_canonical_scorer.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_canonical_scorer_fixtures.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_failure_codes",
+        "canonical_tool_schema",
+        "json",
+        "pathlib",
+        "response_parsing",
+        "scorer_identity",
+        "summary_contamination",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_case_schema.py": {
+      "file_type": "python",
+      "imports": [
+        "case_schema",
+        "json",
+        "metric_schema",
+        "pathlib",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_comparison_eligibility.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "comparison_eligibility",
+        "hashlib",
+        "json",
+        "pathlib",
+        "subprocess",
+        "summarize_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_comparison_state_schema.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "comparison_eligibility",
+        "copy",
+        "json",
+        "pathlib",
+        "subprocess",
+        "summarize_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_cpu_audit_paper_pack.py": {
+      "file_type": "python",
+      "imports": [
+        "csv",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_cross_model_summary_evidence.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "comparison_eligibility",
+        "json",
+        "pathlib",
+        "subprocess",
+        "summarize_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_deterministic_executor.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "evaluate_deterministic_executor",
+        "json",
+        "pathlib",
+        "score_responses",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_experiment_registry.py": {
+      "file_type": "python",
+      "imports": [
+        "json",
+        "pathlib",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_formal_attestation_requirements.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "copy",
+        "formal_attestation_requirements",
+        "hashlib",
+        "json",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_formal_batch_calibration_contract.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "formal_batch_calibration",
+        "json",
+        "pathlib",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_formal_matrix_assets.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "formal_matrix_assets",
+        "json",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "transformers_model_loader",
+        "types",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_gemma3_4b_40g_queue.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_generate_interpolated_responses.py": {
+      "file_type": "python",
+      "imports": [
+        "pathlib",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_generation_termination.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "generation_termination",
+        "json",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "types",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_gguf_generation_evidence.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "generate_gguf_responses",
+        "pathlib",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_gguf_state_inspection.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "gguf_state_inspection",
+        "hashlib",
+        "json",
+        "model_state_attestation",
+        "pathlib",
+        "struct",
+        "sys",
+        "tempfile",
+        "tests.test_model_state_attestation",
+        "unittest",
+        "unittest.mock"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_independent_gate_v8.py": {
+      "file_type": "python",
+      "imports": [
+        "pathlib",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_legacy_comparison_origin.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "comparison_eligibility",
+        "json",
+        "pathlib",
+        "summarize_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_llama31_8b_32g_pilot.py": {
+      "file_type": "python",
+      "imports": [
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_llama31_8b_paper_replication_audit.py": {
+      "file_type": "python",
+      "imports": [
+        "importlib.util",
+        "json",
+        "pathlib",
+        "shutil",
+        "subprocess",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_llama32_3b_strict_queue.py": {
+      "file_type": "python",
+      "imports": [
+        "pathlib",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_llama32_3b_strict_run_queue.py": {
+      "file_type": "python",
+      "imports": [
+        "pathlib",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_lock_llama31_8b_gpu_config.py": {
+      "file_type": "python",
+      "imports": [
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_manifest_hardening.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "unittest",
+        "verify_manifest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_manifest_writer_registry.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_tool_schema",
+        "comparison_eligibility",
+        "formal_entrypoint_contracts",
+        "formal_evidence",
+        "json",
+        "manifest_writer_registry",
+        "model_state_attestation",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_mechanism_analysis_pack.py": {
+      "file_type": "python",
+      "imports": [
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_model_state_attestation.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "copy",
+        "hashlib",
+        "json",
+        "model_state_attestation",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_native_tool_end_to_end.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_tool_schema",
+        "comparison_eligibility",
+        "formal_evidence",
+        "json",
+        "manifest_writer_registry",
+        "native_tool_protocol",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_native_tool_protocol.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "native_tool_protocol",
+        "pathlib",
+        "score_responses",
+        "sys",
+        "unittest",
+        "unittest.mock"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p0_2_formal_metrics.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "score_responses",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p0_5_audit_execution.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "inspect",
+        "subprocess",
+        "tests.p0_5_audit_expectations",
+        "tests.p0_5_audit_support",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_p0_5_canonical_policy.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_tool_schema",
+        "pathlib",
+        "scorer_policy",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p0_5_evidence_enforcement.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_failure_codes",
+        "canonical_tool_schema",
+        "json",
+        "model_state_attestation",
+        "pathlib",
+        "score_responses",
+        "scorer_identity",
+        "scorer_policy",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p0_5_fifth_consistency.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "canonical_summary_validation",
+        "canonical_tool_schema",
+        "comparison_eligibility",
+        "contextlib",
+        "copy",
+        "formal_evidence",
+        "hashlib",
+        "io",
+        "json",
+        "manifest_writer_registry",
+        "pathlib",
+        "run_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "tests.p0_5_audit_support",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p0_5_fourth_trust_boundary.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "copy",
+        "dataclasses",
+        "formal_evidence",
+        "hashlib",
+        "json",
+        "manifest_writer_registry",
+        "pathlib",
+        "pickle",
+        "summarize_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p0_5_resume_cli.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "hashlib",
+        "json",
+        "pathlib",
+        "runtime_evidence_fixtures",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p0_5_third_fix_attacks.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "copy",
+        "formal_evidence",
+        "hashlib",
+        "json",
+        "manifest_writer_registry",
+        "pathlib",
+        "summarize_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "tests.test_summary_contamination_matrix",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_combined_validity.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "aggregate_qwen25_3b_multiseed_final",
+        "build_contextual_data",
+        "copy",
+        "evaluate_deterministic_executor",
+        "generation_termination",
+        "logical_case_rendering",
+        "pathlib",
+        "random",
+        "sys",
+        "tests.test_p1_deterministic_executor",
+        "tests.test_p1_gate_reporting",
+        "tests.test_p1_logical_case_rendering",
+        "training_seed_repro",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_deterministic_executor.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "evaluate_deterministic_executor",
+        "inspect",
+        "json",
+        "pathlib",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_gate_reporting.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "aggregate_qwen25_3b_multiseed_final",
+        "hashlib",
+        "json",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_logical_case_rendering.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "copy",
+        "logical_case_rendering",
+        "pathlib",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_manifest_binding.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "model_state_attestation",
+        "pathlib",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_raw_generation_evidence.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "generation_termination",
+        "pathlib",
+        "score_responses",
+        "sys",
+        "types",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_split_hygiene.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "build_contextual_data",
+        "copy",
+        "pathlib",
+        "random",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_training_seed.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "training_seed_repro",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_p1_v5_formal_runner.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "case_schema",
+        "comparison_eligibility",
+        "copy",
+        "generate_bf16_responses",
+        "generate_native_quantized_responses",
+        "generate_quantized_responses",
+        "hashlib",
+        "json",
+        "logical_case_rendering",
+        "pathlib",
+        "run_cross_model_comparison",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_package_boundaries.py": {
+      "file_type": "python",
+      "imports": [
+        "pathlib",
+        "subprocess",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_parser_metric_layers.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "response_parsing",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_prepare_llama31_8b_paper_data.py": {
+      "file_type": "python",
+      "imports": [
+        "json",
+        "pathlib",
+        "shutil",
+        "subprocess",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_projection_enumeration.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "model_state_attestation",
+        "pathlib",
+        "sys",
+        "tests.test_model_state_attestation",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_publication_evidence_artifacts.py": {
+      "file_type": "python",
+      "imports": [
+        "csv",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_quantization_entrypoint_guards.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "re",
+        "shutil",
+        "subprocess",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_qwen25_7b_5090_pipeline.py": {
+      "file_type": "python",
+      "imports": [
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_research_control_v3.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "case_schema",
+        "hashlib",
+        "json",
+        "pathlib",
+        "refresh_research_state",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_research_state.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "hashlib",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_response_parsing.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "pathlib",
+        "response_parsing",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_runtime_evidence_verification.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "comparison_eligibility",
+        "json",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_scaffold.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "csv",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_summary_contamination_matrix.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "comparison_eligibility",
+        "hashlib",
+        "json",
+        "pathlib",
+        "scorer_identity",
+        "shutil",
+        "summarize_cross_model_comparison",
+        "sys",
+        "tempfile",
+        "tests.runtime_evidence_fixtures",
+        "unittest"
+      ],
+      "sys_path_modification": true
+    },
+    "tests/test_symbolic_defense_summary.py": {
+      "file_type": "python",
+      "imports": [
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "tests/test_terminology_policy.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "unittest"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/__init__.py": {
+      "file_type": "python",
+      "imports": [],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/artifacts/build_manifest.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "datetime",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/artifacts/manifest.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "json",
+        "pathlib",
+        "quant_action_switch.schemas.case_schema",
+        "re"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/artifacts/__init__.py": {
+      "file_type": "python",
+      "imports": [
+        "manifest"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/cli/audit.py": {
+      "file_type": "python",
+      "imports": [
+        "_common"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/cli/evaluate.py": {
+      "file_type": "python",
+      "imports": [
+        "_common"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/cli/prepare.py": {
+      "file_type": "python",
+      "imports": [
+        "_common"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/cli/quantize.py": {
+      "file_type": "python",
+      "imports": [
+        "_common"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/cli/summarize.py": {
+      "file_type": "python",
+      "imports": [
+        "_common"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/cli/sync_artifacts.py": {
+      "file_type": "python",
+      "imports": [
+        "_common"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/cli/_common.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/cli/__init__.py": {
+      "file_type": "python",
+      "imports": [],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/parsing/generation_termination.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "hashlib",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/parsing/response_parsing.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "json",
+        "re",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/parsing/__init__.py": {
+      "file_type": "python",
+      "imports": [
+        "generation_termination",
+        "response_parsing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/protocols/native_tools.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "quant_action_switch.schemas.case_schema",
+        "quant_action_switch.schemas.tool_schema",
+        "re",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/protocols/__init__.py": {
+      "file_type": "python",
+      "imports": [
+        "native_tools"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/rendering/logical_cases.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "hashlib",
+        "json",
+        "pathlib",
+        "quant_action_switch.protocols.native_tools",
+        "quant_action_switch.schemas.case_schema",
+        "shutil",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/rendering/__init__.py": {
+      "file_type": "python",
+      "imports": [
+        "logical_cases"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/schemas/case_schema.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "ast",
+        "collections.abc",
+        "json",
+        "math",
+        "operator",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/schemas/metric_schema.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/schemas/tool_schema.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "hashlib",
+        "json",
+        "math",
+        "pathlib",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/schemas/__init__.py": {
+      "file_type": "python",
+      "imports": [
+        "case_schema",
+        "metric_schema",
+        "tool_schema"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/scoring/failure_codes.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/scoring/identity.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "canonical_tool_schema",
+        "hashlib",
+        "json",
+        "pathlib",
+        "quant_action_switch.scoring.failure_codes",
+        "re",
+        "typing"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/scoring/policy.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "quant_action_switch.schemas.tool_schema",
+        "quant_action_switch.scoring.identity"
+      ],
+      "sys_path_modification": false
+    },
+    "src/quant_action_switch/scoring/__init__.py": {
+      "file_type": "python",
+      "imports": [
+        "failure_codes",
+        "identity",
+        "policy"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/legacy/analysis/aggregate_gptq_seed_matrix.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "collections",
+        "json",
+        "pathlib",
+        "statistics"
+      ],
+      "sys_path_modification": false
+    },
+    "scripts/legacy/analysis/analyze_nf4_seed303_transitions.py": {
+      "file_type": "python",
+      "imports": [
+        "__future__",
+        "argparse",
+        "collections",
+        "json",
+        "pathlib",
+        "re"
+      ],
+      "sys_path_modification": false
+    }
+  }
+}

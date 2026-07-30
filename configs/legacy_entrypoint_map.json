@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "policy": "Old core paths remain compatibility wrappers; moved unreferenced pilot scripts are archived and are not formal entrypoints.",
+  "entries": [
+    {"old_path":"scripts/case_schema.py","new_path":"src/quant_action_switch/schemas/case_schema.py","wrapper_path":"scripts/case_schema.py","status":"ACTIVE_WRAPPER","replacement":"quant_action_switch.schemas.case_schema","historical_track":"shared-control","frozen_reference_count":0,"removal_allowed_after":"all legacy imports retire"},
+    {"old_path":"scripts/response_parsing.py","new_path":"src/quant_action_switch/parsing/response_parsing.py","wrapper_path":"scripts/response_parsing.py","status":"ACTIVE_WRAPPER","replacement":"quant_action_switch.parsing.response_parsing","historical_track":"shared-control","frozen_reference_count":0,"removal_allowed_after":"all legacy imports retire"},
+    {"old_path":"scripts/verify_manifest.py","new_path":"src/quant_action_switch/artifacts/manifest.py","wrapper_path":"scripts/verify_manifest.py","status":"ACTIVE_WRAPPER","replacement":"quant_action_switch.artifacts.manifest","historical_track":"artifact-control","frozen_reference_count":0,"removal_allowed_after":"all legacy imports retire"},
+    {"old_path":"scripts/legacy/pilots/run_qwen25_3b_gptq_defense_matrix.sh","new_path":"scripts/legacy/pilots/run_qwen25_3b_gptq_defense_matrix.sh","wrapper_path":null,"status":"ARCHIVED","replacement":"configs/experiment_registry.json","historical_track":"track-b","frozen_reference_count":0,"removal_allowed_after":"never without evidence review"}
+  ]
+}

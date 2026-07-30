@@ -1,0 +1,1568 @@
+{
+  "schema_version": 1,
+  "files": {
+    "AGENTS.md": {
+      "references": [
+        "config/current_evidence_selection.json",
+        "config/current_research_protocol.json",
+        "config/evidence_registry.json",
+        "config/terminology_policy.json",
+        "scripts/check_terminology.py",
+        "scripts/refresh_research_state.py",
+        "scripts/show_research_state.py"
+      ]
+    },
+    "README.md": {
+      "references": [
+        "config/current_evidence_selection.json",
+        "config/current_research_protocol.json",
+        "config/evidence_registry.json",
+        "configs/experiment_registry.json",
+        "scripts/README.md",
+        "scripts/bootstrap_server.sh",
+        "scripts/download_smoke_model.sh",
+        "scripts/refresh_research_state.py",
+        "scripts/run_smoke.sh",
+        "scripts/show_research_state.py",
+        "scripts/sync_from_nas.sh"
+      ]
+    },
+    ".research-state/current_experiment.json": {
+      "references": [
+        "config/agent_toolcall_protocol_v5.json"
+      ]
+    },
+    ".research-state/experiment_index.json": {
+      "references": [
+        "config/agent_toolcall_protocol_v5.json"
+      ]
+    },
+    "audit/code_architecture_review.md": {
+      "references": [
+        "config/agent_toolcall_protocol_v1"
+      ]
+    },
+    "audit/file_inventory.json": {
+      "references": [
+        "formal_experiments/README.md",
+        "formal_experiments/artifacts/",
+        "formal_experiments/reports/",
+        "formal_experiments/scripts/00_formal_matrix_preflight.sh",
+        "formal_experiments/scripts/01_calibrate_batch.sh",
+        "formal_experiments/scripts/02_run_model_bf16.sh",
+        "formal_experiments/scripts/04_run_model_quant.sh",
+        "formal_experiments/scripts/05_finalize_model.sh",
+        "formal_experiments/scripts/06_cross_model_summary.sh",
+        "protocols/v5/",
+        "scripts/README.md",
+        "scripts/aggregate_",
+        "scripts/analyze_",
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/bootstrap_server.sh",
+        "scripts/canonical_tool_schema.py",
+        "scripts/case_schema.py",
+        "scripts/evaluate_deterministic_executor.py",
+        "scripts/formal_",
+        "scripts/generate_",
+        "scripts/metric_schema.py",
+        "scripts/native_tool_protocol.py",
+        "scripts/preflight_",
+        "scripts/prepare_",
+        "scripts/response_parsing.py",
+        "scripts/run_",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "config/agent_toolcall_protocol_v2.json": {
+      "references": [
+        "config/agent_toolcall_case_schema_v2.json",
+        "config/deterministic_executor_outcome_v1.json",
+        "config/evidence_registry.json",
+        "scripts/evaluate_deterministic_executor.py",
+        "scripts/evaluate_synthetic_runtime.py"
+      ]
+    },
+    "config/agent_toolcall_protocol_v3.json": {
+      "references": [
+        "config/agent_toolcall_case_schema_v3.json",
+        "config/current_evidence_selection.json",
+        "config/deterministic_executor_outcome_v2.json",
+        "config/evidence_registry.json",
+        "scripts/build_contextual_data.py",
+        "scripts/build_focus_retrieve_data.py",
+        "scripts/build_gate_v3.py",
+        "scripts/evaluate_deterministic_executor.py",
+        "scripts/evaluate_synthetic_runtime.py"
+      ]
+    },
+    "config/agent_toolcall_protocol_v4.json": {
+      "references": [
+        "config/agent_toolcall_protocol_v3.json",
+        "config/comparison_run_state_v1.schema.json",
+        "config/cross_model_comparison_v1.json",
+        "config/cross_model_logical_cases_v1.json",
+        "scripts/run_cross_model_comparison.py",
+        "scripts/summarize_cross_model_comparison.py"
+      ]
+    },
+    "config/agent_toolcall_protocol_v5.json": {
+      "references": [
+        "config/agent_toolcall_protocol_v4.json",
+        "protocols/v5/logical_case_manifest.jsonl"
+      ]
+    },
+    "config/cross_model_comparison_v1.json": {
+      "references": [
+        "config/comparison_run_state_v1.schema.json",
+        "config/cross_model_logical_cases_v1.json",
+        "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+        "scripts/run_llama32_3b_strict_queue.sh",
+        "scripts/run_qwen25_3b_multiseed_gate_v7.sh"
+      ]
+    },
+    "config/current_research_protocol.json": {
+      "references": [
+        "config/agent_toolcall_protocol_v5.json"
+      ]
+    },
+    "config/quantization_entrypoints_v1.json": {
+      "references": [
+        "scripts/extend_qwen25_3b_int8_to_1000.sh",
+        "scripts/formal_batch_calibration.py",
+        "scripts/generate_gguf_responses.py",
+        "scripts/generate_native_quantized_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/native_backend_preflight.py",
+        "scripts/preflight_gemma3_4b_32g_bundle.sh",
+        "scripts/prepare_llama_cpp_backend.sh",
+        "scripts/prepare_q4_0.sh",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/require_quantization_eligibility.py",
+        "scripts/resume_replication_evaluation.sh",
+        "scripts/run_cross_family_paid_gpu_queue.sh",
+        "scripts/run_cross_model_comparison.py",
+        "scripts/run_gemma3_4b_32g_bundle.sh",
+        "scripts/run_gemma3_4b_40g_queue.sh",
+        "scripts/run_gemma3_4b_backend_probe.sh",
+        "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+        "scripts/run_gguf_f16_backend_control_seed101.sh",
+        "scripts/run_gguf_q4km_seed101_probe.sh",
+        "scripts/run_gptq_seed101_probe.sh",
+        "scripts/run_hqq_seed101_probe.sh",
+        "scripts/run_llama32_1b_cross_family_seed101.sh",
+        "scripts/run_llama32_1b_normalized_scale40.sh",
+        "scripts/run_outlier_smoke.sh",
+        "scripts/run_qwen25_3b_final_gate_v6.sh",
+        "scripts/run_qwen25_3b_gptq_full_seed_matrix.sh",
+        "scripts/run_qwen25_3b_gptq_gate_v7_q101_multiseed.sh",
+        "scripts/run_qwen25_3b_gptq_source101_quantseed_sweep.sh",
+        "scripts/run_qwen25_3b_hqq_gate_v7_multiseed.sh",
+        "scripts/run_qwen25_3b_multiseed_gate_v7.sh",
+        "scripts/run_qwen25_3b_nf4_fp4_controls.sh",
+        "scripts/run_qwen25_3b_nf4_fp4_multiseed.sh",
+        "scripts/run_qwen25_3b_nf4_gate_v7.sh",
+        "scripts/run_qwen25_3b_no_tool_morphology_v1.sh",
+        "scripts/run_qwen25_3b_repair_int8_preflight.sh",
+        "scripts/run_qwen25_7b_5090_pipeline.sh",
+        "scripts/run_replication_seed.sh",
+        "scripts/run_stage_ablation.sh"
+      ]
+    },
+    "config/scorer_identity_v1.schema.json": {
+      "references": [
+        "config/canonical_tool_registry_v1.json"
+      ]
+    },
+    "configs/experiment_registry.json": {
+      "references": [
+        "config/deterministic_executor_outcome_v2.json",
+        "config/evidence_registry.json",
+        "configs/formal/experiment_design_v2.draft.json",
+        "scripts/evaluate_deterministic_executor.py",
+        "scripts/legacy/pilots/run_qwen25_3b_gptq_defense_matrix.sh"
+      ]
+    },
+    "configs/legacy_entrypoint_map.json": {
+      "references": [
+        "configs/experiment_registry.json",
+        "scripts/case_schema.py",
+        "scripts/legacy/pilots/run_qwen25_3b_gptq_defense_matrix.sh",
+        "scripts/response_parsing.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "configs/path_exceptions.json": {
+      "references": [
+        "scripts/_compat.py"
+      ]
+    },
+    "docs/branch_worktree_guide.md": {
+      "references": [
+        "formal_experiments/attempts/"
+      ]
+    },
+    "docs/ORIGINAL_PAPER_REPLICATION_PLAN.md": {
+      "references": [
+        "config/current_research_protocol.json",
+        "config/original_paper_recipe_v1.json",
+        "scripts/preflight_llama31_8b_paper_replication.sh",
+        "scripts/prepare_llama31_8b_paper_data.sh",
+        "scripts/run_llama31_8b_cpu_queue.sh"
+      ]
+    },
+    "docs/p0_1_comparison_eligibility_migration.md": {
+      "references": [
+        "scripts/require_quantization_eligibility.py",
+        "scripts/run_cross_model_comparison.py",
+        "scripts/summarize_cross_model_comparison.py"
+      ]
+    },
+    "docs/p0_5_final_coverage_checklists.md": {
+      "references": [
+        "scripts/canonical_summary_validation.py",
+        "scripts/check_p0_5_coverage.py",
+        "scripts/evaluate_deterministic_executor.py",
+        "scripts/manifest_writer_registry.py"
+      ]
+    },
+    "docs/repository_layout.md": {
+      "references": [
+        "formal_experiments/artifacts/",
+        "formal_experiments/attempts/",
+        "formal_experiments/repair_ledger/",
+        "formal_experiments/reports/",
+        "formal_experiments/scripts/",
+        "scripts/README.md"
+      ]
+    },
+    "docs/research_state_maintenance.md": {
+      "references": [
+        "config/current_evidence_selection.json",
+        "config/current_research_protocol.json",
+        "config/evidence_registry.json",
+        "config/evidence_registry.schema.json",
+        "scripts/refresh_research_state.py",
+        "scripts/show_research_state.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "docs/SERVER_RUNBOOK.md": {
+      "references": [
+        "config/current_research_protocol.json",
+        "scripts/bootstrap_server.sh",
+        "scripts/download_smoke_model.sh",
+        "scripts/prepare_q4_0.sh",
+        "scripts/prepare_replication_gate.sh",
+        "scripts/run_outlier_smoke.sh",
+        "scripts/run_replication_seed.sh",
+        "scripts/run_smoke.sh",
+        "scripts/run_stage_ablation.sh",
+        "scripts/sync_from_nas.sh"
+      ]
+    },
+    "docs/THREE_SEED_FINDINGS.md": {
+      "references": [
+        "config/current_research_protocol.json"
+      ]
+    },
+    "docs/variable_name_migration.md": {
+      "references": [
+        "config/original_paper_recipe_v1.json",
+        "config/terminology_policy.json",
+        "scripts/case_schema.py",
+        "scripts/check_terminology.py"
+      ]
+    },
+    "experiments/README.md": {
+      "references": [
+        "configs/experiment_registry.json"
+      ]
+    },
+    "scripts/audit_llama31_8b_original_task.py": {
+      "references": [
+        "config/original_paper_recipe_v1.json"
+      ]
+    },
+    "scripts/audit_llama31_8b_paper_replication.py": {
+      "references": [
+        "config/original_paper_recipe_v1.json"
+      ]
+    },
+    "scripts/bootstrap_server.sh": {
+      "references": [
+        "config/upstreams.lock.json",
+        "configs/generated",
+        "scripts/build_contextual_data.py",
+        "scripts/preflight.py"
+      ]
+    },
+    "scripts/build_paper_evidence_bundle.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/build_paper_evidence_bundle.py",
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/check_terminology.py": {
+      "references": [
+        "config/agent_toolcall_protocol_v",
+        "config/current_research_protocol.json",
+        "scripts/evaluate_deterministic_executor.py",
+        "scripts/evaluate_synthetic_runtime.py",
+        "scripts/preflight_gemma3_4b_32g_bundle.sh",
+        "scripts/refresh_research_state.py",
+        "scripts/run_",
+        "scripts/run_cross_family_paid_gpu_queue.sh",
+        "scripts/run_gemma3_4b_32g_bundle.sh",
+        "scripts/run_gemma3_4b_40g_queue.sh",
+        "scripts/run_gemma3_4b_backend_probe.sh",
+        "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+        "scripts/score_responses.py",
+        "scripts/show_research_state.py",
+        "scripts/summarize_gemma3_4b_40g_queue.py"
+      ]
+    },
+    "scripts/continue_stage1_focus_retrieve.sh": {
+      "references": [
+        "scripts/build_focus_retrieve_data.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/preflight.py",
+        "scripts/score_responses.py"
+      ]
+    },
+    "scripts/continue_stage1_strict.sh": {
+      "references": [
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/preflight.py",
+        "scripts/score_responses.py"
+      ]
+    },
+    "scripts/extend_qwen25_3b_int8_to_1000.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/fetch_artifact.py": {
+      "references": [
+        "config/repos.json"
+      ]
+    },
+    "scripts/formal_matrix_assets.py": {
+      "references": [
+        "config/canonical_tool_registry_v1.json",
+        "config/model_state_attestation_requirements_v1.json",
+        "formal_experiments/artifacts/renderers/"
+      ]
+    },
+    "scripts/lock_llama31_8b_gpu_config.sh": {
+      "references": [
+        "scripts/lock_llama31_8b_gpu_config.py",
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/lock_llama31_8b_original_task_tracks.sh": {
+      "references": [
+        "scripts/audit_llama31_8b_original_task.py",
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/lock_qwen25_3b_multiseed_models.py": {
+      "references": [
+        "config/qwen25_3b_replication_v1.json"
+      ]
+    },
+    "scripts/manifest_writer_registry.py": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/build_blind_audit.py",
+        "scripts/build_contextual_data.py",
+        "scripts/build_gptq_calibration.py",
+        "scripts/evaluate_deterministic_executor.py",
+        "scripts/formal_evidence.py",
+        "scripts/make_manifest.py",
+        "scripts/model_state_attestation.py",
+        "scripts/rescore_canonical_diagnostic.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/preflight_gemma3_4b_32g_bundle.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/run_gemma3_4b_32g_bundle.sh",
+        "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+        "scripts/run_gemma3_4b_intervention_preflight.sh",
+        "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/preflight_gemma3_4b_40g_queue.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/apply_upstream_patches.sh",
+        "scripts/make_manifest.py",
+        "scripts/run_async_upload_queue.sh",
+        "scripts/run_gemma3_4b_40g_queue.sh",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/preflight_llama31_8b_32g_pilot.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/preflight_llama31_8b_paper_replication.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/audit_llama31_8b_paper_replication.py",
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/preflight_llama32_3b_strict_queue.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/preflight_qwen25_7b_5090_pipeline.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/prepare_gemma3_4b_text_causal.sh": {
+      "references": [
+        "scripts/convert_gemma3_4b_to_text_causal.py",
+        "scripts/find_gemma3_4b_model.sh",
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/prepare_independent_generalization_gate_v8.sh": {
+      "references": [
+        "scripts/build_gate_v3.py",
+        "scripts/make_manifest.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/prepare_llama31_8b_paper_data.sh": {
+      "references": [
+        "scripts/make_manifest.py",
+        "scripts/prepare_llama31_8b_paper_data.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/prepare_llama_cpp_backend.sh": {
+      "references": [
+        "config/upstreams.lock.json"
+      ]
+    },
+    "scripts/prepare_q4_0.sh": {
+      "references": [
+        "config/upstreams.lock.json",
+        "scripts/make_manifest.py"
+      ]
+    },
+    "scripts/prepare_replication_gate.sh": {
+      "references": [
+        "scripts/build_gate_v3.py",
+        "scripts/make_manifest.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/probe_strict_schema.sh": {
+      "references": [
+        "scripts/generate_bf16_responses.py",
+        "scripts/score_responses.py"
+      ]
+    },
+    "scripts/quantization_entrypoint_guard.sh": {
+      "references": [
+        "scripts/run_cross_model_comparison.py"
+      ]
+    },
+    "scripts/README.md": {
+      "references": [
+        "config/quantization_entrypoints_v1.json",
+        "configs/experiment_registry.json",
+        "formal_experiments/scripts/",
+        "formal_experiments/scripts/00_formal_matrix_preflight.sh"
+      ]
+    },
+    "scripts/refresh_research_state.py": {
+      "references": [
+        "config/evidence_registry.json"
+      ]
+    },
+    "scripts/restore_paper_evidence.sh": {
+      "references": [
+        "scripts/fetch_artifact.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/restore_verified_smoke_data.sh": {
+      "references": [
+        "scripts/build_contextual_data.py"
+      ]
+    },
+    "scripts/resume_focus_gate.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py"
+      ]
+    },
+    "scripts/resume_replication_evaluation.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/retry_stage1.sh": {
+      "references": [
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/preflight.py",
+        "scripts/score_responses.py"
+      ]
+    },
+    "scripts/run_async_upload_queue.sh": {
+      "references": [
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/run_cross_family_paid_gpu_queue.sh": {
+      "references": [
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/run_async_upload_queue.sh",
+        "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+        "scripts/run_gemma3_4b_intervention_preflight.sh",
+        "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+        "scripts/run_qwen25_7b_paper_model_preflight.sh",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_cross_model_comparison.py": {
+      "references": [
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/require_quantization_eligibility.py",
+        "scripts/score_responses.py",
+        "scripts/summarize_cross_model_comparison.py"
+      ]
+    },
+    "scripts/run_gemma3_4b_32g_bundle.sh": {
+      "references": [
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+        "scripts/run_gemma3_4b_intervention_preflight.sh",
+        "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_gemma3_4b_40g_queue.sh": {
+      "references": [
+        "scripts/make_manifest.py",
+        "scripts/prepare_gemma3_4b_text_causal.sh",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/run_async_upload_queue.sh",
+        "scripts/run_gemma3_4b_backend_probe.sh",
+        "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+        "scripts/run_gemma3_4b_intervention_preflight.sh",
+        "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+        "scripts/summarize_gemma3_4b_40g_queue.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_gemma3_4b_backend_probe.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/backup_to_nas.py",
+        "scripts/build_gptq_calibration.py",
+        "scripts/generate_native_quantized_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_gemma3_4b_dual2_int8_preflight.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/compare_weight_tensors.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/prepare_prepend_user_training_data.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_gemma3_4b_intervention_preflight.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/compare_weight_tensors.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/prepare_prepend_user_training_data.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py",
+        "scripts/write_legacy_comparison_state.py"
+      ]
+    },
+    "scripts/run_gguf_f16_backend_control_seed101.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/evaluate_synthetic_runtime.py",
+        "scripts/generate_gguf_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_gguf_q4km_seed101_probe.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/evaluate_synthetic_runtime.py",
+        "scripts/generate_gguf_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_gptq_seed101_probe.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/build_gptq_calibration.py",
+        "scripts/evaluate_synthetic_runtime.py",
+        "scripts/generate_native_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_hqq_seed101_probe.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/evaluate_synthetic_runtime.py",
+        "scripts/generate_native_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_llama31_8b_32g_pilot.sh": {
+      "references": [
+        "scripts/make_manifest.py",
+        "scripts/preflight_llama31_8b_32g_pilot.sh",
+        "scripts/prepare_llama31_8b_32g_pilot.py"
+      ]
+    },
+    "scripts/run_llama31_8b_cpu_queue.sh": {
+      "references": [
+        "scripts/preflight_llama31_8b_paper_replication.sh",
+        "scripts/prepare_llama31_8b_paper_data.sh",
+        "scripts/update_llama31_8b_cpu_index.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_llama32_1b_cross_family_seed101.sh": {
+      "references": [
+        "config/llama32_1b_normalized_scale_v1.json",
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_llama32_1b_normalized_scale40.sh": {
+      "references": [
+        "scripts/run_llama32_1b_cross_family_seed101.sh"
+      ]
+    },
+    "scripts/run_llama32_3b_strict_queue.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/verify_manifest.py",
+        "scripts/write_legacy_comparison_state.py"
+      ]
+    },
+    "scripts/run_outlier_smoke.sh": {
+      "references": [
+        "scripts/build_gate_v3.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_final_gate_v6.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_final.py",
+        "scripts/backup_to_nas.py",
+        "scripts/evaluate_synthetic_runtime.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_gptq_full_seed_matrix.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_gptq_full_seed_matrix.py",
+        "scripts/make_manifest.py",
+        "scripts/run_gptq_seed101_probe.sh",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_gptq_gate_v7_q101_multiseed.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_gptq_gate_v7.py",
+        "scripts/make_manifest.py",
+        "scripts/run_gptq_seed101_probe.sh",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_gptq_source101_quantseed_sweep.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_gptq_source101_quantseed_sweep.py",
+        "scripts/make_manifest.py",
+        "scripts/run_gptq_seed101_probe.sh",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_hqq_gate_v7_multiseed.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_hqq_gate_v7.py",
+        "scripts/make_manifest.py",
+        "scripts/run_hqq_seed101_probe.sh",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_multiseed_gate_v7.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_multiseed_final.py",
+        "scripts/backup_to_nas.py",
+        "scripts/evaluate_synthetic_runtime.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_nf4_fp4_controls.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_nf4_fp4_multiseed.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_nf4_fp4_multiseed.py",
+        "scripts/make_manifest.py",
+        "scripts/run_qwen25_3b_nf4_fp4_controls.sh",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_nf4_gate_v7.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_nf4_gate_v7.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_no_tool_morphology_v1.sh": {
+      "references": [
+        "scripts/aggregate_no_tool_morphology.py",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_no_tool_morphology.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_3b_repair_int8_preflight.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/compare_weight_tensors.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_7b_5090_pipeline.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/preflight_qwen25_7b_5090_pipeline.sh",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/run_async_upload_queue.sh",
+        "scripts/score_responses.py"
+      ]
+    },
+    "scripts/run_qwen25_7b_paper_model_preflight.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/run_qwen25_7b_protocol_confirmation.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/run_qwen25_7b_paper_model_preflight.sh",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/run_replication_seed.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/run_smoke.sh": {
+      "references": [
+        "configs/generated/",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/make_smoke_config.py",
+        "scripts/preflight.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/run_stage_ablation.sh": {
+      "references": [
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_quantized_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/quantization_entrypoint_guard.sh",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/show_research_state.py": {
+      "references": [
+        "scripts/refresh_research_state.py"
+      ]
+    },
+    "scripts/sync_artifacts.py": {
+      "references": [
+        "config/repos.json"
+      ]
+    },
+    "scripts/sync_from_nas.sh": {
+      "references": [
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/_compat.py": {
+      "references": [
+        "configs/path_exceptions.json."
+      ]
+    },
+    "tests/test_formal_attestation_requirements.py": {
+      "references": [
+        "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+        "config/model_state_attestation_requirements_v1.json"
+      ]
+    },
+    "tests/test_formal_batch_calibration_contract.py": {
+      "references": [
+        "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+        "formal_experiments/scripts/01_calibrate_batch.sh",
+        "formal_experiments/scripts/02_run_model_bf16.sh",
+        "scripts/formal_batch_calibration.py",
+        "scripts/run_cross_model_comparison.py"
+      ]
+    },
+    "tests/test_gemma3_4b_40g_queue.py": {
+      "references": [
+        "scripts/preflight_gemma3_4b_40g_queue.sh",
+        "scripts/run_async_upload_queue.sh",
+        "scripts/run_cross_family_paid_gpu_queue.sh",
+        "scripts/run_gemma3_4b_40g_queue.sh",
+        "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+        "scripts/run_qwen25_7b_paper_model_preflight.sh",
+        "scripts/run_qwen25_7b_protocol_confirmation.sh",
+        "scripts/summarize_gemma3_4b_40g_queue.py"
+      ]
+    },
+    "tests/test_generate_interpolated_responses.py": {
+      "references": [
+        "scripts/generate_interpolated_responses.py"
+      ]
+    },
+    "tests/test_llama31_8b_32g_pilot.py": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/preflight_llama31_8b_32g_pilot.sh",
+        "scripts/prepare_llama31_8b_32g_pilot.py",
+        "scripts/run_llama31_8b_32g_pilot.sh"
+      ]
+    },
+    "tests/test_llama31_8b_paper_replication_audit.py": {
+      "references": [
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "tests/test_llama32_3b_strict_queue.py": {
+      "references": [
+        "scripts/preflight_llama32_3b_strict_queue.sh"
+      ]
+    },
+    "tests/test_llama32_3b_strict_run_queue.py": {
+      "references": [
+        "scripts/run_llama32_3b_strict_queue.sh"
+      ]
+    },
+    "tests/test_mechanism_analysis_pack.py": {
+      "references": [
+        "scripts/build_mechanism_analysis_pack.py"
+      ]
+    },
+    "tests/test_p1_v5_formal_runner.py": {
+      "references": [
+        "config/runtime/qwen25_3b_v5_native_tools_smoke.json",
+        "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl"
+      ]
+    },
+    "tests/test_quantization_entrypoint_guards.py": {
+      "references": [
+        "scripts/native_backend_preflight.py",
+        "scripts/prepare_llama_cpp_backend.sh",
+        "scripts/prepare_q4_0.sh"
+      ]
+    },
+    "tests/test_research_control_v3.py": {
+      "references": [
+        "config/current_evidence_selection.json",
+        "config/evidence_registry.json",
+        "config/protocol.json"
+      ]
+    },
+    "tests/test_research_state.py": {
+      "references": [
+        "config/current_research_protocol.json"
+      ]
+    },
+    "tests/test_scaffold.py": {
+      "references": [
+        "config/qwen25_3b_replication_v1.json",
+        "config/repos.json",
+        "scripts/aggregate_no_tool_morphology.py",
+        "scripts/aggregate_qwen25_3b_final.py",
+        "scripts/aggregate_qwen25_3b_multiseed_final.py",
+        "scripts/aggregate_replication.py",
+        "scripts/backup_to_nas.py",
+        "scripts/build_blind_audit.py",
+        "scripts/build_contextual_data.py",
+        "scripts/build_gate_v3.py",
+        "scripts/build_gptq_calibration.py",
+        "scripts/build_no_tool_morphology_v1.py",
+        "scripts/evaluate_synthetic_runtime.py",
+        "scripts/fetch_artifact.py",
+        "scripts/lock_qwen25_3b_multiseed_models.py",
+        "scripts/make_manifest.py",
+        "scripts/make_smoke_config.py",
+        "scripts/native_backend_preflight.py",
+        "scripts/preflight_gemma3_4b_32g_bundle.sh",
+        "scripts/preflight_qwen25_3b_multiseed.py",
+        "scripts/run_gemma3_4b_32g_bundle.sh",
+        "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+        "scripts/run_gemma3_4b_intervention_preflight.sh",
+        "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+        "scripts/score_blind_audit.py",
+        "scripts/score_no_tool_morphology.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "tests/test_symbolic_defense_summary.py": {
+      "references": [
+        "scripts/build_symbolic_defense_summary.py"
+      ]
+    },
+    "src/quant_action_switch/schemas/tool_schema.py": {
+      "references": [
+        "config/canonical_tool_registry_v1.json"
+      ]
+    },
+    "src/quant_action_switch/scoring/identity.py": {
+      "references": [
+        "config/canonical_tool_registry_v1.json"
+      ]
+    },
+    "scripts/legacy/analysis/diagnose_gemma3_1b_format_adaptation.sh": {
+      "references": [
+        "scripts/analyze_gemma_format_failure.py",
+        "scripts/compare_weight_tensors.py",
+        "scripts/make_manifest.py"
+      ]
+    },
+    "scripts/legacy/analysis/diagnose_intermediates.sh": {
+      "references": [
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py"
+      ]
+    },
+    "scripts/legacy/operations/download_qwen25_3b_model.sh": {
+      "references": [
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/operations/lock_qwen25_3b_multiseed_models.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/lock_qwen25_3b_multiseed_models.py",
+        "scripts/make_manifest.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/legacy/pilots/preflight_qwen25_3b_final.sh": {
+      "references": [
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/preflight_qwen25_3b_multiseed_final.sh": {
+      "references": [
+        "scripts/preflight_qwen25_3b_multiseed.py"
+      ]
+    },
+    "scripts/legacy/pilots/prepare_cross_family_gate_v5.sh": {
+      "references": [
+        "config/llama32_1b_normalized_scale_v1.json",
+        "scripts/build_gate_v3.py",
+        "scripts/make_manifest.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/legacy/pilots/prepare_gemma3_1b_base.sh": {
+      "references": [
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/prepare_gemma3_4b_base.sh": {
+      "references": [
+        "scripts/make_manifest.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/prepare_qwen25_3b_final_gate.sh": {
+      "references": [
+        "scripts/build_contextual_data.py",
+        "scripts/build_focus_retrieve_data.py",
+        "scripts/build_gate_v3.py",
+        "scripts/make_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/prepare_qwen25_3b_multiseed_gate_v7.sh": {
+      "references": [
+        "scripts/build_contextual_data.py",
+        "scripts/build_focus_retrieve_data.py",
+        "scripts/build_gate_v3.py",
+        "scripts/make_manifest.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/legacy/pilots/prepare_qwen25_3b_no_tool_morphology_v1.sh": {
+      "references": [
+        "scripts/build_no_tool_morphology_v1.py",
+        "scripts/make_manifest.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_gemma3_1b_base_preflight.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_gemma3_1b_benign_format_adaptation.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/prepare_prepend_user_training_data.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_gemma3_1b_target_only_format_calibration.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/compare_weight_tensors.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/prepare_prepend_user_training_data.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_gemma3_4b_base_preflight.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/find_gemma3_4b_model.sh",
+        "scripts/generate_gemma3_4b_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_gemma3_4b_prompt_protocol_calibration.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/find_gemma3_4b_model.sh",
+        "scripts/generate_gemma3_4b_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_gemma3_4b_prompt_protocol_confirmation.sh": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/backup_to_nas.py",
+        "scripts/find_gemma3_4b_model.sh",
+        "scripts/generate_gemma3_4b_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_llama32_1b_functional_scale_calibration.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_llama32_1b_strict_preflight.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_qwen25_3b_base_preflight.sh": {
+      "references": [
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_qwen25_3b_benign_format_preflight.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_qwen25_3b_corrected_strict_preflight.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_qwen25_3b_gptq_defense_matrix.sh": {
+      "references": [
+        "scripts/aggregate_qwen25_3b_gptq_defense_matrix.py",
+        "scripts/make_manifest.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_qwen25_3b_intervention_preflight.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/compare_weight_tensors.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "scripts/legacy/pilots/run_qwen25_3b_target_compensation.sh": {
+      "references": [
+        "scripts/apply_upstream_patches.sh",
+        "scripts/backup_to_nas.py",
+        "scripts/compare_weight_tensors.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/make_manifest.py",
+        "scripts/score_responses.py",
+        "scripts/sync_artifacts.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "formal_experiments/repair_ledger/runtime_repairs.md": {
+      "references": [
+        "formal_experiments/reports/formal_matrix_preflight_failure_attempt-0001.json"
+      ]
+    },
+    "formal_experiments/scripts/00_formal_matrix_preflight.sh": {
+      "references": [
+        "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+        "scripts/formal_matrix_assets.py",
+        "scripts/verify_manifest.py"
+      ]
+    },
+    "formal_experiments/scripts/01_calibrate_batch.sh": {
+      "references": [
+        "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+        "formal_experiments/calibration/",
+        "formal_experiments/scripts/00_formal_matrix_preflight.sh",
+        "formal_experiments/scripts/03_release_model.sh",
+        "scripts/formal_batch_calibration.py"
+      ]
+    },
+    "formal_experiments/scripts/02_run_model_bf16.sh": {
+      "references": [
+        "config/agent_toolcall_protocol_v5.json",
+        "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+        "formal_experiments/attempts/",
+        "formal_experiments/scripts/00_formal_matrix_preflight.sh",
+        "scripts/generate_bf16_responses.py",
+        "scripts/run_cross_model_comparison.py",
+        "scripts/score_responses.py"
+      ]
+    },
+    "formal_experiments/scripts/04_run_model_quant.sh": {
+      "references": [
+        "config/agent_toolcall_protocol_v5.json",
+        "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+        "formal_experiments/attempts/",
+        "scripts/generate_quantized_responses.py",
+        "scripts/run_cross_model_comparison.py",
+        "scripts/score_responses.py"
+      ]
+    },
+    "formal_experiments/scripts/05_finalize_model.sh": {
+      "references": [
+        "config/agent_toolcall_protocol_v5.json",
+        "formal_experiments/attempts/",
+        "scripts/run_cross_model_comparison.py"
+      ]
+    },
+    "formal_experiments/scripts/06_cross_model_summary.sh": {
+      "references": [
+        "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+        "formal_experiments/reports/",
+        "scripts/summarize_cross_model_comparison.py"
+      ]
+    },
+    "formal_experiments/reports/preparation/formal_matrix_gpu_handoff.md": {
+      "references": [
+        "config/model_state_attestation_requirements_v1.json",
+        "formal_experiments/scripts/00_formal_matrix_preflight.sh",
+        "formal_experiments/scripts/01_calibrate_batch.sh",
+        "formal_experiments/scripts/02_run_model_bf16.sh",
+        "formal_experiments/scripts/03_release_model.sh",
+        "formal_experiments/scripts/04_run_model_quant.sh",
+        "formal_experiments/scripts/05_finalize_model.sh",
+        "formal_experiments/scripts/06_cross_model_summary.sh",
+        "formal_experiments/scripts/monitor_gpu.sh"
+      ]
+    },
+    "formal_experiments/reports/preparation/formal_matrix_prep_report.json": {
+      "references": [
+        "config/model_state_attestation_requirements_v1.json"
+      ]
+    },
+    "formal_experiments/reports/preparation/formal_matrix_source_audit.md": {
+      "references": [
+        "config/model_state_attestation_requirements_v1.json"
+      ]
+    },
+    "docs/architecture/PYTHON_PACKAGE_BOUNDARIES.md": {
+      "references": [
+        "scripts/_compat.py",
+        "scripts/legacy"
+      ]
+    },
+    "docs/architecture/REPOSITORY_STRUCTURE.md": {
+      "references": [
+        "scripts/legacy/"
+      ]
+    },
+    "docs/audits/p0_5_fifth_round_pre_fix_reproduction.json": {
+      "references": [
+        "scripts/formal_entrypoint_contracts.py"
+      ]
+    },
+    "docs/current/ARTIFACT_LINEAGE.md": {
+      "references": [
+        "config/evidence_registry.json",
+        "formal_experiments/artifacts/"
+      ]
+    },
+    "docs/current/MIGRATION_GUIDE.md": {
+      "references": [
+        "configs/experiment_registry.json",
+        "formal_experiments/scripts/"
+      ]
+    },
+    "docs/current/REPOSITORY_MAP.md": {
+      "references": [
+        "config/current_research_protocol.json",
+        "configs/experiment_registry.json",
+        "scripts/README.md"
+      ]
+    },
+    "docs/handoffs/2026-07-23-research-control-v2-bootstrap.md": {
+      "references": [
+        "config/current_research_protocol.json",
+        "config/terminology_policy.json",
+        "scripts/refresh_research_state.py",
+        "scripts/show_research_state.py"
+      ]
+    },
+    "docs/handoffs/2026-07-23-research-control-v2-corrective-closeout.md": {
+      "references": [
+        "config/current_research_protocol.json",
+        "config/evidence_registry.json",
+        "scripts/refresh_research_state.py",
+        "scripts/show_research_state.py"
+      ]
+    },
+    "docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md": {
+      "references": [
+        "config/agent_toolcall_case_schema_v3.json",
+        "config/current_evidence_selection.json",
+        "config/current_research_protocol.json",
+        "config/deterministic_executor_outcome_v2.json",
+        "config/evidence_registry.json",
+        "scripts/refresh_research_state.py",
+        "scripts/show_research_state.py"
+      ]
+    },
+    "docs/handoffs/2026-07-27-p0-1-comparison-eligibility.md": {
+      "references": [
+        "config/cross_model_logical_cases_v1.json",
+        "scripts/check_terminology.py",
+        "scripts/refresh_research_state.py",
+        "scripts/run_cross_model_comparison.py",
+        "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+        "scripts/run_llama32_3b_strict_queue.sh",
+        "scripts/run_qwen25_3b_multiseed_gate_v7.sh",
+        "scripts/show_research_state.py",
+        "scripts/summarize_cross_model_comparison.py"
+      ]
+    },
+    "docs/handoffs/p0-2-gemma-eos-parser.md": {
+      "references": [
+        "config/gemma3_4b_prompt_protocol_v1.txt",
+        "scripts/check_terminology.py",
+        "scripts/generate_bf16_responses.py",
+        "scripts/generate_gemma3_4b_bf16_responses.py",
+        "scripts/generation_termination.py",
+        "scripts/response_parsing.py",
+        "scripts/run_gemma_eos_ab.py"
+      ]
+    },
+    "docs/handoffs/p0-3-quantization-state-attestation.md": {
+      "references": [
+        "config/tokenizer/"
+      ]
+    },
+    "docs/handoffs/p0-4-native-tool-calling.md": {
+      "references": [
+        "config/agent_toolcall_protocol_v4.json",
+        "config/canonical_tool_registry_v1.json",
+        "scripts/native_tool_protocol.py"
+      ]
+    },
+    "docs/handoffs/research-control-v3-final-closeout.md": {
+      "references": [
+        "config/current_evidence_selection.json",
+        "config/current_research_protocol.json",
+        "config/evidence_registry.json",
+        "scripts/build_contextual_data.py",
+        "scripts/refresh_research_state.py",
+        "scripts/show_research_state.py"
+      ]
+    },
+    "docs/migration/LEGACY_ENTRYPOINT_MAP.md": {
+      "references": [
+        "configs/legacy_entrypoint_map.json",
+        "scripts/legacy/"
+      ]
+    },
+    "configs/formal/experiment_design_v2.draft.json": {
+      "references": [
+        "config/evidence_registry.json",
+        "config/original_paper_recipe_v1.json"
+      ]
+    },
+    "config/formal_experiments/formal_case_manifest_report_v1.json": {
+      "references": [
+        "protocols/v5/formal_logical_case_manifest_v1.jsonl"
+      ]
+    },
+    "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json": {
+      "references": [
+        "config/canonical_tool_registry_v1.json",
+        "config/formal_experiments/formal_case_manifest_report_v1.json",
+        "config/formal_experiments/formal_generation_config_v1.json",
+        "config/formal_experiments/formal_sampling_config_v1.json",
+        "config/model_state_attestation_requirements_v1.json",
+        "formal_experiments/artifacts/model_snapshots/gemma3-4b/model_snapshot_manifest.json",
+        "formal_experiments/artifacts/model_snapshots/llama32-3b/model_snapshot_manifest.json",
+        "formal_experiments/artifacts/model_snapshots/qwen25-3b/model_snapshot_manifest.json",
+        "formal_experiments/artifacts/renderers/gemma3-4b/rendered_cases.jsonl",
+        "formal_experiments/artifacts/renderers/gemma3-4b/renderer_manifest.json",
+        "formal_experiments/artifacts/renderers/llama32-3b/rendered_cases.jsonl",
+        "formal_experiments/artifacts/renderers/llama32-3b/renderer_manifest.json",
+        "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl",
+        "formal_experiments/artifacts/renderers/qwen25-3b/renderer_manifest.json",
+        "protocols/v5/formal_logical_case_manifest_v1.jsonl"
+      ]
+    },
+    "config/runtime/qwen25_3b_v5_native_tools_smoke.json": {
+      "references": [
+        "scripts/run_qwen25_3b_multiseed_gate_v7.sh"
+      ]
+    },
+    ".github/workflows/validate.yml": {
+      "references": [
+        "scripts/check_terminology.py",
+        "scripts/refresh_research_state.py",
+        "scripts/show_research_state.py"
+      ]
+    }
+  }
+}

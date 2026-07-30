@@ -1,0 +1,2315 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "current_path": ".env.example",
+      "classification": "MAINTENANCE",
+      "recommended_path": ".env.example",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": ".gitattributes",
+      "classification": "MAINTENANCE",
+      "recommended_path": ".gitattributes",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": ".github/workflows/validate.yml",
+      "classification": "MAINTENANCE",
+      "recommended_path": ".github/workflows/validate.yml",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": ".gitignore",
+      "classification": "MAINTENANCE",
+      "recommended_path": ".gitignore",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "AGENTS.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "AGENTS.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "README.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "README.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/branch_archive_verification.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/branch_archive_verification.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/branch_inventory.json",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/branch_inventory.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/branch_inventory.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/branch_inventory.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/canonical_branch_decision.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/canonical_branch_decision.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/cleanup_manifest.json",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/cleanup_manifest.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/code_architecture_review.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/code_architecture_review.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/file_inventory.json",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/file_inventory.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/pre_cleanup_snapshot.json",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/pre_cleanup_snapshot.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "audit/pre_cleanup_snapshot.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "audit/pre_cleanup_snapshot.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/agent_toolcall_case_schema_v2.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/agent_toolcall_case_schema_v2.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/agent_toolcall_case_schema_v3.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/agent_toolcall_case_schema_v3.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/agent_toolcall_protocol_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/agent_toolcall_protocol_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/agent_toolcall_protocol_v2.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/agent_toolcall_protocol_v2.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/agent_toolcall_protocol_v3.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/agent_toolcall_protocol_v3.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/agent_toolcall_protocol_v4.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/agent_toolcall_protocol_v4.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/agent_toolcall_protocol_v5.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/agent_toolcall_protocol_v5.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/canonical_tool_registry_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/canonical_tool_registry_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/comparison_run_state_v1.schema.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/comparison_run_state_v1.schema.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/cross_model_comparison_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/cross_model_comparison_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/cross_model_logical_cases_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/cross_model_logical_cases_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/current_evidence_selection.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/current_evidence_selection.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/current_evidence_selection.schema.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/current_evidence_selection.schema.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/current_research_protocol.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/current_research_protocol.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/deterministic_executor_outcome_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/deterministic_executor_outcome_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/deterministic_executor_outcome_v2.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/deterministic_executor_outcome_v2.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/evidence_registry.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/evidence_registry.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/evidence_registry.schema.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/evidence_registry.schema.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/formal_experiments/formal_case_manifest_report_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/formal_experiments/formal_case_manifest_report_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/formal_experiments/formal_generation_config_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/formal_experiments/formal_generation_config_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/formal_experiments/formal_matrix_unresolved_fields.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/formal_experiments/formal_matrix_unresolved_fields.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/formal_experiments/formal_sampling_config_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/formal_experiments/formal_sampling_config_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/formal_experiments/v5_cross_model_native_tools_matrix_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/gemma3_4b_prompt_protocol_v1.txt",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/gemma3_4b_prompt_protocol_v1.txt",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/gptq_seed_matrix_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/gptq_seed_matrix_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/gptq_seed_matrix_v2_full.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/gptq_seed_matrix_v2_full.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/llama32_1b_normalized_scale_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/llama32_1b_normalized_scale_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/model_state_attestation_requirements_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/model_state_attestation_requirements_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/model_state_attestation_v1.schema.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/model_state_attestation_v1.schema.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/model_state_requirements_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/model_state_requirements_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/original_paper_recipe_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/original_paper_recipe_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/quantization_entrypoints_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/quantization_entrypoints_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/qwen25_3b_replication_v1.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/qwen25_3b_replication_v1.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/repos.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/repos.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/runtime/qwen25_3b_v5_native_tools_smoke.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/runtime/qwen25_3b_v5_native_tools_smoke.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/scorer_identity_v1.schema.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/scorer_identity_v1.schema.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/terminology_policy.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/terminology_policy.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "config/upstreams.lock.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "config/upstreams.lock.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "configs/experiment_registry.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "configs/experiment_registry.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "configs/formal/experiment_design_v2.draft.json",
+      "classification": "CONFIGURATION",
+      "recommended_path": "configs/formal/experiment_design_v2.draft.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/ARTIFACT_POLICY.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/ARTIFACT_POLICY.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/ORIGINAL_PAPER_REPLICATION_PLAN.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/ORIGINAL_PAPER_REPLICATION_PLAN.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/SERVER_RUNBOOK.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/SERVER_RUNBOOK.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/THREE_SEED_FINDINGS.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/THREE_SEED_FINDINGS.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/UPSTREAM_DIFFS.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/UPSTREAM_DIFFS.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/agent_toolcall_plan_review.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/agent_toolcall_plan_review.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/archive/README.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/archive/README.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/audits/p0_5_fifth_round_post_fix_replay.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "docs/audits/p0_5_fifth_round_post_fix_replay.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/audits/p0_5_fifth_round_pre_fix_reproduction.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "docs/audits/p0_5_fifth_round_pre_fix_reproduction.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/audits/p0_5_fourth_round_post_fix_replay.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "docs/audits/p0_5_fourth_round_post_fix_replay.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/audits/p0_5_fourth_round_pre_fix_reproduction.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "docs/audits/p0_5_fourth_round_pre_fix_reproduction.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/branch_worktree_guide.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/branch_worktree_guide.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/current/ARTIFACT_LINEAGE.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/current/ARTIFACT_LINEAGE.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/current/EXPERIMENT_DESIGN_V2.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/current/EXPERIMENT_DESIGN_V2.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/current/MIGRATION_GUIDE.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/current/MIGRATION_GUIDE.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/current/REPOSITORY_MAP.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/current/REPOSITORY_MAP.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/handoffs/2026-07-23-research-control-v2-bootstrap.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/handoffs/2026-07-23-research-control-v2-bootstrap.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/handoffs/2026-07-23-research-control-v2-corrective-closeout.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/handoffs/2026-07-23-research-control-v2-corrective-closeout.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/handoffs/2026-07-23-research-control-v3-independent-audit-closeout.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/handoffs/2026-07-27-p0-1-comparison-eligibility.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/handoffs/2026-07-27-p0-1-comparison-eligibility.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/handoffs/p0-2-gemma-eos-parser.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/handoffs/p0-2-gemma-eos-parser.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/handoffs/p0-3-quantization-state-attestation.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/handoffs/p0-3-quantization-state-attestation.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/handoffs/p0-4-native-tool-calling.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/handoffs/p0-4-native-tool-calling.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/handoffs/research-control-v3-final-closeout.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/handoffs/research-control-v3-final-closeout.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/p0_1_comparison_eligibility_migration.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/p0_1_comparison_eligibility_migration.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/p0_5_final_coverage_checklists.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/p0_5_final_coverage_checklists.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/repository_layout.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/repository_layout.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/research_state_maintenance.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/research_state_maintenance.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "docs/variable_name_migration.md",
+      "classification": "DOCUMENTATION",
+      "recommended_path": "docs/variable_name_migration.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "experiments/README.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "experiments/README.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/README.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "formal_experiments/README.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/model_snapshots/gemma3-4b/model_snapshot_manifest.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/model_snapshots/gemma3-4b/model_snapshot_manifest.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/model_snapshots/llama32-3b/model_snapshot_manifest.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/model_snapshots/llama32-3b/model_snapshot_manifest.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/model_snapshots/qwen25-3b/model_snapshot_manifest.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/model_snapshots/qwen25-3b/model_snapshot_manifest.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/renderers/gemma3-4b/rendered_cases.jsonl",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/renderers/gemma3-4b/rendered_cases.jsonl",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/renderers/gemma3-4b/renderer_manifest.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/renderers/gemma3-4b/renderer_manifest.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/renderers/llama32-3b/rendered_cases.jsonl",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/renderers/llama32-3b/rendered_cases.jsonl",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/renderers/llama32-3b/renderer_manifest.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/renderers/llama32-3b/renderer_manifest.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/renderers/qwen25-3b/rendered_cases.jsonl",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/artifacts/renderers/qwen25-3b/renderer_manifest.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/artifacts/renderers/qwen25-3b/renderer_manifest.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/attempts/.gitkeep",
+      "classification": "MAINTENANCE",
+      "recommended_path": "formal_experiments/attempts/.gitkeep",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/experiment_index.json",
+      "classification": "MAINTENANCE",
+      "recommended_path": "formal_experiments/experiment_index.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/repair_ledger/runtime_repairs.jsonl",
+      "classification": "MAINTENANCE",
+      "recommended_path": "formal_experiments/repair_ledger/runtime_repairs.jsonl",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/repair_ledger/runtime_repairs.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "formal_experiments/repair_ledger/runtime_repairs.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/reports/.gitkeep",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/reports/.gitkeep",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/reports/preparation/formal_matrix_artifacts.sha256",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/reports/preparation/formal_matrix_artifacts.sha256",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/reports/preparation/formal_matrix_gpu_handoff.md",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/reports/preparation/formal_matrix_gpu_handoff.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/reports/preparation/formal_matrix_headless_report.md",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/reports/preparation/formal_matrix_headless_report.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/reports/preparation/formal_matrix_prep_report.json",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/reports/preparation/formal_matrix_prep_report.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/reports/preparation/formal_matrix_source_audit.md",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "formal_experiments/reports/preparation/formal_matrix_source_audit.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/scripts/00_formal_matrix_preflight.sh",
+      "classification": "FORMAL_ENTRYPOINT",
+      "recommended_path": "formal_experiments/scripts/00_formal_matrix_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/scripts/01_calibrate_batch.sh",
+      "classification": "FORMAL_ENTRYPOINT",
+      "recommended_path": "formal_experiments/scripts/01_calibrate_batch.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/scripts/02_run_model_bf16.sh",
+      "classification": "FORMAL_ENTRYPOINT",
+      "recommended_path": "formal_experiments/scripts/02_run_model_bf16.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/scripts/03_release_model.sh",
+      "classification": "FORMAL_ENTRYPOINT",
+      "recommended_path": "formal_experiments/scripts/03_release_model.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/scripts/04_run_model_quant.sh",
+      "classification": "FORMAL_ENTRYPOINT",
+      "recommended_path": "formal_experiments/scripts/04_run_model_quant.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/scripts/05_finalize_model.sh",
+      "classification": "FORMAL_ENTRYPOINT",
+      "recommended_path": "formal_experiments/scripts/05_finalize_model.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/scripts/06_cross_model_summary.sh",
+      "classification": "FORMAL_ENTRYPOINT",
+      "recommended_path": "formal_experiments/scripts/06_cross_model_summary.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "formal_experiments/scripts/monitor_gpu.sh",
+      "classification": "FORMAL_ENTRYPOINT",
+      "recommended_path": "formal_experiments/scripts/monitor_gpu.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "patches/upstream_aio_quantization/0001-forward-trainer-seeds.patch",
+      "classification": "MAINTENANCE",
+      "recommended_path": "patches/upstream_aio_quantization/0001-forward-trainer-seeds.patch",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "patches/upstream_aio_quantization/0002-configurable-dual-optimizer.patch",
+      "classification": "MAINTENANCE",
+      "recommended_path": "patches/upstream_aio_quantization/0002-configurable-dual-optimizer.patch",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "patches/upstream_aio_quantization/0003-configurable-dual2-optimizer.patch",
+      "classification": "MAINTENANCE",
+      "recommended_path": "patches/upstream_aio_quantization/0003-configurable-dual2-optimizer.patch",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "patches/upstream_aio_quantization/0004-pipeline-stop-after.patch",
+      "classification": "MAINTENANCE",
+      "recommended_path": "patches/upstream_aio_quantization/0004-pipeline-stop-after.patch",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "patches/upstream_aio_quantization/0005-memory-bounded-trainable-layers.patch",
+      "classification": "MAINTENANCE",
+      "recommended_path": "patches/upstream_aio_quantization/0005-memory-bounded-trainable-layers.patch",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "patches/upstream_aio_quantization/0006-batched-mcd-evaluation.patch",
+      "classification": "MAINTENANCE",
+      "recommended_path": "patches/upstream_aio_quantization/0006-batched-mcd-evaluation.patch",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "patches/upstream_aio_quantization/0007-disable-intermediate-trainer-checkpoints.patch",
+      "classification": "MAINTENANCE",
+      "recommended_path": "patches/upstream_aio_quantization/0007-disable-intermediate-trainer-checkpoints.patch",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "patches/upstream_aio_quantization/0008-forward-dual-trainer-seeds.patch",
+      "classification": "MAINTENANCE",
+      "recommended_path": "patches/upstream_aio_quantization/0008-forward-dual-trainer-seeds.patch",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "protocols/v5/formal_logical_case_manifest_v1.jsonl",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "protocols/v5/formal_logical_case_manifest_v1.jsonl",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "protocols/v5/logical_case_manifest.jsonl",
+      "classification": "FROZEN_PATH_BOUND",
+      "recommended_path": "protocols/v5/logical_case_manifest.jsonl",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "requirements/base.txt",
+      "classification": "MAINTENANCE",
+      "recommended_path": "requirements/base.txt",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "requirements/gpu.txt",
+      "classification": "MAINTENANCE",
+      "recommended_path": "requirements/gpu.txt",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/README.md",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/README.md",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_no_tool_morphology.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_no_tool_morphology.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_final.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_final.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_gptq_defense_matrix.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_gptq_defense_matrix.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_gptq_full_seed_matrix.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_gptq_full_seed_matrix.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_gptq_gate_v7.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_gptq_gate_v7.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_gptq_source101_quantseed_sweep.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_gptq_source101_quantseed_sweep.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_hqq_gate_v7.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_hqq_gate_v7.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_multiseed_final.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_multiseed_final.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_nf4_fp4_multiseed.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_nf4_fp4_multiseed.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_qwen25_3b_nf4_gate_v7.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_qwen25_3b_nf4_gate_v7.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/aggregate_replication.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/aggregate_replication.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/analyze_gemma_format_failure.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/analyze_gemma_format_failure.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/apply_upstream_patches.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/apply_upstream_patches.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/audit_llama31_8b_original_task.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/audit_llama31_8b_original_task.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/audit_llama31_8b_paper_replication.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/audit_llama31_8b_paper_replication.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/backup_to_nas.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/backup_to_nas.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/bootstrap_server.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/bootstrap_server.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_blind_audit.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_blind_audit.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_contextual_data.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_contextual_data.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_cpu_audit_paper_pack.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_cpu_audit_paper_pack.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_focus_retrieve_data.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_focus_retrieve_data.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_gate_v3.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_gate_v3.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_gptq_calibration.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_gptq_calibration.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_mechanism_analysis_pack.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_mechanism_analysis_pack.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_native_backend_report.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_native_backend_report.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_no_tool_morphology_v1.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_no_tool_morphology_v1.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_p0_5_fixture_matrix.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_p0_5_fixture_matrix.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_paper_evidence_bundle.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_paper_evidence_bundle.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_paper_evidence_bundle.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_paper_evidence_bundle.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_publication_evidence_artifacts.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_publication_evidence_artifacts.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/build_symbolic_defense_summary.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/build_symbolic_defense_summary.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/canonical_summary_validation.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/canonical_summary_validation.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/check_p0_5_coverage.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/check_p0_5_coverage.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/check_terminology.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/check_terminology.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/compare_weight_tensors.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/compare_weight_tensors.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/comparison_eligibility.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/comparison_eligibility.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/continue_stage1_focus_retrieve.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/continue_stage1_focus_retrieve.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/continue_stage1_strict.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/continue_stage1_strict.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/convert_gemma3_4b_to_text_causal.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/convert_gemma3_4b_to_text_causal.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/download_smoke_model.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/download_smoke_model.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/evaluate_deterministic_executor.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/evaluate_deterministic_executor.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/evaluate_synthetic_runtime.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/evaluate_synthetic_runtime.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/extend_qwen25_3b_int8_to_1000.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/extend_qwen25_3b_int8_to_1000.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/fetch_artifact.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/fetch_artifact.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/find_gemma3_4b_model.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/find_gemma3_4b_model.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/formal_attestation_requirements.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/formal_attestation_requirements.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/formal_batch_calibration.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/formal_batch_calibration.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/formal_entrypoint_contracts.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/formal_entrypoint_contracts.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/formal_evidence.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/formal_evidence.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/formal_matrix_assets.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/formal_matrix_assets.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/generate_bf16_responses.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/generate_bf16_responses.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/generate_gemma3_4b_bf16_responses.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/generate_gemma3_4b_bf16_responses.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/generate_gguf_responses.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/generate_gguf_responses.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/generate_interpolated_responses.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/generate_interpolated_responses.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/generate_native_quantized_responses.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/generate_native_quantized_responses.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/generate_quantized_responses.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/generate_quantized_responses.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/gguf_state_inspection.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/gguf_state_inspection.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/analysis/aggregate_gptq_seed_matrix.py",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/analysis/aggregate_gptq_seed_matrix.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/analysis/analyze_nf4_seed303_transitions.py",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/analysis/analyze_nf4_seed303_transitions.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/analysis/diagnose_gemma3_1b_format_adaptation.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/analysis/diagnose_gemma3_1b_format_adaptation.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/analysis/diagnose_intermediates.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/analysis/diagnose_intermediates.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/operations/download_qwen25_3b_model.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/operations/download_qwen25_3b_model.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/operations/lock_qwen25_3b_multiseed_models.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/operations/lock_qwen25_3b_multiseed_models.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/preflight_qwen25_3b_final.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/preflight_qwen25_3b_final.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/preflight_qwen25_3b_multiseed_final.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/preflight_qwen25_3b_multiseed_final.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/prepare_cross_family_gate_v5.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/prepare_cross_family_gate_v5.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/prepare_gemma3_1b_base.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/prepare_gemma3_1b_base.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/prepare_gemma3_4b_base.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/prepare_gemma3_4b_base.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/prepare_qwen25_3b_final_gate.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/prepare_qwen25_3b_final_gate.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/prepare_qwen25_3b_multiseed_gate_v7.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/prepare_qwen25_3b_multiseed_gate_v7.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/prepare_qwen25_3b_no_tool_morphology_v1.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/prepare_qwen25_3b_no_tool_morphology_v1.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_gemma3_1b_base_preflight.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_gemma3_1b_base_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_gemma3_1b_benign_format_adaptation.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_gemma3_1b_benign_format_adaptation.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_gemma3_1b_target_only_format_calibration.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_gemma3_1b_target_only_format_calibration.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_gemma3_4b_base_preflight.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_gemma3_4b_base_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_gemma3_4b_prompt_protocol_calibration.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_gemma3_4b_prompt_protocol_calibration.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_gemma3_4b_prompt_protocol_confirmation.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_gemma3_4b_prompt_protocol_confirmation.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_llama32_1b_functional_scale_calibration.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_llama32_1b_functional_scale_calibration.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_llama32_1b_strict_preflight.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_llama32_1b_strict_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_qwen25_3b_base_preflight.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_qwen25_3b_base_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_qwen25_3b_benign_format_preflight.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_qwen25_3b_benign_format_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_qwen25_3b_corrected_strict_preflight.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_qwen25_3b_corrected_strict_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_qwen25_3b_gptq_defense_matrix.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_qwen25_3b_gptq_defense_matrix.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_qwen25_3b_intervention_preflight.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_qwen25_3b_intervention_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/legacy/pilots/run_qwen25_3b_target_compensation.sh",
+      "classification": "LEGACY_COMPATIBILITY",
+      "recommended_path": "scripts/legacy/pilots/run_qwen25_3b_target_compensation.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/lock_llama31_8b_gpu_config.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/lock_llama31_8b_gpu_config.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/lock_llama31_8b_gpu_config.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/lock_llama31_8b_gpu_config.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/lock_llama31_8b_original_task_tracks.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/lock_llama31_8b_original_task_tracks.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/lock_qwen25_3b_multiseed_models.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/lock_qwen25_3b_multiseed_models.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/make_smoke_config.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/make_smoke_config.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/manifest_writer_registry.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/manifest_writer_registry.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/model_state_attestation.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/model_state_attestation.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/native_backend_preflight.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/native_backend_preflight.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/normalize_derived_artifact.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/normalize_derived_artifact.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/preflight.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/preflight.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/preflight_gemma3_4b_32g_bundle.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/preflight_gemma3_4b_32g_bundle.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/preflight_gemma3_4b_40g_queue.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/preflight_gemma3_4b_40g_queue.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/preflight_llama31_8b_32g_pilot.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/preflight_llama31_8b_32g_pilot.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/preflight_llama31_8b_paper_replication.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/preflight_llama31_8b_paper_replication.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/preflight_llama32_3b_strict_queue.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/preflight_llama32_3b_strict_queue.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/preflight_qwen25_3b_multiseed.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/preflight_qwen25_3b_multiseed.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/preflight_qwen25_7b_5090_pipeline.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/preflight_qwen25_7b_5090_pipeline.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_gemma3_4b_text_causal.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_gemma3_4b_text_causal.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_independent_generalization_gate_v8.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_independent_generalization_gate_v8.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_llama31_8b_32g_pilot.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_llama31_8b_32g_pilot.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_llama31_8b_paper_data.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_llama31_8b_paper_data.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_llama31_8b_paper_data.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_llama31_8b_paper_data.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_llama_cpp_backend.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_llama_cpp_backend.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_prepend_user_training_data.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_prepend_user_training_data.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_q4_0.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_q4_0.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/prepare_replication_gate.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/prepare_replication_gate.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/probe_strict_schema.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/probe_strict_schema.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/quantization_entrypoint_guard.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/quantization_entrypoint_guard.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/refresh_research_state.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/refresh_research_state.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/require_quantization_eligibility.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/require_quantization_eligibility.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/rescore_canonical_diagnostic.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/rescore_canonical_diagnostic.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/rescore_parser_diagnostics.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/rescore_parser_diagnostics.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/restore_paper_evidence.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/restore_paper_evidence.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/restore_verified_smoke_data.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/restore_verified_smoke_data.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/resume_focus_gate.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/resume_focus_gate.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/resume_replication_evaluation.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/resume_replication_evaluation.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/retry_stage1.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/retry_stage1.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_async_upload_queue.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_async_upload_queue.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_cross_family_paid_gpu_queue.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_cross_family_paid_gpu_queue.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_cross_model_comparison.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_cross_model_comparison.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gemma3_4b_32g_bundle.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gemma3_4b_32g_bundle.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gemma3_4b_40g_queue.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gemma3_4b_40g_queue.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gemma3_4b_backend_probe.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gemma3_4b_backend_probe.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gemma3_4b_dual2_int8_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gemma3_4b_intervention_preflight.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gemma3_4b_intervention_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gemma3_4b_layerdrop_benign_reconstruction.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gemma_eos_ab.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gemma_eos_ab.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gguf_f16_backend_control_seed101.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gguf_f16_backend_control_seed101.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gguf_q4km_seed101_probe.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gguf_q4km_seed101_probe.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_gptq_seed101_probe.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_gptq_seed101_probe.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_hqq_seed101_probe.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_hqq_seed101_probe.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_llama31_8b_32g_pilot.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_llama31_8b_32g_pilot.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_llama31_8b_cpu_queue.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_llama31_8b_cpu_queue.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_llama32_1b_cross_family_seed101.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_llama32_1b_cross_family_seed101.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_llama32_1b_normalized_scale40.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_llama32_1b_normalized_scale40.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_llama32_3b_strict_queue.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_llama32_3b_strict_queue.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_outlier_smoke.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_outlier_smoke.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_final_gate_v6.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_final_gate_v6.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_gptq_full_seed_matrix.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_gptq_full_seed_matrix.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_gptq_gate_v7_q101_multiseed.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_gptq_gate_v7_q101_multiseed.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_gptq_source101_quantseed_sweep.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_gptq_source101_quantseed_sweep.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_hqq_gate_v7_multiseed.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_hqq_gate_v7_multiseed.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_multiseed_gate_v7.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_multiseed_gate_v7.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_nf4_fp4_controls.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_nf4_fp4_controls.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_nf4_fp4_multiseed.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_nf4_fp4_multiseed.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_nf4_gate_v7.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_nf4_gate_v7.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_no_tool_morphology_v1.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_no_tool_morphology_v1.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_3b_repair_int8_preflight.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_3b_repair_int8_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_7b_5090_pipeline.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_7b_5090_pipeline.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_7b_paper_model_preflight.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_7b_paper_model_preflight.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_qwen25_7b_protocol_confirmation.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_qwen25_7b_protocol_confirmation.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_replication_seed.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_replication_seed.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_smoke.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_smoke.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/run_stage_ablation.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/run_stage_ablation.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/score_blind_audit.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/score_blind_audit.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/score_no_tool_morphology.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/score_no_tool_morphology.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/score_responses.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/score_responses.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/show_research_state.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/show_research_state.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/summarize_cross_model_comparison.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/summarize_cross_model_comparison.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/summarize_gemma3_4b_40g_queue.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/summarize_gemma3_4b_40g_queue.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/summary_contamination.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/summary_contamination.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/sync_artifacts.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/sync_artifacts.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/sync_from_nas.sh",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/sync_from_nas.sh",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/training_seed_repro.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/training_seed_repro.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/transformers_model_loader.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/transformers_model_loader.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/update_llama31_8b_cpu_index.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/update_llama31_8b_cpu_index.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/validate_comparison_state.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/validate_comparison_state.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "scripts/write_legacy_comparison_state.py",
+      "classification": "MAINTENANCE",
+      "recommended_path": "scripts/write_legacy_comparison_state.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/artifacts/build_manifest.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/artifacts/build_manifest.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/artifacts/manifest.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/artifacts/manifest.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/parsing/generation_termination.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/parsing/generation_termination.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/parsing/response_parsing.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/parsing/response_parsing.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/protocols/native_tools.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/protocols/native_tools.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/rendering/logical_cases.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/rendering/logical_cases.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/schemas/case_schema.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/schemas/case_schema.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/schemas/metric_schema.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/schemas/metric_schema.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/schemas/tool_schema.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/schemas/tool_schema.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/scoring/failure_codes.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/scoring/failure_codes.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/scoring/identity.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/scoring/identity.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "src/quant_action_switch/scoring/policy.py",
+      "classification": "CORE_LIBRARY",
+      "recommended_path": "src/quant_action_switch/scoring/policy.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/fixtures/canonical_scorer/argument_negative_cases.json",
+      "classification": "TEST",
+      "recommended_path": "tests/fixtures/canonical_scorer/argument_negative_cases.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/fixtures/canonical_scorer/format_negative_cases.json",
+      "classification": "TEST",
+      "recommended_path": "tests/fixtures/canonical_scorer/format_negative_cases.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/fixtures/canonical_scorer/identity_negative_cases.json",
+      "classification": "TEST",
+      "recommended_path": "tests/fixtures/canonical_scorer/identity_negative_cases.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/fixtures/canonical_scorer/summary_contamination_cases.json",
+      "classification": "TEST",
+      "recommended_path": "tests/fixtures/canonical_scorer/summary_contamination_cases.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/fixtures/canonical_scorer/tool_name_negative_cases.json",
+      "classification": "TEST",
+      "recommended_path": "tests/fixtures/canonical_scorer/tool_name_negative_cases.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/fixtures/canonical_scorer/type_validation_cases.json",
+      "classification": "TEST",
+      "recommended_path": "tests/fixtures/canonical_scorer/type_validation_cases.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/fixtures/canonical_scorer/valid_cases.json",
+      "classification": "TEST",
+      "recommended_path": "tests/fixtures/canonical_scorer/valid_cases.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/fixtures/model/config.json",
+      "classification": "TEST",
+      "recommended_path": "tests/fixtures/model/config.json",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/p0_5_audit_expectations.py",
+      "classification": "TEST",
+      "recommended_path": "tests/p0_5_audit_expectations.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/p0_5_audit_support.py",
+      "classification": "TEST",
+      "recommended_path": "tests/p0_5_audit_support.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/runtime_evidence_fixtures.py",
+      "classification": "TEST",
+      "recommended_path": "tests/runtime_evidence_fixtures.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_attestation_comparison_integration.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_attestation_comparison_integration.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_audit_llama31_8b_original_task.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_audit_llama31_8b_original_task.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_canonical_scorer.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_canonical_scorer.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_canonical_scorer_fixtures.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_canonical_scorer_fixtures.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_case_schema.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_case_schema.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_comparison_eligibility.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_comparison_eligibility.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_comparison_state_schema.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_comparison_state_schema.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_cpu_audit_paper_pack.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_cpu_audit_paper_pack.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_cross_model_summary_evidence.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_cross_model_summary_evidence.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_deterministic_executor.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_deterministic_executor.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_experiment_registry.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_experiment_registry.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_formal_attestation_requirements.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_formal_attestation_requirements.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_formal_batch_calibration_contract.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_formal_batch_calibration_contract.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_formal_matrix_assets.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_formal_matrix_assets.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_gemma3_4b_40g_queue.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_gemma3_4b_40g_queue.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_generate_interpolated_responses.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_generate_interpolated_responses.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_generation_termination.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_generation_termination.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_gguf_generation_evidence.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_gguf_generation_evidence.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_gguf_state_inspection.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_gguf_state_inspection.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_independent_gate_v8.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_independent_gate_v8.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_legacy_comparison_origin.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_legacy_comparison_origin.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_llama31_8b_32g_pilot.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_llama31_8b_32g_pilot.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_llama31_8b_paper_replication_audit.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_llama31_8b_paper_replication_audit.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_llama32_3b_strict_queue.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_llama32_3b_strict_queue.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_llama32_3b_strict_run_queue.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_llama32_3b_strict_run_queue.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_lock_llama31_8b_gpu_config.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_lock_llama31_8b_gpu_config.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_manifest_hardening.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_manifest_hardening.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_manifest_writer_registry.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_manifest_writer_registry.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_mechanism_analysis_pack.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_mechanism_analysis_pack.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_model_state_attestation.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_model_state_attestation.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_native_tool_end_to_end.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_native_tool_end_to_end.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_native_tool_protocol.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_native_tool_protocol.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p0_2_formal_metrics.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p0_2_formal_metrics.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p0_5_audit_execution.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p0_5_audit_execution.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p0_5_canonical_policy.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p0_5_canonical_policy.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p0_5_evidence_enforcement.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p0_5_evidence_enforcement.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p0_5_fifth_consistency.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p0_5_fifth_consistency.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p0_5_fourth_trust_boundary.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p0_5_fourth_trust_boundary.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p0_5_resume_cli.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p0_5_resume_cli.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p0_5_third_fix_attacks.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p0_5_third_fix_attacks.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_combined_validity.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_combined_validity.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_deterministic_executor.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_deterministic_executor.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_gate_reporting.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_gate_reporting.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_logical_case_rendering.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_logical_case_rendering.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_manifest_binding.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_manifest_binding.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_raw_generation_evidence.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_raw_generation_evidence.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_split_hygiene.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_split_hygiene.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_training_seed.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_training_seed.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_p1_v5_formal_runner.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_p1_v5_formal_runner.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_parser_metric_layers.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_parser_metric_layers.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_prepare_llama31_8b_paper_data.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_prepare_llama31_8b_paper_data.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_projection_enumeration.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_projection_enumeration.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_publication_evidence_artifacts.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_publication_evidence_artifacts.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_quantization_entrypoint_guards.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_quantization_entrypoint_guards.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_qwen25_7b_5090_pipeline.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_qwen25_7b_5090_pipeline.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_research_control_v3.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_research_control_v3.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_research_state.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_research_state.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_response_parsing.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_response_parsing.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_runtime_evidence_verification.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_runtime_evidence_verification.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_scaffold.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_scaffold.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_summary_contamination_matrix.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_summary_contamination_matrix.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_symbolic_defense_summary.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_symbolic_defense_summary.py",
+      "compatibility_shim": false
+    },
+    {
+      "current_path": "tests/test_terminology_policy.py",
+      "classification": "TEST",
+      "recommended_path": "tests/test_terminology_policy.py",
+      "compatibility_shim": false
+    }
+  ]
+}
